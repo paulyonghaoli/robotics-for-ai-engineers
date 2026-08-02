@@ -1,0 +1,91 @@
+id: eval-l2-discrimination
+title: "A benchmark everything passes has stopped measuring"
+lesson: modules/10-evaluation/02-scenario-suites
+description: >-
+  Three candidate suites and three stacks whose true ordering you know.
+  Work out which suite can actually tell them apart. Two of the three are
+  useless — one because it's too easy, one because it's too hard — and
+  neither reveals that from its aggregate score alone.
+setup_code: |
+  import numpy as np
+
+  # Ground truth: stack skill on a 0-1 scale. C is genuinely better than B,
+  # which is genuinely better than A. A good suite must recover this order.
+  TRUE_SKILL = {"A": 0.55, "B": 0.70, "C": 0.85}
+
+  def run_suite(stack, difficulty, n=120, seed=0):
+      """Episode outcomes (1 = success). Success probability is logistic in
+      (skill - difficulty), so it saturates at both extremes — which is why
+      a suite that is far too easy and one far too hard both lose their
+      ability to separate stacks."""
+      # Deterministic per-stack offset: Python's str hash is randomized
+      # per process, so hash() here would make results irreproducible.
+      rng = np.random.default_rng(seed + sum(ord(c) for c in stack))
+      skill = TRUE_SKILL[stack]
+      d = rng.normal(difficulty, 0.08, n)
+      p = 1.0 / (1.0 + np.exp(-8.0 * (skill - d)))
+      return (rng.random(n) < p).astype(int)
+
+  SUITES = {"trivial": 0.10, "balanced": 0.70, "brutal": 1.15}
+starter_code: |
+  import numpy as np
+  # Provided: run_suite(stack, difficulty, n, seed) -> array of 0/1 outcomes,
+  #           SUITES = {name: difficulty}, TRUE_SKILL (the answer key).
+
+  def suite_scores(difficulty, n=120, seed=0):
+      """Success rate per stack on a suite of this difficulty.
+      Return {'A': rate, 'B': rate, 'C': rate}."""
+      # TODO
+      return {}
+
+  def discriminates(difficulty, n=120, seed=0, margin=0.05):
+      """Does this suite recover the true ordering A < B < C, with each
+      gap at least `margin`? Return True/False."""
+      # TODO
+      return False
+
+  def spread(difficulty, n=120, seed=0):
+      """Best stack's rate minus worst stack's rate — the suite's dynamic range."""
+      # TODO
+      return 0.0
+
+  for name, d in SUITES.items():
+      s = suite_scores(d)
+      print("%-9s scores %s  spread %.2f  discriminates %s" % (
+          name, {k: round(v, 2) for k, v in s.items()}, spread(d), discriminates(d)))
+tests: |
+  import numpy as np
+  _t = suite_scores(SUITES["trivial"])
+  assert set(_t) == {"A", "B", "C"}, "return a rate for each stack"
+  assert min(_t.values()) > 0.9, "on the TRIVIAL suite everything should score >90%% - that's the problem"
+  assert spread(SUITES["trivial"]) < 0.08, "trivial suite has almost no dynamic range (got %.2f)" % spread(SUITES["trivial"])
+  assert not discriminates(SUITES["trivial"]), "a suite everything passes cannot discriminate - it has stopped measuring"
+  _b = suite_scores(SUITES["brutal"])
+  assert max(_b.values()) < 0.35, "on the BRUTAL suite everything should fail (got max %.2f)" % max(_b.values())
+  assert not discriminates(SUITES["brutal"]), "a suite everything fails cannot discriminate either - the opposite error, equally useless"
+  assert discriminates(SUITES["balanced"]), "the BALANCED suite should recover A < B < C with real gaps"
+  _bal = suite_scores(SUITES["balanced"])
+  assert _bal["A"] < _bal["B"] < _bal["C"], "balanced suite must order the stacks correctly"
+  assert spread(SUITES["balanced"]) > spread(SUITES["trivial"]), "the useful suite has the widest dynamic range"
+hints:
+  - "suite_scores: `{s: float(run_suite(s, difficulty, n, seed).mean()) for s in TRUE_SKILL}`."
+  - "discriminates: get the scores, then check `s['A'] + margin <= s['B'] and s['B'] + margin <= s['C']`."
+  - "The lesson: BOTH failure directions look like a clean number. A suite at 99% and a suite at 5% are equally uninformative, and neither announces itself — you have to check dynamic range deliberately."
+solution: |
+  import numpy as np
+
+  def suite_scores(difficulty, n=120, seed=0):
+      return {s: float(run_suite(s, difficulty, n, seed).mean()) for s in TRUE_SKILL}
+
+  def discriminates(difficulty, n=120, seed=0, margin=0.05):
+      s = suite_scores(difficulty, n, seed)
+      return bool(s["A"] + margin <= s["B"] and s["B"] + margin <= s["C"])
+
+  def spread(difficulty, n=120, seed=0):
+      s = suite_scores(difficulty, n, seed)
+      return float(max(s.values()) - min(s.values()))
+
+  for name, d in SUITES.items():
+      s = suite_scores(d)
+      print("%-9s scores %s  spread %.2f  discriminates %s" % (
+          name, {k: round(v, 2) for k, v in s.items()}, spread(d), discriminates(d)))

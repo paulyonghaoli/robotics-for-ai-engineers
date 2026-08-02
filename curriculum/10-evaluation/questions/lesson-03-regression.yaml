@@ -1,0 +1,76 @@
+id: eval-l3-regression-quiz
+title: "Quiz — regression testing a stochastic system"
+lesson: modules/10-evaluation/03-regression-from-logs
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Nightly paired test over 100 scenarios reports mean difference −0.03 with 95% CI [−0.08, +0.02]. Block the release?"
+    options:
+      - text: "No — the interval contains zero, so this is consistent with no change"
+        correct: true
+        explanation: "Same arithmetic as lesson 10.1's 18-of-25 problem, run nightly. Blocking here is how a team learns to ignore its own gate."
+      - text: "Yes — the mean is negative"
+        explanation: "The point estimate is negative about half the time by chance. Alerting on it guarantees false alarms."
+      - text: "Yes — any regression risk justifies blocking"
+        explanation: "A gate that fires constantly is functionally the same as no gate, because nobody reads it."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why does pairing baseline and candidate on identical seeds reduce the episodes needed to detect a regression?"
+    options:
+      - text: "Scenario difficulty is the dominant variance source and it cancels in the per-scenario difference, leaving only the code effect"
+        correct: true
+        explanation: "This is what makes nightly regression testing affordable — unpaired, you'd need many times the episodes for the same sensitivity."
+      - text: "Reusing seeds means fewer scenarios need generating"
+        explanation: "A compute saving, not a statistical one. The variance reduction is the real win."
+      - text: "It eliminates sensor noise"
+        explanation: "The noise is still there; what cancels is the difficulty variation *between* scenarios."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Bit-exact trajectory comparison as a whole-stack regression gate is a bad idea mainly because…"
+    options:
+      - text: "It fails on library upgrades, summation-order changes, and genuine improvements alike — so the team learns to ignore red"
+        correct: true
+        explanation: "It's the right tool for pure functions (transforms, planners on fixed grids) and the wrong one for a stochastic stack."
+      - text: "Bit-exact comparison is computationally expensive"
+        explanation: "It's the cheapest possible check — that's its appeal. The problem is what it flags."
+      - text: "Robots can't be made deterministic"
+        explanation: "They can, with enough seed pinning. The issue is that the gate then breaks for uninteresting reasons."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "With enough episodes, a 0.4-point drop becomes statistically significant. Your gate should…"
+    options:
+      - text: "Require both statistical significance AND an effect-size floor, so trivial-but-real changes warn rather than block"
+        correct: true
+        explanation: "Statistical significance is not operational significance. Without a floor, more episodes means more blocked releases over nothing."
+      - text: "Block it — significance is significance"
+        explanation: "Then increasing your sample size makes your process worse, which should be a clue something's off."
+      - text: "Reduce the episode count so it stops being detectable"
+        explanation: "Deliberately blinding the gate to avoid bad news is the worst option on the list."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Your gate fires most nights, the flagged scenarios differ each time, and the aggregate is flat. Diagnosis?"
+    options:
+      - text: "A handful of cliff-edge scenarios are flipping on noise alone — characterize their flip rates and quarantine them"
+        correct: true
+        explanation: "Those scenarios are measuring the sampler, not the software. Quarantine is a legitimate engineering response, not sweeping it under the rug."
+      - text: "A slow real regression"
+        explanation: "A real regression would show a consistent direction in the aggregate, not a flat mean with rotating culprits."
+      - text: "The bootstrap is misimplemented"
+        explanation: "Possible, but the rotating-scenario signature points squarely at genuine sensitivity to initial conditions."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "After each small regression your team re-baselines so the gate goes green. Over six months this produces…"
+    options:
+      - text: "Baseline drift — a large regression accumulated one individually-acceptable step at a time, with no single commit to blame"
+        correct: true
+        explanation: "Re-baseline deliberately and keep the history, so the long-run trend stays visible even when each step passes."
+      - text: "A well-maintained baseline"
+        explanation: "It's maintained in the sense that it always agrees with you, which is the problem."
+      - text: "No effect, since each change was insignificant"
+        explanation: "Individually insignificant changes in a consistent direction sum to a significant one."

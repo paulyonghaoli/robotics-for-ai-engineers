@@ -1,0 +1,71 @@
+id: eval-l2-suites
+title: "Quiz — scenario-suite design"
+lesson: modules/10-evaluation/02-scenario-suites
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "A suite is 90% easy scenarios (98% success) and 10% hard (40% success). What is the aggregate success rate, as a decimal?"
+    answer: 0.922
+    tolerance: 0.005
+    explanation: "0.9(0.98) + 0.1(0.40) = 0.922 — a healthy-looking 92% concealing a 60% failure rate on the hard band. If hard cases are 30% of real deliveries, the aggregate is the wrong estimator entirely."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why hold the robot's own parameters fixed while randomizing the world?"
+    options:
+      - text: "So a score change is attributable — otherwise you can't tell whether the planner regressed or the sampler drew harder robots"
+        correct: true
+        explanation: "Randomize what you're testing against; fix what you're testing. Mixing them makes every regression un-diagnosable."
+      - text: "Because robot parameters don't affect performance"
+        explanation: "They affect it enormously — which is exactly why varying them alongside the world destroys attribution."
+      - text: "To make episodes run faster"
+        explanation: "No runtime effect; this is about experimental design."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Every stack you test scores 97–99% on your suite. The correct interpretation is…"
+    options:
+      - text: "The suite has stopped measuring — it no longer has the dynamic range to separate stacks, and needs harder scenarios"
+        correct: true
+        explanation: "Saturation is how LIBERO stopped being informative. A benchmark everything passes carries no signal, and its high numbers are the most misleading part."
+      - text: "The stacks are all excellent — ship them"
+        explanation: "You've learned they clear a bar you set too low, and nothing about how they compare."
+      - text: "The metric is miscalculated"
+        explanation: "The arithmetic can be perfectly right; the *suite* is the problem."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A suite where every stack scores near 0% is…"
+    options:
+      - text: "Equally uninformative as one where everything passes — both ends of the difficulty range destroy discrimination"
+        correct: true
+        explanation: "The symmetric error people miss. Discrimination lives in the middle; check dynamic range deliberately, because neither failure announces itself."
+      - text: "Ideal — it leaves room to improve"
+        explanation: "Room to improve is only useful if the suite can *detect* improvement, and a floored one can't."
+      - text: "Evidence the robot is broken"
+        explanation: "Possibly — or evidence the suite is asking for something no stack was built to do."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Your suite's aggregate improved 4 points after a change, but field failures increased. Which suite-design explanation fits best?"
+    options:
+      - text: "The change helped the common cases the suite over-samples and hurt a rare case the suite under-samples — aggregate-only reporting hid the trade"
+        correct: true
+        explanation: "The classic stratification failure. Per-band reporting would have shown the easy band rising while the hard band fell."
+      - text: "The field is simply harder than simulation"
+        explanation: "True in general, but it doesn't explain a *divergence in direction* between the two."
+      - text: "Random noise"
+        explanation: "Possible — which is why you'd check the interval (lesson 10.1) — but a consistent field increase points at coverage."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "You've been tuning against your evaluation suite for three months. The risk is…"
+    options:
+      - text: "The suite has become a training set; you need held-out scenarios never used for tuning"
+        correct: true
+        explanation: "Test-set leakage, robot edition — slow, invisible, and it makes your numbers optimistic in exactly the way you'd never notice."
+      - text: "Nothing — that's what suites are for"
+        explanation: "Suites are for measuring. The moment they steer design decisions, they stop being an unbiased measurement of them."
+      - text: "The suite will get too easy over time"
+        explanation: "Relative saturation is real, but the sharper problem is that your score no longer generalizes off-suite."

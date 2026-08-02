@@ -124,3 +124,5 @@ nav:
   - "Module 10 · Evaluation & Data Systems":
       - Overview: modules/10-evaluation/index.md
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md
+      - "10.2 Scenario-suite design": modules/10-evaluation/02-scenario-suites.md
+      - "10.3 Regression testing": modules/10-evaluation/03-regression-from-logs.md

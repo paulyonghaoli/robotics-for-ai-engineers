@@ -1,0 +1,107 @@
+id: eval-l2-coverage
+title: "Measure what your suite actually covers"
+lesson: modules/10-evaluation/02-scenario-suites
+description: >-
+  A 300-scenario suite that looks thorough. Compute its coverage over the
+  parameter space, find the gap, then build a stratified generator that
+  fills it. The tests check that you found the hole AND that stratifying
+  didn't just shift it somewhere else.
+setup_code: |
+  import numpy as np
+
+  # Two parameters that matter: obstacle density and start-goal distance.
+  DENSITY_BINS = [(0, 4), (4, 8), (8, 12), (12, 16)]     # obstacle count
+  DISTANCE_BINS = [(0, 6), (6, 12), (12, 18), (18, 24)]  # metres
+
+  def naive_suite(n=300, seed=0):
+      """What you get from 'just randomize it' - normal-ish draws."""
+      rng = np.random.default_rng(seed)
+      density = np.clip(rng.normal(8, 2.2, n), 0, 15.99)
+      distance = np.clip(rng.normal(12, 3.0, n), 0, 23.99)
+      return np.column_stack([density, distance])
+
+  def bin_index(value, bins):
+      for i, (lo, hi) in enumerate(bins):
+          if lo <= value < hi:
+              return i
+      return len(bins) - 1
+starter_code: |
+  import numpy as np
+  # Provided: naive_suite(n, seed) -> (n, 2) array of [density, distance],
+  #           DENSITY_BINS, DISTANCE_BINS, bin_index(value, bins)
+
+  def coverage_grid(suite):
+      """Count scenarios per (density bin, distance bin) cell.
+
+      Return a 4x4 integer array: rows = density bins, cols = distance bins.
+      """
+      # TODO
+      return np.zeros((4, 4), dtype=int)
+
+  def coverage_fraction(suite, min_per_cell=5):
+      """Fraction of the 16 cells holding at least min_per_cell scenarios."""
+      # TODO
+      return 0.0
+
+  def stratified_suite(n=300, seed=0):
+      """Equal scenarios per cell: n // 16 per cell, sampled uniformly
+      WITHIN each cell's parameter ranges."""
+      # TODO
+      return np.zeros((n, 2))
+
+  naive = naive_suite()
+  strat = stratified_suite()
+  print("naive coverage:      %.2f" % coverage_fraction(naive))
+  print("stratified coverage: %.2f" % coverage_fraction(strat))
+  print("naive grid:\n", coverage_grid(naive))
+tests: |
+  import numpy as np
+  _n = naive_suite()
+  _g = coverage_grid(_n)
+  assert _g.shape == (4, 4), "grid must be 4x4"
+  assert _g.sum() == len(_n), "every scenario must land in exactly one cell"
+  _cov_naive = coverage_fraction(_n)
+  assert _cov_naive < 0.75, "the naive suite should have visible GAPS (got coverage %.2f) - normal draws starve the corners" % _cov_naive
+  assert _g[0, 0] < 5, "the low-density/short-distance corner should be nearly empty in the naive suite"
+  _s = stratified_suite()
+  assert len(_s) >= 288, "stratified suite should produce ~n scenarios (got %d)" % len(_s)
+  _gs = coverage_grid(_s)
+  assert coverage_fraction(_s) == 1.0, "stratified suite must cover ALL 16 cells (got %.2f)" % coverage_fraction(_s)
+  assert _gs.min() >= 5, "every cell needs at least 5 scenarios, weakest has %d" % _gs.min()
+  assert _gs.max() - _gs.min() <= 2, "stratification means EQUAL cells - spread is %d" % (_gs.max() - _gs.min())
+  _s2 = stratified_suite(seed=7)
+  assert not np.allclose(_s, _s2), "different seeds must give different scenarios (equal coverage, not identical worlds)"
+  assert coverage_fraction(_s2) == 1.0, "coverage must hold across seeds"
+hints:
+  - "coverage_grid: loop the suite, `g[bin_index(d, DENSITY_BINS), bin_index(x, DISTANCE_BINS)] += 1`."
+  - "coverage_fraction: `float((coverage_grid(suite) >= min_per_cell).sum()) / 16`."
+  - "stratified_suite: `per = n // 16`; for each (i, j) cell draw `per` samples with `rng.uniform(lo, hi)` from that cell's DENSITY_BINS[i] and DISTANCE_BINS[j] ranges; stack them all."
+solution: |
+  import numpy as np
+
+  def coverage_grid(suite):
+      g = np.zeros((4, 4), dtype=int)
+      for d, x in suite:
+          g[bin_index(d, DENSITY_BINS), bin_index(x, DISTANCE_BINS)] += 1
+      return g
+
+  def coverage_fraction(suite, min_per_cell=5):
+      return float((coverage_grid(suite) >= min_per_cell).sum()) / 16.0
+
+  def stratified_suite(n=300, seed=0):
+      rng = np.random.default_rng(seed)
+      per = n // 16
+      out = []
+      for i, (dlo, dhi) in enumerate(DENSITY_BINS):
+          for j, (xlo, xhi) in enumerate(DISTANCE_BINS):
+              out.append(np.column_stack([
+                  rng.uniform(dlo, dhi, per),
+                  rng.uniform(xlo, xhi, per),
+              ]))
+      return np.vstack(out)
+
+  naive = naive_suite()
+  strat = stratified_suite()
+  print("naive coverage:      %.2f" % coverage_fraction(naive))
+  print("stratified coverage: %.2f" % coverage_fraction(strat))
+  print("naive grid:\n", coverage_grid(naive))

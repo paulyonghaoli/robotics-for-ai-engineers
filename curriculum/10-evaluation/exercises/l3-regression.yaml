@@ -1,0 +1,115 @@
+id: eval-l3-regression
+title: "Build a nightly gate people will actually trust"
+lesson: modules/10-evaluation/03-regression-from-logs
+description: >-
+  Four nights of results against a baseline: one genuine regression, one
+  pure noise, one statistically real but operationally trivial, and one
+  where a single flaky scenario tries to hijack the verdict. Build a gate
+  that blocks exactly the first — and quarantines the flake.
+setup_code: |
+  import numpy as np
+
+  N_SCEN = 120
+  # Each scenario has a fixed difficulty. Whether a stack clears it is
+  # MOSTLY determined by that difficulty — only borderline scenarios flip
+  # run to run. This is why pairing on identical scenarios works: the
+  # dominant variance cancels.
+  _THRESHOLD = np.random.default_rng(11).uniform(0.10, 0.90, N_SCEN)
+
+  def _run(skill_delta, seed, flaky_scenarios=()):
+      rng = np.random.default_rng(seed)
+      noise = rng.normal(0.0, 0.02, N_SCEN)      # small run-to-run variation
+      out = ((0.75 + skill_delta + noise) > _THRESHOLD).astype(int)
+      for s in flaky_scenarios:                  # cliff-edge scenarios
+          out[s] = int(rng.random() < 0.5)
+      return out
+
+  BASELINE = _run(0.0, seed=100)
+  FLAKY = (7, 23, 41)
+
+  NIGHTS = {
+      "real_regression": _run(-0.18,  seed=201),
+      "just_noise":      _run(0.0,    seed=202),
+      "trivial_change":  _run(-0.022, seed=203),
+      "flaky_only":      _run(0.0,    seed=204, flaky_scenarios=FLAKY),
+  }
+starter_code: |
+  import numpy as np
+  # Provided: BASELINE (120 outcomes), NIGHTS (4 candidate runs), N_SCEN,
+  #           FLAKY = scenario indices known to coin-flip regardless of code.
+
+  MIN_EFFECT = 0.05     # operational floor: smaller drops aren't worth blocking
+
+  def paired_bootstrap(baseline, candidate, n_boot=3000, seed=0):
+      """95% CI on the mean paired difference (candidate - baseline).
+      Resample SCENARIO INDICES, keeping each pair together."""
+      rng = np.random.default_rng(seed)
+      # TODO
+      return (0.0, 0.0)
+
+  def verdict(baseline, candidate, quarantine=()):
+      """Return 'BLOCK', 'WARN', or 'PASS'.
+
+      Drop quarantined scenarios first. Then:
+        BLOCK - CI entirely below zero AND point estimate <= -MIN_EFFECT
+        WARN  - CI entirely below zero but the drop is smaller than MIN_EFFECT
+        PASS  - otherwise (CI contains zero: consistent with no change)
+      """
+      # TODO
+      return "PASS"
+
+  for name, cand in NIGHTS.items():
+      lo, hi = paired_bootstrap(BASELINE, cand)
+      d = float(np.mean(cand - BASELINE))
+      print("%-16s d=%+.3f CI[%+.3f,%+.3f] -> %s" % (name, d, lo, hi, verdict(BASELINE, cand)))
+tests: |
+  import numpy as np
+  _lo, _hi = paired_bootstrap(BASELINE, NIGHTS["just_noise"])
+  assert _lo <= 0 <= _hi, "a noise-only night's CI must contain zero"
+  _lo2, _hi2 = paired_bootstrap(BASELINE, NIGHTS["real_regression"])
+  assert _hi2 < 0, "a real regression's CI must lie entirely below zero (got [%.3f, %.3f])" % (_lo2, _hi2)
+  assert verdict(BASELINE, NIGHTS["real_regression"]) == "BLOCK", "the genuine regression must BLOCK"
+  assert verdict(BASELINE, NIGHTS["just_noise"]) == "PASS", "noise must PASS - blocking here is how teams learn to ignore the gate"
+  _tv = verdict(BASELINE, NIGHTS["trivial_change"])
+  assert _tv in ("PASS", "WARN"), "a tiny change must never BLOCK (got %s) - statistical significance is not operational significance" % _tv
+  # The flaky night: without quarantine the coin-flips add noise; with
+  # quarantine the verdict must be clean.
+  assert verdict(BASELINE, NIGHTS["flaky_only"], quarantine=FLAKY) == "PASS", "with the known flakes quarantined, this night is unchanged code and must PASS"
+  _b2, _c2 = BASELINE.copy(), NIGHTS["flaky_only"].copy()
+  assert len(_b2) == N_SCEN, "do not mutate the inputs"
+  _lo3, _hi3 = paired_bootstrap(BASELINE, BASELINE)
+  assert abs(_lo3) < 1e-9 and abs(_hi3) < 1e-9, "a run against itself has zero difference and a zero-width interval"
+hints:
+  - "paired_bootstrap: `idx = rng.integers(0, len(a), size=(n_boot, len(a)))`; `diffs = (c[idx] - b[idx]).mean(axis=1)`; return `np.percentile(diffs, [2.5, 97.5])`."
+  - "verdict: build `keep = [i for i in range(len(baseline)) if i not in set(quarantine)]`, index both arrays with it, then apply the three rules in the docstring."
+  - "Order matters: check `hi < 0` first (is it real?), then check the effect size (is it worth blocking?). Reversing them makes you block trivia."
+solution: |
+  import numpy as np
+
+  MIN_EFFECT = 0.05
+
+  def paired_bootstrap(baseline, candidate, n_boot=3000, seed=0):
+      rng = np.random.default_rng(seed)
+      b, c = np.asarray(baseline), np.asarray(candidate)
+      if len(b) == 0:
+          return (0.0, 0.0)
+      idx = rng.integers(0, len(b), size=(n_boot, len(b)))
+      diffs = (c[idx] - b[idx]).mean(axis=1)
+      lo, hi = np.percentile(diffs, [2.5, 97.5])
+      return (float(lo), float(hi))
+
+  def verdict(baseline, candidate, quarantine=()):
+      drop = set(quarantine)
+      keep = [i for i in range(len(baseline)) if i not in drop]
+      b = np.asarray(baseline)[keep]
+      c = np.asarray(candidate)[keep]
+      lo, hi = paired_bootstrap(b, c)
+      d = float(np.mean(c - b))
+      if hi < 0:
+          return "BLOCK" if d <= -MIN_EFFECT else "WARN"
+      return "PASS"
+
+  for name, cand in NIGHTS.items():
+      lo, hi = paired_bootstrap(BASELINE, cand)
+      d = float(np.mean(cand - BASELINE))
+      print("%-16s d=%+.3f CI[%+.3f,%+.3f] -> %s" % (name, d, lo, hi, verdict(BASELINE, cand)))

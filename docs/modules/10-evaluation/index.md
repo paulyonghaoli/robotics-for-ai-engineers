@@ -9,8 +9,8 @@ It's also the module whose lab you already have: the [capstone harness](../capst
 ## Lessons
 
 1. [Statistical rigor: how many episodes justify a claim?](01-statistical-rigor.md) — **available**
-2. Scenario-suite design: coverage, difficulty, and what to randomize *(planned)*
-3. Regression testing from logs and bags *(planned)*
+2. [Scenario-suite design: what to randomize, and what not to](02-scenario-suites.md) — **available**
+3. [Regression testing a stochastic system](03-regression-from-logs.md) — **available**
 4. Dataset lifecycle: curation, provenance, versioning *(planned)*
 5. Drift monitoring in deployment *(planned)*
 6. Neural real-to-sim evaluation *(planned)*

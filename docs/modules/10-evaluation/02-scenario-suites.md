@@ -1,0 +1,91 @@
+# 10.2 Scenario-suite design: what to randomize, and what not to
+
+**Status:** Code verified · **Prereqs:** lesson 10.1 · **Time:** ~2 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
+
+---
+
+## A. Why this matters
+
+Lesson 10.1 showed how many episodes a claim needs. This lesson is about *which* episodes. A suite of 500 randomized worlds that are all structurally similar tells you one thing very precisely — and tells you nothing about the case that will break the robot in production.
+
+Every autonomy team eventually builds a scenario suite, and the design decisions are always the same four: what varies, what stays fixed, how hard the cases are, and how you know the suite covers anything. Get them wrong and you get a number that improves while the robot gets worse.
+
+## B. Mental model
+
+**A scenario suite is a sampling design over the space of situations your robot can encounter.** Three failure shapes:
+
+- **Too narrow** — everything randomized within a tight band. Metrics are precise and meaningless; you've measured performance on one situation 500 times. Our capstone's first worlds had this problem: random boxes, but always the same density.
+- **Too wide** — randomize everything including things the robot was never designed for. Now every run fails somewhere and the metric is dominated by cases you don't care about. You cannot tell improvement from noise.
+- **Unstratified** — the hard cases exist but are rare, so a 5%-of-episodes failure mode is invisible until it's 5% of *deliveries*.
+
+The fix for the third is **stratification**: deliberately sample difficulty bands and report per-band, rather than hoping uniform sampling finds the tail. A suite that is 90% easy and 10% hard, reported as one aggregate, hides the number you actually need.
+
+**What to hold fixed** is the underrated half. Randomizing the robot's own parameters (sensor noise, actuator limits) alongside the world makes regressions un-attributable: when the score drops you cannot tell whether the planner got worse or the sampler drew harder robots. Randomize the *world*; fix the *robot*; seed everything.
+
+## C. Formulation
+
+For a scenario space with parameters \(\theta\) (obstacle density, corridor width, start–goal distance, mover count), a suite is a set \(\{\theta_i\}\) plus a seed per scenario. Three properties worth measuring:
+
+- **Coverage** — the fraction of the parameter space's cells that contain at least one scenario. Cheap to compute, and immediately exposes "we never test narrow corridors."
+- **Stratification** — episodes per difficulty band. Report per band; aggregate only after.
+- **Discrimination** — does the suite separate two stacks you *know* differ? A suite where every stack scores 100% has no discriminating power, and neither does one where everything scores 0%.
+
+Discrimination is the property people forget. A benchmark that everything passes has stopped being a measurement — which is exactly how LIBERO saturated (lesson 10.1).
+
+## D. From ML to robotics
+
+- **This is test-set design**, with the same pathologies: a test set drawn from one distribution, class imbalance hiding rare-case failure, and the slow leak of test information into design decisions as you iterate against it.
+- **Stratified reporting is per-slice evaluation.** You would not ship a classifier on aggregate accuracy while a critical class sat at 40%; a robot suite reported only in aggregate is the same mistake.
+- **Coverage metrics are the robotics analogue of feature-space coverage checks** in data validation — cheap, mechanical, and they catch the embarrassing gaps before a reviewer does.
+
+## E. Practice
+
+<code-exercise src="eval-l2-coverage"></code-exercise>
+
+<code-exercise src="eval-l2-discrimination"></code-exercise>
+
+## F. In production
+
+Waymo and Zoox both build scenario libraries mined from real driving plus procedurally generated variations, and report per-scenario-class rather than one number. Nav2's regression suites fix the robot and vary the world exactly as argued in section B. The 2026 benchmark [RoboDojo](https://arxiv.org/html/2607.04434v1) went further and standardized the *physical* protocol — lighting, workspace layout, reset procedure — after finding those unstated variables dominated cross-lab differences.
+
+Our own capstone harness is a small worked example: `make_world(seed)` varies obstacle count, size, and goal position; the robot's noise parameters are module constants and never randomized; every episode is reproducible from its seed.
+
+## G. Experiment
+
+Take the capstone's world generator and compute coverage over (obstacle count × start–goal distance). You'll find the corners are thin — very open worlds and very dense worlds are both rare under uniform sampling. Add a stratified generator that forces equal episodes per density band, re-run the v1 and v3 stacks, and compare per-band success. The aggregate barely moves; the hard band tells a different story.
+
+## H. Failure modes
+
+- **Randomizing the robot with the world** — regressions become unattributable.
+- **Unseeded scenarios** — a failure you cannot reproduce is a failure you cannot fix. Every scenario needs a seed, and the seed belongs in the failure report.
+- **Iterating against the suite** until it passes — the suite becomes a training set. Hold out scenarios you never tune against.
+- **Aggregate-only reporting** — hides exactly the tail you built the suite to find.
+- **Suites that no longer discriminate** — when everything passes, the suite is done measuring and needs harder cases, not celebration.
+
+## I. Questions
+
+1. *(Concept)* Why fix the robot's parameters while randomizing the world?
+2. *(Calculation)* A suite is 90% easy (98% success) and 10% hard (40% success). What's the aggregate, and what does it hide?
+3. *(Debugging)* Your suite's aggregate score improved 4 points after a change, but field failures went up. Give two suite-design explanations.
+4. *(System design)* Design a 200-episode nightly suite for the capstone: which parameters vary, which are held out, how you stratify, and what triggers a build failure.
+
+??? note "Answer sketch for Q2"
+    \(0.9(0.98) + 0.1(0.40) = 0.922\) — a healthy-looking 92%, concealing a hard-case failure rate of 60%. If hard cases are 10% of the suite but 30% of real deliveries, the aggregate is not just optimistic, it's the wrong estimator.
+
+### Interactive quiz
+
+<quiz-bank src="eval-l2-suites"></quiz-bank>
+
+## J. References
+
+| Reference | Type | Difficulty | Why read it |
+|---|---|---|---|
+| [RoboDojo (arXiv:2607.04434)](https://arxiv.org/html/2607.04434v1) | paper | intermediate | Standardizing the physical protocol, not just the tasks |
+| [Waymo safety methodology](https://waymo.com/safety/impact/) | docs | introductory | Scenario-based evaluation at real scale |
+| Koopman & Wagner, *"Challenges in Autonomous Vehicle Testing"* | paper | intermediate | Why mileage is not a safety argument |
+
+## K. Graded work & portfolio extension
+
+**Graded:** the capstone's evaluation harness is a scenario suite; adding stratified reporting to `python -m eval` is the natural contribution.
+
+**Portfolio:** the section G study — coverage heatmap plus per-band success for two stacks — demonstrates that you evaluate systems rather than run demos.
