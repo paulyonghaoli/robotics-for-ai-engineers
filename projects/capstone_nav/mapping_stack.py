@@ -38,6 +38,11 @@ OCC_THRESHOLD = 0.65
 
 
 class MappingStack:
+    # Stop this fraction of the goal tolerance from the believed goal. With a
+    # trusted pose you can park on the edge of the tolerance; with an estimated
+    # one your own uncertainty eats the margin, so v4 lowers it.
+    GOAL_STOP_FRACTION = 0.8
+
     def __init__(self, goal: np.ndarray) -> None:
         self.goal = np.asarray(goal, dtype=float)
         self.map = OccupancyGridMap((GRID_N, GRID_N), RESOLUTION)
@@ -134,6 +139,14 @@ class MappingStack:
         pose = obs["pose_meas"]
         self.last_estimate = pose
         self._integrate_scan(pose, obs["scan"])
+        return self._navigate(pose, obs)
+
+    def _navigate(self, pose: np.ndarray, obs: dict) -> tuple[float, float]:
+        """Plan and drive from a pose the caller supplies.
+
+        Split out from step() so v4 can reuse it verbatim: SLAM changes
+        where the pose comes from, not what you do with it.
+        """
         self.steps_since_plan += 1
 
         if obs["collided"]:
@@ -153,7 +166,7 @@ class MappingStack:
                 return (0.0, 1.2)
 
         dist_goal = float(np.hypot(*(pose[:2] - self.goal)))
-        if dist_goal < GOAL_TOLERANCE * 0.8:
+        if dist_goal < GOAL_TOLERANCE * self.GOAL_STOP_FRACTION:
             return (0.0, 0.0)
         w = pure_pursuit(pose, self.path, LOOKAHEAD, CRUISE_V)
         v = CRUISE_V / (1.0 + 0.8 * abs(w))

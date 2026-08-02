@@ -1,6 +1,6 @@
-# Capstone engineering log: eight bugs and how they were found
+# Capstone engineering log: thirteen bugs and how they were found
 
-Every algorithm in this curriculum was written to make the [capstone](modules/capstone/index.md) work. Along the way it broke — eight times, in ways worth studying. Each of these was found by **instrumentation, not guesswork**, and each turned out to be a textbook failure mode wearing a disguise.
+Every algorithm in this curriculum was written to make the [capstone](modules/capstone/index.md) work. Along the way it broke — thirteen times, in ways worth studying. Each of these was found by **instrumentation, not guesswork**, and each turned out to be a textbook failure mode wearing a disguise.
 
 This page exists because the debugging is the education. Anyone can follow a working derivation; the skill that gets you hired is recognizing a symptom and knowing which of five suspects to interrogate first.
 
@@ -123,10 +123,94 @@ Result: 18/18 episodes at six movers, 17/18 collision-free, localization RMSE ho
 
 ---
 
-## What the eight have in common
+## Capstone v4 — SLAM: no map *and* no pose
 
-Seven of the eight were **not** bugs in an algorithm. They were bugs in the *interface between* an algorithm and the world: what a sensor's non-detection means, what a clipped coordinate implies, what a blocked command did, how margins accumulate. The algorithms — particle filter, A*, pure pursuit, occupancy mapping, DWA — were textbook-correct throughout.
+v4 keeps v2's navigation verbatim and replaces exactly one thing: the pose sensor becomes an estimate the stack has to earn. It reads `pose_meas` once, to choose where the map's origin is, and never again.
 
-That ratio matches professional experience and it's why this curriculum weights conventions, failure modes, and diagnostic labs as heavily as derivations. It's also why the [frontier research](frontier.md) finds the field's bottleneck in data and evaluation rather than architecture: at every scale, the hard part is the seam between a correct component and a world that doesn't match its assumptions.
+The first end-to-end run scored **0/4 with 3–13 m of error**. Per the method above, the first move was not to tune anything — it was to cut the feedback loop: let the reference controller drive on the true pose, and run the localizer alongside as a pure observer. That harness is `projects/capstone_nav/slam_ablation.py`, and every number below is reproducible from it.
+
+The first thing it printed was humbling:
+
+| localizer | RMSE | worst seed |
+|---|---:|---:|
+| dead reckoning, no map lookups at all | **0.52 m** | 0.91 |
+| scan matching every step | 6.11 m | 9.98 |
+| ...scoring occupied evidence only | 29.09 m | 46.76 |
+
+### Bug 9: matching too often is worse than not matching
+
+**Symptom:** every scan-matching variant was 10–50× worse than using no map at all.
+
+**Cause:** 36 beams on a 0.2 m grid is not enough evidence to correct a pose at 10 Hz. Each match injects its own noise into the pose, the scan is then integrated into the map *at that noisy pose*, and the next match scores against the corrupted map. The error has a path back to its own cause.
+
+**Fix:** match at keyframes — every 0.20 m or 0.12 rad — so each correction has enough baseline to be well-posed. And give map updates a *separate*, slower threshold (0.35 m / 0.25 rad): correcting the pose and rewriting the map are different decisions, and mapping on every correction blurs the geometry the matcher depends on. Splitting the two thresholds alone moved success 0.50 → 0.75.
+
+**The lesson:** sensor fusion has a rate at which it stops helping. "Use every measurement" is not free when the measurement's information is smaller than the noise of using it.
+
+### Bug 10: occupied-only scoring, or how I deleted the restoring force
+
+**Symptom:** scoring only occupied cells — which I was confident was the fix — was the *worst* configuration measured, at 29 m.
+
+**Cause:** with free space penalized, a pose that slides its endpoints into known-empty space pays for it. Score only occupancy and free and unknown are both exactly zero: a flat plateau with nothing pushing back, so the pose slides until endpoints happen to pile onto a wall.
+
+**Fix:** score against a **likelihood field** (the distance transform v1 used, now built from the map so far). Unexplored space is *far* from every mapped surface, so it scores badly rather than scoring zero. There is no plateau to slide along.
+
+**The lesson:** when you remove a term because it seems unprincipled, check what it was holding up. The free-space penalty looked like an implementation detail and was the only thing making the objective well-posed.
+
+### Bug 11: boundary-clip reward — the *same* bug as v1's bug 3
+
+**Symptom:** match confidence held at **0.87–0.99 while true error grew monotonically to 14 m**. The matcher was not lost. It was certain, and wrong.
+
+**Cause:** `np.clip` on the endpoint cell indices. The world's boundary ring is solid wall, so every endpoint projected outside the grid was clamped onto a wall surface at distance 0 — maximum likelihood. Drifting out of the world was being paid for.
+
+**Fix:** carry an `inside` mask and score out-of-bounds endpoints as zero evidence. Never clamp.
+
+**The lesson:** I wrote bug 3's lesson — *any `clip`, `clamp`, or `min/max` on the boundary of a scoring function deserves the question "what does this now make free?"* — and then committed the same bug again, in a different file, three stacks later. Knowing a failure mode is not the same as having a habit that catches it. It is also why the confidence trace was the decisive measurement: **high confidence alongside growing error is a signature, and it always means the model is being scored on something it shouldn't be.**
+
+### Bug 12: the argmax of a flat score is not "stay put"
+
+**Symptom:** an uninformative match displaced the pose diagonally instead of leaving it alone.
+
+**Cause:** when every beam gates out, the score array is all zeros and `np.argmax` returns index 0 — the most-negative corner of the search window. Ties do not resolve to the identity; they resolve to whatever the loop built first.
+
+**Fix:** maximize a **posterior**, not the scan likelihood: add an odometry prior penalizing displacement from the incoming guess. Now a scan with nothing to say leaves the pose where odometry put it, which is the correct answer.
+
+**The lesson:** the same lesson as the Kalman filter, arrived at by stepping on it. An estimator with no prior has no defined behaviour when the measurement is uninformative — and "uninformative" is a case that *will* occur.
+
+### Bug 13: the robot that froze because it had stopped
+
+**Symptom:** two seeds parked and sat motionless for 300 steps, believing they had arrived, ~0.7 m from the true goal.
+
+**Cause:** keyframes triggered on *predicted* motion. On arrival the stack commands zero, so dead reckoning predicts no motion, so no keyframe ever fires, so the pose is never corrected again. The robot could not discover it had stopped in the wrong place, because stopping is what disabled the discovery.
+
+**Fix:** trigger keyframes on elapsed time as well as motion.
+
+**The lesson:** any trigger conditioned on the system's own activity has a fixed point at "inactive." Watchdogs, health checks and drift monitors all share this shape — the state you most need to detect is often the one that stops the detector.
+
+### Where v4 lands, and why it stops there
+
+| | success | collision-free | path ratio | loc RMSE |
+|---|---:|---:|---:|---:|
+| v2 — given a pose sensor | 1.000 | 1.000 | 0.94 | 0.14 m |
+| **v4 — SLAM, 24 episodes** | **0.750** | **0.792** | **0.982** | **0.387 m** |
+
+Giving up the pose sensor costs a quarter of the episodes, and the arithmetic is not subtle: drift is 0.39 m against a **0.5 m goal tolerance**, so a quarter of runs park just outside it believing they arrived. v4 is therefore scored against its own published envelope (`--rubric slam`) rather than the bar written for stacks that were handed a map or a pose. Judging it by that bar is a category error; quietly relaxing the bar for everyone would have been worse.
+
+The remaining gap does **not** close by tuning, and the ablation says so directly. Give the odometry a realistic *systematic* error — a wheel-scale factor and a gyro drift, constant per episode, instead of pure white noise:
+
+| | RMSE | spread across seeds |
+|---|---:|---|
+| dead reckoning | 3.26 m | 0.37 – **8.56** |
+| v4's scan matching | 2.31 m | 0.47 – 6.30 |
+
+Scan matching **bounds** drift; it does not remove it. A constant bias is invisible to incremental matching, because detecting it means recognising a place you mapped *before* you drifted — the map and the pose are wrong together and perfectly self-consistent, which is precisely what bug 11's confidence trace was showing. Removing it needs loop closure and a pose graph ([lesson 4.4](modules/04-mapping/04-pose-graphs.md)). That is what v5 would be.
+
+---
+
+## What the thirteen have in common
+
+Eleven of the thirteen were **not** bugs in an algorithm. They were bugs in the *interface between* an algorithm and the world: what a sensor's non-detection means, what a clipped coordinate implies, what a blocked command did, how margins accumulate. The algorithms — particle filter, A*, pure pursuit, occupancy mapping, DWA — were textbook-correct throughout.
+
+One of them I had already found, documented, and written a lesson about — then committed again three stacks later. That ratio matches professional experience and it's why this curriculum weights conventions, failure modes, and diagnostic labs as heavily as derivations. It's also why the [frontier research](frontier.md) finds the field's bottleneck in data and evaluation rather than architecture: at every scale, the hard part is the seam between a correct component and a world that doesn't match its assumptions.
 
 **Practice this:** the [frame-debugging gauntlet](modules/01-geometry/06-lab-frame-debugging.md) and [catching a lying filter](modules/03-estimation/06-consistency-lab.md) hand you working-looking code with these same classes of bug inside, and grade you on finding them.

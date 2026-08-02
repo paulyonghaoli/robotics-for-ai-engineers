@@ -1,6 +1,6 @@
 # Capstone · Autonomous 2D Mobile Robot
 
-**Status:** v0–v3 live and passing the rubric — at `projects/capstone_nav/` (`python -m eval run --stack ...`). v4 (simultaneous SLAM, ROS 2 packaging) is planned.
+**Status:** v0–v4 live — at `projects/capstone_nav/` (`python -m eval run --stack ...`). ROS 2 packaging is planned.
 
 <div markdown class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0.8rem;margin:1.2rem 0;">
 <figure markdown style="margin:0">
@@ -25,6 +25,7 @@ These are rendered from **real evaluation episodes** (`python render.py all`) �
 | **v1** `pf_stack` | Known map; **localizes from lidar** (pose sensor only seeds the belief) | 20/20, 6–11 cm RMSE |
 | **v2** `mapping_stack` | **Nothing but the goal** — builds the map online from scans | 20/20 |
 | **v3** `dynamic_stack` | Six **moving obstacles that are not in the map** — DWA local planning + dynamic-beam rejection | 18/18, 17/18 collision-free |
+| **v4** `slam_stack` | **SLAM** — no map *and* no pose sensor after step 0; keyframe scan matching | 18/24, 0.39 m RMSE ([own envelope](#v4)) |
 
 Each stage keeps the same evaluation contract, so the metrics are comparable across the whole climb:
 
@@ -34,7 +35,24 @@ python -m eval run --episodes 8 --stack dynamic_stack --dynamic 6
 
 **v3's envelope, measured:** at 6 movers it is 18/18; at **10 movers it still reaches every goal but is collision-free only half the time.** That boundary is published rather than tuned away — and it's partly an artifact worth naming: these obstacles are non-cooperative, walking straight through the robot in a way real people don't.
 
-Read the [engineering log](../../capstone-log.md) for the eight debugging campaigns behind those numbers, and [lesson 10.1](../10-evaluation/01-statistical-rigor.md) for what "18/18" does and does not entitle you to claim.
+<h3 id="v4">v4's envelope, measured</h3>
+
+v4 gives up the pose sensor entirely and localizes by matching each scan against the map it is simultaneously building. It keeps v2's navigation **verbatim** — the only thing that changes is where the pose comes from — which makes the comparison clean: the same robot, given a pose sensor, scores 24/24.
+
+| | success | collision-free | path ratio | loc RMSE |
+|---|---:|---:|---:|---:|
+| v2, handed a pose sensor | 1.000 | 1.000 | 0.94 | 0.14 m |
+| **v4, SLAM** | **0.750** | **0.792** | **0.982** | **0.387 m** |
+
+Doing it yourself costs a quarter of the episodes, and the arithmetic is not subtle: 0.39 m of drift against a **0.5 m goal tolerance** means a quarter of runs park just outside it *believing they arrived*. So v4 is scored against its own envelope rather than the bar written for stacks that were handed a map or a pose:
+
+```bash
+python -m eval run --episodes 24 --stack slam_stack --rubric slam
+```
+
+That gap does not close by tuning — it closes with **loop closure** ([lesson 4.4](../04-mapping/04-pose-graphs.md)), which v4 does not have. The [ablation harness](../../capstone-log.md#capstone-v4-slam-no-map-and-no-pose) shows why: under a systematic odometry bias, scan matching bounds the drift (2.31 m) but cannot remove it, because the map and the pose drift *together* and stay perfectly self-consistent.
+
+Read the [engineering log](../../capstone-log.md) for the thirteen debugging campaigns behind those numbers, and [lesson 10.1](../10-evaluation/01-statistical-rigor.md) for what "18/18" does and does not entitle you to claim.
 
 Everything in v0.1 integrates here: a simulated differential-drive robot with noisy wheel odometry and a range sensor, running
 

@@ -34,5 +34,8 @@ jobs:
       - name: Capstone v3 self-check (dynamic obstacles)
         run: python -m eval run --episodes 3 --seed 1000 --stack dynamic_stack --dynamic 6
         working-directory: projects/capstone_nav
+      - name: Capstone v4 self-check (SLAM, scored on its own envelope)
+        run: python -m eval run --episodes 24 --seed 0 --stack slam_stack --rubric slam
+        working-directory: projects/capstone_nav
       - name: Site build
         run: mkdocs build --strict
