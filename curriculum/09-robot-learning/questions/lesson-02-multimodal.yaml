@@ -1,0 +1,71 @@
+id: rl-l2-multimodal
+title: "Quiz — multimodality and action distributions"
+lesson: modules/09-robot-learning/02-multimodality
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Demonstrators go left or right around an obstacle. An MSE-trained policy drives into it. What went wrong?"
+    options:
+      - text: "Nothing, mechanically — MSE's minimizer is the conditional mean, and the mean of 'left or right' is 'straight ahead'. The objective was the bug"
+        correct: true
+        explanation: "The model found the exact optimum of the loss it was given. More data, more parameters, and longer training all leave this failure untouched."
+      - text: "The model was undertrained"
+        explanation: "Training longer converges harder onto the mean — it makes the collision more reliable, not less."
+      - text: "The demonstrations were inconsistent and should be cleaned"
+        explanation: "Both sides are correct. 'Cleaning' to one side throws away valid behaviour to accommodate a bad loss."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Demonstrations swerve +0.8 (left) 60% of the time and −0.8 (right) 40%, relative to the obstacle. What action does an MSE policy predict?"
+    answer: 0.16
+    tolerance: 0.01
+    explanation: "0.6(0.8) + 0.4(−0.8) = +0.16. Against a half-width of 0.5 that's a collision — the asymmetry shifts the average without rescuing it."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Discretizing the action space and classifying fixes the averaging problem because…"
+    options:
+      - text: "A categorical distribution can represent several modes, and you sample or take the argmax — you never average two valid actions together"
+        correct: true
+        explanation: "Crude but effective, and exactly what the RT-family VLAs do with action tokens. The cost is resolution and loss of ordering between adjacent bins."
+      - text: "Classification losses are easier to optimize"
+        explanation: "Optimization difficulty isn't the issue; representational capacity for multiple modes is."
+      - text: "It reduces the number of parameters"
+        explanation: "It typically increases output dimensionality."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Which of these tasks is NOT inherently multimodal?"
+    options:
+      - text: "Tracking a reference trajectory with a well-tuned controller"
+        correct: true
+        explanation: "One reference, one correct correction — the action distribution is unimodal, and MSE is fine. Multimodality comes from genuine choice: which side, which grasp, which IK branch."
+      - text: "Reaching a target with a redundant arm"
+        explanation: "Elbow-up and elbow-down are both valid — lesson 2.1's branches, now a data problem."
+      - text: "Passing a person in a corridor"
+        explanation: "Left, right, or wait are all reasonable, which is exactly the trap."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Mode averaging and mode collapse both hurt. How do they differ?"
+    options:
+      - text: "Averaging invents an action no demonstrator took (dangerous); collapse always picks the same valid mode (inflexible) — and only the distribution of rollouts distinguishes them"
+        correct: true
+        explanation: "A single successful trajectory looks identical under a healthy policy and a collapsed one. You have to look at variability across rollouts."
+      - text: "They're two names for the same failure"
+        explanation: "Opposite failures: one produces an invalid action, the other produces a valid one too consistently."
+      - text: "Collapse only affects reinforcement learning"
+        explanation: "Any generative policy can ignore its conditioning."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "At 30 Hz on a 7-DoF arm, why might you choose 256-bin action tokens over a diffusion policy?"
+    options:
+      - text: "Latency — diffusion needs several denoising passes per action, and a 33 ms budget makes that the binding constraint"
+        correct: true
+        explanation: "The same trade the 2026 world-action models pay: 590–800 ms per action chunk versus ~190 ms for the lighter architectures. Discretization gets you multimodality at one forward pass."
+      - text: "Diffusion cannot represent multiple modes"
+        explanation: "Representing them is precisely what it's good at — the cost is inference time."
+      - text: "Discretization is more accurate"
+        explanation: "It's less precise by construction, capped at the bin width. You accept that to buy latency."

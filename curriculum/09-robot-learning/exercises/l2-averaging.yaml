@@ -1,0 +1,129 @@
+id: rl-l2-averaging
+title: "The policy that drove into the obstacle"
+lesson: modules/09-robot-learning/02-multimodality
+description: >-
+  Demonstrators go left or right around an obstacle, and every one of them
+  succeeds. Fit their actions with mean-squared error and the policy drives
+  straight into it — not because training failed, but because it succeeded.
+  Then fix it by classifying over discretized actions instead of regressing.
+setup_code: |
+  import numpy as np
+
+  HALF_WIDTH = 0.5      # you must pass at least this far from the centre
+  OFFSET = 0.8          # how far demonstrators actually swerve
+
+  _rng = np.random.default_rng(0)
+  # Each demo: the obstacle sits at lateral position c; the demonstrator
+  # commits to one side. BOTH choices are correct.
+  OBSTACLE_C = _rng.uniform(-0.3, 0.3, 4000)
+  _side = _rng.choice([-1.0, 1.0], size=4000)
+  DEMO_ACTION = OBSTACLE_C + _side * OFFSET
+
+  # Discretized action grid for the classification policy.
+  ACTION_BINS = np.linspace(-1.5, 1.5, 31)
+
+  def clears(action, c):
+      """Did this action pass far enough from the obstacle?"""
+      return abs(action - c) >= HALF_WIDTH
+starter_code: |
+  import numpy as np
+  # Provided: OBSTACLE_C (4000 obstacle positions), DEMO_ACTION (what the
+  # demonstrator did), ACTION_BINS (31 bins), clears(action, c), HALF_WIDTH.
+
+  def fit_mse_policy(C, A):
+      """Least-squares fit a = w*c + b — the conditional MEAN."""
+      # TODO: np.polyfit(C, A, 1)
+      return 0.0, 0.0
+
+  def mse_action(params, c):
+      w, b = params
+      return w * c + b
+
+  def fit_binned_classifier(C, A, n_ctx=9):
+      """A classification policy. Split obstacle positions into n_ctx
+      context bins; within each, build a HISTOGRAM over ACTION_BINS of the
+      demonstrated actions.
+
+      Return an (n_ctx, len(ACTION_BINS)-1) count array.
+      """
+      # TODO
+      return np.zeros((n_ctx, len(ACTION_BINS) - 1))
+
+  def classify_action(counts, c, n_ctx=9):
+      """Pick the MOST LIKELY action bin for this context and return its
+      centre — never an average."""
+      # TODO: find the context bin for c, argmax over its histogram,
+      #       return the midpoint of that ACTION_BINS interval
+      return 0.0
+
+  def success_rate(action_fn):
+      return float(np.mean([clears(action_fn(c), c) for c in OBSTACLE_C]))
+
+  params = fit_mse_policy(OBSTACLE_C, DEMO_ACTION)
+  counts = fit_binned_classifier(OBSTACLE_C, DEMO_ACTION)
+  print("demonstrators   : %.2f" % np.mean([clears(a, c) for a, c in zip(DEMO_ACTION, OBSTACLE_C)]))
+  print("MSE regression  : %.2f" % success_rate(lambda c: mse_action(params, c)))
+  print("classification  : %.2f" % success_rate(lambda c: classify_action(counts, c)))
+tests: |
+  import numpy as np
+  # The demonstrations themselves are flawless.
+  _demo = np.mean([clears(a, c) for a, c in zip(DEMO_ACTION, OBSTACLE_C)])
+  assert _demo > 0.99, "every demonstration should clear the obstacle (got %.2f)" % _demo
+  _p = fit_mse_policy(OBSTACLE_C, DEMO_ACTION)
+  # The fit tracks the obstacle, which is exactly the problem: it predicts
+  # the midpoint between the two valid swerves.
+  assert abs(_p[0] - 1.0) < 0.15, "the MSE fit should track the obstacle position (slope ~1, got %.2f)" % _p[0]
+  assert abs(_p[1]) < 0.15, "...with near-zero offset - i.e. it aims AT the obstacle (got %.2f)" % _p[1]
+  _mse_rate = success_rate(lambda c: mse_action(_p, c))
+  assert _mse_rate < 0.05, "the MSE policy must fail almost every time (got %.2f) - averaging two valid swerves lands on the obstacle" % _mse_rate
+  _cnt = fit_binned_classifier(OBSTACLE_C, DEMO_ACTION)
+  assert _cnt.shape[1] == len(ACTION_BINS) - 1, "histogram must span the action bins"
+  assert _cnt.sum() == len(DEMO_ACTION), "every demonstration must be counted exactly once"
+  # Each context should show TWO peaks, not one.
+  _row = _cnt[4]
+  _peaks = int(np.sum(_row > 0.15 * _row.max()))
+  assert _peaks >= 2, "a context's action histogram should be bimodal (got %d significant bins) - that is what MSE destroys" % _peaks
+  _cls_rate = success_rate(lambda c: classify_action(_cnt, c))
+  assert _cls_rate > 0.9, "the classification policy must succeed (got %.2f) - it commits to a mode instead of averaging" % _cls_rate
+  assert _cls_rate > _mse_rate + 0.8, "same data, same information, different loss: %.2f vs %.2f" % (_cls_rate, _mse_rate)
+hints:
+  - "fit_mse_policy: `w, b = np.polyfit(C, A, 1)`. You should find w ~ 1.0, b ~ 0 — the policy faithfully aims at the obstacle."
+  - "fit_binned_classifier: make context edges with `np.linspace(C.min(), C.max(), n_ctx+1)`; for each demo find its context index (`np.digitize` minus 1, clipped) and its action bin index, then increment counts[ctx, act]."
+  - "classify_action: get the context index the same way, `j = int(np.argmax(counts[ctx]))`, and return `(ACTION_BINS[j] + ACTION_BINS[j+1]) / 2`."
+  - "The whole lesson: the MSE model is not undertrained or underparameterized. It found the exact minimizer of the loss you gave it. The loss was the bug."
+solution: |
+  import numpy as np
+
+  def fit_mse_policy(C, A):
+      w, b = np.polyfit(C, A, 1)
+      return float(w), float(b)
+
+  def mse_action(params, c):
+      w, b = params
+      return w * c + b
+
+  def _ctx_index(c, C, n_ctx):
+      edges = np.linspace(C.min(), C.max(), n_ctx + 1)
+      return int(np.clip(np.digitize(c, edges) - 1, 0, n_ctx - 1))
+
+  def fit_binned_classifier(C, A, n_ctx=9):
+      counts = np.zeros((n_ctx, len(ACTION_BINS) - 1))
+      for c, a in zip(C, A):
+          i = _ctx_index(c, C, n_ctx)
+          j = int(np.clip(np.digitize(a, ACTION_BINS) - 1, 0, len(ACTION_BINS) - 2))
+          counts[i, j] += 1
+      return counts
+
+  def classify_action(counts, c, n_ctx=9):
+      i = _ctx_index(c, OBSTACLE_C, n_ctx)
+      j = int(np.argmax(counts[i]))
+      return float((ACTION_BINS[j] + ACTION_BINS[j + 1]) / 2.0)
+
+  def success_rate(action_fn):
+      return float(np.mean([clears(action_fn(c), c) for c in OBSTACLE_C]))
+
+  params = fit_mse_policy(OBSTACLE_C, DEMO_ACTION)
+  counts = fit_binned_classifier(OBSTACLE_C, DEMO_ACTION)
+  print("demonstrators   : %.2f" % np.mean([clears(a, c) for a, c in zip(DEMO_ACTION, OBSTACLE_C)]))
+  print("MSE regression  : %.2f" % success_rate(lambda c: mse_action(params, c)))
+  print("classification  : %.2f" % success_rate(lambda c: classify_action(counts, c)))

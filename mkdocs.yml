@@ -124,6 +124,7 @@ nav:
   - "Module 9 · Robot Learning":
       - Overview: modules/09-robot-learning/index.md
       - "9.1 Behavior cloning": modules/09-robot-learning/01-behavior-cloning.md
+      - "9.2 Multimodality": modules/09-robot-learning/02-multimodality.md
   - "Module 10 · Evaluation & Data Systems":
       - Overview: modules/10-evaluation/index.md
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md
