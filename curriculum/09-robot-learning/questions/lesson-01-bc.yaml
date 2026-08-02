@@ -1,0 +1,71 @@
+id: rl-l1-bc
+title: "Quiz — behavior cloning and compounding error"
+lesson: modules/09-robot-learning/01-behavior-cloning
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Behavior-cloning error grows as O(εT²) while supervised error grows as O(εT). The extra factor of T comes from…"
+    options:
+      - text: "The policy's own mistakes changing the states it sees next, so the per-step error rate itself grows as the robot drifts off-distribution"
+        correct: true
+        explanation: "One T counts the steps; the second counts the rising per-step error as the state leaves the expert's distribution. Closed loop, from lesson 0.1, biting the learner."
+      - text: "Robot sensors being noisier than typical ML data"
+        explanation: "Noise would give a constant factor, not an extra power of T."
+      - text: "Longer episodes containing more training examples"
+        explanation: "That would help, not hurt — and it's about deployment, not training."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Per-step error probability 1%, horizon 200 steps, treating steps as independent. What fraction of episodes complete without a failure? (decimal)"
+    answer: 0.134
+    tolerance: 0.01
+    explanation: "0.99²⁰⁰ ≈ 0.134 — about 13%. And that's the optimistic bound, since it assumes the error rate stays at 1% even off-distribution, which is precisely what compounding violates."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your policy has 1.5% validation error and fails 80% of episodes. These facts are…"
+    options:
+      - text: "Entirely compatible — validation error is measured on the expert's state distribution, which is not the distribution the policy encounters"
+        correct: true
+        explanation: "The single most important consequence of the distribution mismatch, and the reason closed-loop rollouts are the only honest evaluation."
+      - text: "Contradictory — one of the two numbers must be wrong"
+        explanation: "They measure different distributions. Both can be exactly right."
+      - text: "A sign of a bug in the data loader"
+        explanation: "It's the expected behaviour of behavior cloning, not a defect."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why does DAgger work when simply collecting more expert demonstrations often doesn't?"
+    options:
+      - text: "It labels the states the *policy* visits, so training data comes from the distribution that actually matters at deployment"
+        correct: true
+        explanation: "More expert demos give you more of a distribution you already cover well. DAgger targets the gap directly — which is why the exercise goes 0% → 100% in one round."
+      - text: "It uses a larger model"
+        explanation: "Architecture is unchanged; only the data distribution differs."
+      - text: "It trains for more epochs"
+        explanation: "Optimization isn't the bottleneck — coverage is."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "A flawless expert that never makes a mistake produces demonstrations that are…"
+    options:
+      - text: "Missing all recovery behaviour — the data contains no examples of the error states an imperfect policy will actually reach"
+        correct: true
+        explanation: "Your expert never showed you how to recover because your expert never got into trouble. Deliberately imperfect demos, or explicit recovery data, often beat pristine ones."
+      - text: "Ideal training data"
+        explanation: "Ideal for imitating success, useless for handling failure — and failure is what the policy will encounter."
+      - text: "Too small to train on"
+        explanation: "Quantity isn't the issue; coverage of error states is."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "ACT and diffusion policies both predict action *chunks* rather than single actions. What does chunking do for compounding error?"
+    options:
+      - text: "It shortens the effective decision horizon — fewer closed-loop decisions means fewer opportunities for error to feed back"
+        correct: true
+        explanation: "A practical mitigation, not a cure: the T in O(εT²) becomes the number of chunks rather than the number of steps."
+      - text: "It eliminates distribution shift entirely"
+        explanation: "It reduces the exponent's bite; the mismatch is still there within and across chunks."
+      - text: "It makes the model smaller"
+        explanation: "Chunked outputs are larger, not smaller."

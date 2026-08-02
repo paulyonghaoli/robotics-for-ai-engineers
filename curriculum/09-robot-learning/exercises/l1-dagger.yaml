@@ -1,0 +1,187 @@
+id: rl-l1-dagger
+title: "DAgger: label the states you actually visit"
+lesson: modules/09-robot-learning/01-behavior-cloning
+description: >-
+  The expert corrects harder when it is far from centre — but it is never
+  far from centre, so its demonstrations never show that. A cloned policy
+  drifts out, under-corrects, and diverges. Implement DAgger: roll out,
+  ask the expert what it would have done *there*, retrain. Watch coverage
+  and success climb together.
+setup_code: |
+  import numpy as np
+
+  LANE_LIMIT, NOISE = 1.0, 0.02
+  BINS = np.linspace(-1.0, 1.0, 21)          # 20 bins over the lane
+
+  def _push(x):
+      """The plant shoves you further out once you are genuinely off track."""
+      return 0.9 * np.sign(x) * max(0.0, abs(x) - 0.35)
+
+  def expert_action(x):
+      """Stabilizes near centre AND cancels the outward push far out.
+      The second half is the recovery skill the demos will never show."""
+      return -0.45 * x - _push(x)
+
+  def step(x, a, rng):
+      return 1.30 * x + _push(x) + a + rng.normal(0, NOISE)
+
+  def bin_of(x):
+      return int(np.clip(np.digitize(x, BINS) - 1, 0, len(BINS) - 2))
+
+  def collect_expert_demos(n_episodes=40, horizon=30, seed=0):
+      """The expert starts near centre and contracts toward it, so these
+      states only ever populate the middle bins."""
+      rng = np.random.default_rng(seed)
+      X = []
+      for _ in range(n_episodes):
+          x = rng.uniform(-0.25, 0.25)
+          for _ in range(horizon):
+              X.append(x)
+              x = step(x, expert_action(x), rng)
+      return np.array(X)
+
+  DEMO_X = collect_expert_demos()
+
+  # Deployment does not start where the demonstrations did. This is the
+  # ordinary case, not an adversarial one.
+  DEPLOY_X0 = 0.55
+starter_code: |
+  import numpy as np
+  # Provided: expert_action(x), step(x, a, rng), bin_of(x), BINS (20 bins),
+  #           DEMO_X (states the expert visited), LANE_LIMIT, DEPLOY_X0.
+
+  def fit_binned_policy(states):
+      """Label each state with the expert's action and average per bin.
+
+      Return a length-20 array; use np.nan for bins with no data.
+      """
+      # TODO
+      return np.full(len(BINS) - 1, np.nan)
+
+  def act(policy, x):
+      """Look up the action for x. If that bin is empty (never seen in
+      training), fall back to the NEAREST populated bin — which is what a
+      model does off-distribution: it reuses the closest thing it knows."""
+      # TODO: find bin_of(x); if nan, search outward for the nearest
+      #       non-nan bin and use that value
+      return 0.0
+
+  def coverage(policy):
+      """Fraction of the 20 bins that have data."""
+      # TODO
+      return 0.0
+
+  def rollout(policy, horizon, seed, x0=DEPLOY_X0, collect=False):
+      """Run closed-loop. Returns (survived, visited_states)."""
+      rng = np.random.default_rng(seed)
+      x, visited = x0, []
+      for _ in range(horizon):
+          visited.append(x)
+          x = step(x, act(policy, x), rng)
+          if abs(x) > LANE_LIMIT:
+              return False, visited
+      return True, visited
+
+  def success_rate(policy, horizon=60, n=100):
+      return sum(rollout(policy, horizon, s)[0] for s in range(n)) / n
+
+  def dagger_round(states, policy, horizon=60, n=30):
+      """Roll the CURRENT policy out, collect the states it actually
+      visited, and append them to the training states. Return the new
+      state array (the expert labels them inside fit_binned_policy)."""
+      # TODO
+      return states
+
+  states = DEMO_X.copy()
+  policy = fit_binned_policy(states)
+  print("round 0: coverage %.2f  success %.2f" % (coverage(policy), success_rate(policy)))
+  for r in range(1, 4):
+      states = dagger_round(states, policy)
+      policy = fit_binned_policy(states)
+      print("round %d: coverage %.2f  success %.2f" % (r, coverage(policy), success_rate(policy)))
+tests: |
+  import numpy as np
+  _p0 = fit_binned_policy(DEMO_X)
+  assert len(_p0) == len(BINS) - 1, "one entry per bin"
+  _cov0 = coverage(_p0)
+  assert _cov0 < 0.55, "expert demos should leave most bins EMPTY (got coverage %.2f) - the expert never goes there" % _cov0
+  _mid = _p0[bin_of(0.0)]
+  assert not np.isnan(_mid), "the centre bin must be populated"
+  assert abs(_mid) < 0.15, "near centre the expert's action is small"
+  # A far-out state falls back to the nearest known bin, which under-corrects.
+  _far = act(_p0, 0.85)
+  _true = expert_action(0.85)
+  assert abs(_far) < abs(_true) - 0.15, "off-distribution the policy should UNDER-correct badly (%.2f vs expert %.2f)" % (_far, _true)
+  _s0 = success_rate(_p0)
+  assert _s0 < 0.6, "the naive clone should fail often (got success %.2f)" % _s0
+  # DAgger: three rounds of labelling the states the policy actually reaches.
+  _st, _pol = DEMO_X.copy(), _p0
+  _hist = [(coverage(_pol), success_rate(_pol))]
+  for _ in range(3):
+      _st = dagger_round(_st, _pol)
+      _pol = fit_binned_policy(_st)
+      _hist.append((coverage(_pol), success_rate(_pol)))
+  assert len(_st) > len(DEMO_X), "DAgger must ADD states to the dataset"
+  assert _hist[-1][0] > _hist[0][0] + 0.1, "coverage must grow (%.2f -> %.2f)" % (_hist[0][0], _hist[-1][0])
+  assert _hist[-1][1] > _hist[0][1] + 0.25, "success must improve substantially (%.2f -> %.2f)" % (_hist[0][1], _hist[-1][1])
+  assert _hist[-1][1] > 0.85, "after three rounds the policy should be reliable (got %.2f)" % _hist[-1][1]
+hints:
+  - "fit_binned_policy: for each state compute `bin_of(x)` and collect `expert_action(x)`; then per bin take the mean, leaving np.nan where a bin has no samples."
+  - "act: `b = bin_of(x)`; if `np.isnan(policy[b])`, scan outward (b-1, b+1, b-2, ...) for the first non-nan entry and return it."
+  - "dagger_round: `visited = []`; for several seeds call `rollout(policy, horizon, seed, collect=True)` and extend `visited` with the states returned; then `np.concatenate([states, visited])`. Crucially you keep the OLD data too — that is the 'aggregation' in Dataset Aggregation."
+  - "Note what makes this work: you never need a new human demonstration episode, only the expert's answer at states your own policy chose to visit."
+solution: |
+  import numpy as np
+
+  def fit_binned_policy(states):
+      n = len(BINS) - 1
+      sums, counts = np.zeros(n), np.zeros(n)
+      for x in states:
+          b = bin_of(x)
+          sums[b] += expert_action(x)
+          counts[b] += 1
+      out = np.full(n, np.nan)
+      nz = counts > 0
+      out[nz] = sums[nz] / counts[nz]
+      return out
+
+  def act(policy, x):
+      b = bin_of(x)
+      if not np.isnan(policy[b]):
+          return float(policy[b])
+      for d in range(1, len(policy)):
+          for c in (b - d, b + d):
+              if 0 <= c < len(policy) and not np.isnan(policy[c]):
+                  return float(policy[c])
+      return 0.0
+
+  def coverage(policy):
+      return float(np.mean(~np.isnan(policy)))
+
+  def rollout(policy, horizon, seed, x0=DEPLOY_X0, collect=False):
+      rng = np.random.default_rng(seed)
+      x, visited = x0, []
+      for _ in range(horizon):
+          visited.append(x)
+          x = step(x, act(policy, x), rng)
+          if abs(x) > LANE_LIMIT:
+              return False, visited
+      return True, visited
+
+  def success_rate(policy, horizon=60, n=100):
+      return sum(rollout(policy, horizon, s)[0] for s in range(n)) / n
+
+  def dagger_round(states, policy, horizon=60, n=30):
+      visited = []
+      for s in range(1000, 1000 + n):
+          _, v = rollout(policy, horizon, s, collect=True)
+          visited.extend(v)
+      return np.concatenate([states, np.array(visited)])
+
+  states = DEMO_X.copy()
+  policy = fit_binned_policy(states)
+  print("round 0: coverage %.2f  success %.2f" % (coverage(policy), success_rate(policy)))
+  for r in range(1, 4):
+      states = dagger_round(states, policy)
+      policy = fit_binned_policy(states)
+      print("round %d: coverage %.2f  success %.2f" % (r, coverage(policy), success_rate(policy)))

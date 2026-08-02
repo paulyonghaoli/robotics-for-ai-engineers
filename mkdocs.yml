@@ -121,6 +121,9 @@ nav:
   - "Capstone · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: eight bugs": capstone-log.md
+  - "Module 9 · Robot Learning":
+      - Overview: modules/09-robot-learning/index.md
+      - "9.1 Behavior cloning": modules/09-robot-learning/01-behavior-cloning.md
   - "Module 10 · Evaluation & Data Systems":
       - Overview: modules/10-evaluation/index.md
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md

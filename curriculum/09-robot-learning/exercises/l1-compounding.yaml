@@ -1,0 +1,137 @@
+id: rl-l1-compounding
+title: "Watch the error compound"
+lesson: modules/09-robot-learning/01-behavior-cloning
+description: >-
+  Clone an expert lane-follower from its demonstrations, then run it
+  closed-loop. Your validation error will be tiny and your policy will
+  still drive off the road — because off the expert's distribution it is
+  extrapolating. Measure failure rate against horizon and see the
+  super-linear growth for yourself.
+setup_code: |
+  import numpy as np
+
+  # Balancing-style task: the plant is OPEN-LOOP UNSTABLE (a pole tips over,
+  # a Segway falls). State = offset from centre; without control it grows.
+  # This is what makes cloning delicate — the margin between a gain that
+  # stabilizes and one that doesn't is small, and the difference is
+  # invisible on the expert's own data.
+  PLANT = 1.55            # x grows by 55% per step with no action
+  EXPERT_GAIN = 0.60      # expert closes the loop at 1.55 - 0.60 = 0.95 (stable)
+  NOISE = 0.01
+  LANE_LIMIT = 1.0
+
+  def expert_action(x):
+      return -EXPERT_GAIN * x
+
+  def step(x, a, rng):
+      return PLANT * x + a + rng.normal(0, NOISE)
+
+  def collect_demos(n_episodes=60, horizon=40, seed=0):
+      """Expert rollouts. The expert corrects immediately, so its data sits
+      in a narrow band near centre — it never demonstrates recovery from
+      the states a slightly-wrong policy will drift into."""
+      rng = np.random.default_rng(seed)
+      X, A = [], []
+      for _ in range(n_episodes):
+          x = rng.uniform(-0.35, 0.35)
+          for _ in range(horizon):
+              a = expert_action(x)
+              X.append(x); A.append(a)
+              x = step(x, a, rng)
+      return np.array(X), np.array(A)
+
+  DEMO_X, DEMO_A = collect_demos()
+starter_code: |
+  import numpy as np
+  # Provided: expert_action(x), step(x, a, rng), DEMO_X, DEMO_A,
+  #           LANE_LIMIT = 1.0 (|x| beyond this = off the road).
+
+  def fit_policy(X, A):
+      """Fit a linear policy a = w*x + b by least squares.
+      Return (w, b)."""
+      # TODO: np.polyfit(X, A, 1) gives (slope, intercept)
+      return 0.0, 0.0
+
+  def validation_error(w, b, X, A):
+      """Mean absolute error on the EXPERT's data — the number that will
+      mislead you."""
+      # TODO
+      return 0.0
+
+  def rollout(w, b, horizon, seed, x0=0.15):
+      """Run the cloned policy closed-loop. Return True if it stayed on
+      the road for the whole horizon (|x| <= LANE_LIMIT throughout)."""
+      rng = np.random.default_rng(seed)
+      # TODO: x = x0; each step a = w*x + b; x = step(x, a, rng);
+      #       return False the moment |x| > LANE_LIMIT
+      return True
+
+  def failure_rate(w, b, horizon, n=200):
+      """Fraction of episodes that leave the lane."""
+      # TODO
+      return 0.0
+
+  w, b = fit_policy(DEMO_X, DEMO_A)
+  print("fitted policy: a = %.4f x + %.4f  (expert: a = %.4f x)" % (w, b, -EXPERT_GAIN))
+
+  # A perfect clone is safe. Now a clone that is 12%% off - the kind of
+  # error any finite dataset or function approximator produces.
+  for name, (pw, pb) in [("exact clone", (w, b)), ("12% low", (-0.53, 0.008))]:
+      mae = validation_error(pw, pb, DEMO_X, DEMO_A)
+      rates = " ".join("h=%d:%.2f" % (h, failure_rate(pw, pb, h)) for h in (25, 50, 100, 200))
+      print("%-12s val MAE %.4f  |  %s" % (name, mae, rates))
+tests: |
+  import numpy as np
+  _w, _b = fit_policy(DEMO_X, DEMO_A)
+  assert abs(_w - (-EXPERT_GAIN)) < 0.05, "the fit should recover the expert gain closely (got %.3f vs %.3f)" % (_w, -EXPERT_GAIN)
+  _val = validation_error(_w, _b, DEMO_X, DEMO_A)
+  assert _val < 0.01, "validation error on expert data must be TINY (got %.4f) - that is what makes this trap work" % _val
+  assert rollout(-EXPERT_GAIN, 0.0, 200, seed=1) is True, "the true expert policy should survive a long horizon"
+  # A slightly-off policy. Its validation error is tiny, but 1.55 - 0.53
+  # = 1.02 > 1: the closed loop now GROWS instead of shrinking, slowly.
+  _wb, _bb = -0.53, 0.008
+  assert validation_error(_wb, _bb, DEMO_X, DEMO_A) < 0.04, "the flawed policy's validation error is small - that is the point"
+  _fr = [failure_rate(_wb, _bb, h) for h in (25, 50, 100, 200)]
+  assert all(_fr[i] >= _fr[i - 1] for i in range(1, 4)), "failure rate must be non-decreasing in horizon (got %s)" % [round(f, 2) for f in _fr]
+  assert _fr[0] < 0.25, "at horizon 25 it should mostly succeed - short tasks HIDE the problem (got %.2f)" % _fr[0]
+  assert _fr[2] > 0.75, "by horizon 100 the same policy should fail almost every episode (got %.2f)" % _fr[2]
+  # The transition is abrupt, and that is the point: divergence is
+  # exponential, so the failure does not creep in - it arrives.
+  assert _fr[1] > _fr[0], "the failure must appear somewhere between horizon 25 and 100"
+hints:
+  - "fit_policy: `w, b = np.polyfit(X, A, 1)` and return them as floats."
+  - "rollout: loop `horizon` times — `a = w*x + b`, `x = step(x, a, rng)`, and `if abs(x) > LANE_LIMIT: return False`. Return True if the loop finishes."
+  - "failure_rate: `sum(not rollout(w, b, horizon, seed=s) for s in range(n)) / n`."
+  - "The trap: gain -0.53 instead of -0.60 is a 12% error, invisible in validation. But the plant multiplies by 1.55 each step, so the closed loop goes from 0.95 (shrinking) to 1.02 (growing). Growth compounds — which is why the failure is invisible at horizon 25 and total at horizon 200."
+solution: |
+  import numpy as np
+
+  def fit_policy(X, A):
+      w, b = np.polyfit(X, A, 1)
+      return float(w), float(b)
+
+  def validation_error(w, b, X, A):
+      return float(np.mean(np.abs((w * X + b) - A)))
+
+  def rollout(w, b, horizon, seed, x0=0.3):
+      rng = np.random.default_rng(seed)
+      x = x0
+      for _ in range(horizon):
+          a = w * x + b
+          x = step(x, a, rng)
+          if abs(x) > LANE_LIMIT:
+              return False
+      return True
+
+  def failure_rate(w, b, horizon, n=200):
+      return sum(not rollout(w, b, horizon, seed=s) for s in range(n)) / n
+
+  w, b = fit_policy(DEMO_X, DEMO_A)
+  print("fitted policy: a = %.4f x + %.4f  (expert: a = %.4f x)" % (w, b, -EXPERT_GAIN))
+
+  # A perfect clone is safe. Now a clone that is 12%% off - the kind of
+  # error any finite dataset or function approximator produces.
+  for name, (pw, pb) in [("exact clone", (w, b)), ("12% low", (-0.53, 0.008))]:
+      mae = validation_error(pw, pb, DEMO_X, DEMO_A)
+      rates = " ".join("h=%d:%.2f" % (h, failure_rate(pw, pb, h)) for h in (25, 50, 100, 200))
+      print("%-12s val MAE %.4f  |  %s" % (name, mae, rates))
