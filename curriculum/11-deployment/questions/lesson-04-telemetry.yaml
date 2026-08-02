@@ -1,0 +1,71 @@
+id: dep-l4-telemetry-quiz
+title: "Quiz — telemetry and incident forensics"
+lesson: modules/11-deployment/04-telemetry-forensics
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A telemetry scheme uses 0.16 MB/s of a 2 MB/s budget and never drops data. What's likely wrong with it?"
+    options:
+      - text: "It probably keeps only the cheap streams, so it fits comfortably and cannot reconstruct a single incident — the diagnostic streams are the expensive ones"
+        correct: true
+        explanation: "The trap most fleets fall into. Comfortable headroom is not the goal; being able to answer a question after the fact is."
+      - text: "Nothing — efficient telemetry is good telemetry"
+        explanation: "Efficiency that discards the answer is just a smaller way of learning nothing."
+      - text: "It will exceed the budget as the fleet grows"
+        explanation: "The budget is per robot, so fleet size doesn't change it."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Streams total 33.16 MB/s, ring buffer 30 s, continuous streams 0.14 MB/s. Sustained rate at 6 incidents/hour, in MB/s?"
+    answer: 1.80
+    tolerance: 0.1
+    explanation: "33.16 × 30 ≈ 995 MB per incident; 6/hour over 3600 s ≈ 1.66, plus 0.14 ≈ 1.80 MB/s. Inside a 2 MB/s budget with almost no headroom."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Triggered telemetry sized for 3 incidents/hour costs 0.97 MB/s. At 12/hour it costs 3.46 and blows a 2 MB/s budget. Why does this matter especially?"
+    options:
+      - text: "Its cost scales with the incident rate, so it fails exactly when things are going wrong and you most need the data"
+        correct: true
+        explanation: "Budget for the bad day, and give the uploader a documented degradation ladder that reports when it engages rather than dropping silently."
+      - text: "It doesn't — 12 incidents/hour would never happen"
+        explanation: "Bad weather, a new site, or a bad rollout can multiply the incident rate several-fold."
+      - text: "The buffer should simply be made longer"
+        explanation: "A longer buffer increases per-incident cost, making the spike problem worse."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A robot froze in a doorway. You have its trajectory and cmd_vel. Why is that insufficient?"
+    options:
+      - text: "Both are outputs — they show it chose zero velocity but not why. You need the decision: candidate arcs and their score components"
+        correct: true
+        explanation: "Freezing is a scoring outcome. With the scores, it shows immediately as the zero-velocity option winning on a clearance term no arc could satisfy; without them, you're guessing."
+      - text: "The trajectory is enough; the freeze is visible in it"
+        explanation: "The *symptom* is visible. The cause lives in the scoring that produced it."
+      - text: "You'd need a camera feed"
+        explanation: "Useful context, but the planner's own scores are the direct evidence and far cheaper."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why log ground truth alongside the estimate in simulation, when a real robot can't?"
+    options:
+      - text: "Some errors are invisible to every runtime signal — an unobservable bias leaves NEES bad while NIS looks perfect, and only truth exposes it"
+        correct: true
+        explanation: "Lesson 3.6's fourth diagnostic pattern, and the reason simulation-time auditing complements rather than duplicates runtime monitoring."
+      - text: "It makes the logs easier to read"
+        explanation: "A side benefit, not the reason."
+      - text: "Real robots can log ground truth too"
+        explanation: "Only with external instrumentation like motion capture, which is why simulation is where this audit is affordable."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "What single field turns a pile of incident records into something you can act on months later?"
+    options:
+      - text: "A replay key (seed or equivalent) — without it you have an anecdote rather than a reproducible bug report"
+        correct: true
+        explanation: "Every field note in the capstone log was tractable because the episode could be re-run from its seed. Software version is the close second."
+      - text: "A timestamp"
+        explanation: "Necessary, and nearly always present automatically."
+      - text: "The robot's serial number"
+        explanation: "Useful for attribution, but it doesn't let you reproduce the failure."

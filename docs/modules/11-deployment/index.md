@@ -11,7 +11,7 @@ This is the module where your platform-engineering instincts transfer most direc
 1. [Latency budgets and the real-time contract](01-latency-budgets.md) — **available**
 2. [Edge inference: quantization and the accuracy/latency trade](02-edge-inference.md) — **available**
 3. [Rollout and rollback across a fleet](03-rollout-rollback.md) — **available**
-4. Fleet telemetry and incident forensics *(planned)*
+4. [Fleet telemetry and incident forensics](04-telemetry-forensics.md) — **available**
 5. Safety cases for learned components *(planned)*
 6. Lab: the incident *(planned)*
 

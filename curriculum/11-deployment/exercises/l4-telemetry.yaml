@@ -1,0 +1,144 @@
+id: dep-l4-telemetry
+title: "Budget the telemetry, then survive an incident spike"
+lesson: modules/11-deployment/04-telemetry-forensics
+description: >-
+  You cannot upload everything a robot produces, and the streams you'd
+  need to diagnose an incident are exactly the expensive ones. Size a
+  ring-buffer-plus-trigger scheme against a real uplink budget — then
+  discover that its bandwidth scales with the incident rate, so it breaks
+  precisely when things start going wrong.
+setup_code: |
+  # Per-robot data rates, MB/s, and whether the stream is needed to
+  # reconstruct what happened during an incident.
+  STREAMS = {
+      "camera":      {"mb_per_s": 25.0, "needed_for_diagnosis": True},
+      "lidar":       {"mb_per_s":  8.0, "needed_for_diagnosis": True},
+      "diagnostics": {"mb_per_s":  0.10, "needed_for_diagnosis": True},
+      "pose":        {"mb_per_s":  0.04, "needed_for_diagnosis": True},
+      "imu":         {"mb_per_s":  0.02, "needed_for_diagnosis": False},
+  }
+
+  UPLINK_BUDGET_MB_S = 2.0     # per robot, sustained
+  BUFFER_SECONDS = 30.0        # ring buffer captured around each incident
+  NOMINAL_INCIDENTS_PER_HOUR = 3.0
+starter_code: |
+  import numpy as np
+  # Provided: STREAMS (rate + whether diagnosis needs it),
+  #           UPLINK_BUDGET_MB_S = 2.0, BUFFER_SECONDS = 30.0,
+  #           NOMINAL_INCIDENTS_PER_HOUR = 3.0.
+
+  def total_rate(names):
+      """Combined MB/s of the named streams."""
+      # TODO
+      return 0.0
+
+  def log_everything_rate():
+      """Sustained rate if every stream is uploaded continuously."""
+      # TODO
+      return 0.0
+
+  def summaries_only_rate():
+      """Only the cheap streams (< 1 MB/s) uploaded continuously."""
+      # TODO
+      return 0.0
+
+  def triggered_rate(incidents_per_hour, continuous=("diagnostics", "pose")):
+      """Ring buffer + trigger: the cheap streams stream continuously, and
+      on each incident the whole BUFFER_SECONDS of EVERY stream is
+      uploaded. Return the average sustained MB/s."""
+      # TODO: continuous rate + (incidents/hour) * (all-stream MB per buffer)
+      #       / 3600 seconds
+      return 0.0
+
+  def can_diagnose(strategy):
+      """Does this strategy retain every stream marked
+      needed_for_diagnosis? strategy is 'everything', 'summaries', or
+      'triggered'."""
+      # TODO
+      return False
+
+  def max_incident_rate(budget=UPLINK_BUDGET_MB_S):
+      """Highest incidents/hour the triggered scheme can sustain within
+      budget. Search 0.5 to 40 in 0.5 steps; return the largest that fits."""
+      # TODO
+      return 0.0
+
+  for name, rate in [("everything", log_everything_rate()),
+                     ("summaries", summaries_only_rate()),
+                     ("triggered", triggered_rate(NOMINAL_INCIDENTS_PER_HOUR))]:
+      print("%-11s %6.2f MB/s  fits=%-5s  diagnosable=%s" % (
+          name, rate, rate <= UPLINK_BUDGET_MB_S, can_diagnose(name)))
+  print()
+  print("triggered scheme tolerates up to %.1f incidents/hour" % max_incident_rate())
+  for r in (3, 6, 12):
+      print("  at %2d/hour: %.2f MB/s" % (r, triggered_rate(r)))
+tests: |
+  import numpy as np
+  assert abs(total_rate(["camera", "lidar"]) - 33.0) < 1e-9, "rates add"
+  # Logging everything is hopeless; summaries fit but blind you.
+  _all = log_everything_rate()
+  assert _all > 30, "continuous full-rate logging is ~33 MB/s (got %.1f)" % _all
+  assert _all > 15 * UPLINK_BUDGET_MB_S, "...more than 15x the uplink budget"
+  _sum = summaries_only_rate()
+  assert _sum < 0.2, "summaries-only should be tiny (got %.3f)" % _sum
+  assert not can_diagnose("summaries"), "summaries-only drops camera and lidar, so incidents can't be reconstructed"
+  assert can_diagnose("everything") and can_diagnose("triggered"), "both of these retain the diagnostic streams"
+  # The triggered scheme fits AND diagnoses - that's the design.
+  _trig = triggered_rate(NOMINAL_INCIDENTS_PER_HOUR)
+  assert _trig <= UPLINK_BUDGET_MB_S, "triggered capture must fit the budget at the nominal rate (got %.2f)" % _trig
+  assert _trig > _sum, "...while costing more than summaries alone"
+  # THE CATCH: cost scales with incident rate, so it breaks when things go wrong.
+  assert triggered_rate(12) > UPLINK_BUDGET_MB_S, "at 12 incidents/hour the scheme should BLOW the budget (got %.2f) - telemetry cost rises exactly when you need it most" % triggered_rate(12)
+  _mx = max_incident_rate()
+  assert 4.0 <= _mx <= 8.0, "the sustainable incident rate should be single digits (got %.1f)" % _mx
+  assert _mx > NOMINAL_INCIDENTS_PER_HOUR, "...but above the nominal rate, or the design was never viable"
+  assert triggered_rate(_mx) <= UPLINK_BUDGET_MB_S and triggered_rate(_mx + 0.5) > UPLINK_BUDGET_MB_S, "max_incident_rate should be the true boundary"
+hints:
+  - "total_rate: sum `STREAMS[n]['mb_per_s']` over the names given."
+  - "triggered_rate: continuous part is total_rate(continuous); each incident uploads `total_rate(all streams) * BUFFER_SECONDS` megabytes, and `incidents_per_hour` of those spread over 3600 s."
+  - "can_diagnose: 'everything' and 'triggered' both retain all streams; 'summaries' keeps only the cheap ones, so check whether any needed_for_diagnosis stream costs >= 1 MB/s."
+  - "The last result is the one to sit with: a scheme sized for 3 incidents/hour breaks at 12. Telemetry demand and incident rate are correlated, so budget for the bad day, not the average one."
+solution: |
+  import numpy as np
+
+  def total_rate(names):
+      return float(sum(STREAMS[n]["mb_per_s"] for n in names))
+
+  def log_everything_rate():
+      return total_rate(list(STREAMS))
+
+  def summaries_only_rate():
+      return total_rate([n for n, s in STREAMS.items() if s["mb_per_s"] < 1.0])
+
+  def triggered_rate(incidents_per_hour, continuous=("diagnostics", "pose")):
+      cont = total_rate(list(continuous))
+      per_incident_mb = log_everything_rate() * BUFFER_SECONDS
+      return float(cont + incidents_per_hour * per_incident_mb / 3600.0)
+
+  def can_diagnose(strategy):
+      needed = [n for n, s in STREAMS.items() if s["needed_for_diagnosis"]]
+      if strategy in ("everything", "triggered"):
+          return True
+      if strategy == "summaries":
+          kept = [n for n, s in STREAMS.items() if s["mb_per_s"] < 1.0]
+          return all(n in kept for n in needed)
+      return False
+
+  def max_incident_rate(budget=UPLINK_BUDGET_MB_S):
+      best = 0.0
+      r = 0.5
+      while r <= 40.0:
+          if triggered_rate(r) <= budget:
+              best = r
+          r += 0.5
+      return best
+
+  for name, rate in [("everything", log_everything_rate()),
+                     ("summaries", summaries_only_rate()),
+                     ("triggered", triggered_rate(NOMINAL_INCIDENTS_PER_HOUR))]:
+      print("%-11s %6.2f MB/s  fits=%-5s  diagnosable=%s" % (
+          name, rate, rate <= UPLINK_BUDGET_MB_S, can_diagnose(name)))
+  print()
+  print("triggered scheme tolerates up to %.1f incidents/hour" % max_incident_rate())
+  for r in (3, 6, 12):
+      print("  at %2d/hour: %.2f MB/s" % (r, triggered_rate(r)))
