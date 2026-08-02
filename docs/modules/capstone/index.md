@@ -15,6 +15,10 @@
 ![Dynamic obstacles](../../assets/demo/capstone-v3-dynamic.gif){ width="100%" }
 <figcaption markdown>**v3** — six movers that aren't in the map, avoided by DWA</figcaption>
 </figure>
+<figure markdown style="margin:0">
+![SLAM](../../assets/demo/capstone-v4-slam.gif){ width="100%" }
+<figcaption markdown>**v4** — SLAM: the map is being built by a robot that doesn't know where it is</figcaption>
+</figure>
 </div>
 
 These are rendered from **real evaluation episodes** (`python render.py all`) — the same code path `python -m eval run` scores. Whatever the robot does here is what it does when it's being graded.

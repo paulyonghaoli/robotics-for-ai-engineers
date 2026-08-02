@@ -197,6 +197,8 @@ DEMOS = {
                    title="global localization · 8,000 particles, no prior", global_loc=True),
     "dynamic": dict(stack_name="dynamic_stack", seed=1000, out_name="capstone-v3-dynamic.gif",
                     title="v3 · avoiding obstacles that aren't in the map", n_dynamic=6),
+    "slam": dict(stack_name="slam_stack", seed=51, out_name="capstone-v4-slam.gif",
+                 title="v4 · SLAM — no map, and no pose sensor", show_map=True),
 }
 
 
