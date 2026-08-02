@@ -108,6 +108,7 @@ nav:
       - "11.3 Rollout and rollback": modules/11-deployment/03-rollout-rollback.md
       - "11.4 Telemetry and forensics": modules/11-deployment/04-telemetry-forensics.md
       - "11.5 Safety cases": modules/11-deployment/05-safety-cases.md
+      - "11.6 Lab: the incident": modules/11-deployment/06-lab-the-incident.md
   - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md

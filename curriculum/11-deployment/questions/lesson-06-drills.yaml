@@ -1,0 +1,77 @@
+id: dep-l6-drills
+title: "Diagnosis drills — fleet incidents"
+lesson: modules/11-deployment/06-lab-the-incident
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Incident:** success drops 16 points; p99 latency went from 38 ms to 71 ms against a 50 ms deadline; both software versions equally affected. Diagnosis?"
+    options:
+      - text: "Deadline cascade — the loop stopped closing in time, and since it hits both versions the cause is environmental or infrastructural rather than the code"
+        correct: true
+        explanation: "Latency in a feedback loop is a stability parameter. Look for new load, thermal throttling, or a stage whose tail grew."
+      - text: "Bad rollout"
+        explanation: "A rollout problem would concentrate on one version; this hits both."
+      - text: "Sensor drift"
+        explanation: "Sensor statistics and NIS were unchanged."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Incident:** v7 robots unchanged at 95%; v8 robots dropped from 94% to 71%. Latency and sensors normal. Diagnosis, and what failed upstream?"
+    options:
+      - text: "Bad rollout — and the canary failed to catch it, most likely because it was underpowered"
+        correct: true
+        explanation: "A 23-point regression should be catchable, so the canary was probably far too small — recall that 50 episodes misses a doubling three times out of four."
+      - text: "Environment drift affecting only some sites"
+        explanation: "Possible in principle, but the split falls exactly along version lines, which is the stronger signal."
+      - text: "Sensor degradation on the v8 hardware"
+        explanation: "Version is software; sensor stats were flat."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Incident:** mean lidar range shifted 4.01 → 4.62 m, NIS rose 1.02 → 2.41, both versions dropped ~13 points. Diagnosis?"
+    options:
+      - text: "Environment or sensor drift — the world changed, not the code, and the belief layer registered it before outcomes did"
+        correct: true
+        explanation: "The layered monitor working as designed: input statistics moved, NIS followed, success rate last. Both versions affected rules out the software."
+      - text: "A bad rollout that happened to reach both versions"
+        explanation: "Then the version split would be meaningless — and it wouldn't move sensor statistics."
+      - text: "Deadline cascade"
+        explanation: "Latency was flat."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Incident:** success dropped 11 points. Latency normal, both versions equally affected, sensors and NIS normal. What do you report?"
+    options:
+      - text: "Insufficient telemetry — say you cannot determine the cause, and name the signal you're adding so the next occurrence is diagnosable"
+        correct: true
+        explanation: "The only diagnosis that improves the system. A confident wrong root cause closes the ticket and leaves the fault in place, which is worse than an open one because nobody is looking anymore."
+      - text: "Pick the most likely cause and act on it"
+        correct: false
+        explanation: "Acting on a guess spends effort and creates false confidence that the incident is understood."
+      - text: "Close it as a statistical fluctuation"
+        explanation: "An 11-point drop across the fleet is not noise; declaring it so is the same error with extra steps."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "Why does a fleet fully migrated to the newest version lose diagnostic power?"
+    options:
+      - text: "Without robots on the old version, 'our policy regressed' and 'the world changed' produce identical evidence — you cannot separate them"
+        correct: true
+        explanation: "Which is why the ramp should retain a permanent holdout rather than going to 100%. Incident B was only diagnosable because v7 robots were still running."
+      - text: "Newer versions have less telemetry"
+        explanation: "Unrelated to version coverage."
+      - text: "It doesn't — version history is enough"
+        explanation: "History tells you what changed and when; only a concurrent control group tells you what the change caused."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "What do a deadline cascade, an underpowered canary, a saturated uploader, and an over-conservative monitor have in common?"
+    options:
+      - text: "Each is a correct component in a system whose operating conditions moved — deployment failures are rarely failures of the algorithm"
+        correct: true
+        explanation: "The same shape as the capstone's eight field notes, at fleet scale: the code was right and the assumptions around it stopped holding."
+      - text: "They're all bugs in the control code"
+        explanation: "In each case the component does precisely what it was specified to do."
+      - text: "They're all caused by insufficient compute"
+        explanation: "Only the first is even adjacent to compute, and even there the cause is the tail rather than the average."

@@ -1,0 +1,146 @@
+id: dep-l6-incident
+title: "Four incidents, one on-call shift"
+lesson: modules/11-deployment/06-lab-the-incident
+description: >-
+  Four fleet incidents. Success rate dropped in every one, and that is the
+  only thing they have in common. Build the probes that separate a
+  deadline cascade from a bad rollout from environmental drift — and
+  recognize the fourth case, where the honest answer is that your
+  telemetry cannot say.
+setup_code: |
+  # Each incident: metrics from the week BEFORE and the week AFTER it began.
+  # success_by_version splits the fleet by software version.
+  INCIDENTS = {
+      "A": {
+          "latency_p99_ms": (38.0, 71.0),
+          "sensor_mean_range_m": (4.02, 4.01),
+          "mean_nis": (1.03, 1.05),
+          "success_by_version": {"v7": (0.95, 0.79), "v8": (0.95, 0.78)},
+      },
+      "B": {
+          "latency_p99_ms": (39.0, 40.0),
+          "sensor_mean_range_m": (4.00, 3.99),
+          "mean_nis": (1.01, 1.02),
+          "success_by_version": {"v7": (0.95, 0.95), "v8": (0.94, 0.71)},
+      },
+      "C": {
+          "latency_p99_ms": (38.5, 39.5),
+          "sensor_mean_range_m": (4.01, 4.62),
+          "mean_nis": (1.02, 2.41),
+          "success_by_version": {"v7": (0.95, 0.82), "v8": (0.95, 0.81)},
+      },
+      "D": {
+          "latency_p99_ms": (38.0, 38.6),
+          "sensor_mean_range_m": (4.00, 4.02),
+          "mean_nis": (1.02, 1.04),
+          "success_by_version": {"v7": (0.95, 0.83), "v8": (0.95, 0.84)},
+      },
+  }
+
+  DEADLINE_MS = 50.0
+starter_code: |
+  import numpy as np
+  # Provided: INCIDENTS (A-D), each with (before, after) pairs for
+  # latency_p99_ms, sensor_mean_range_m, mean_nis, and success_by_version.
+  # DEADLINE_MS = 50.0.
+
+  def success_drop(inc):
+      """Fleet-wide drop in success rate (before minus after, averaged
+      across versions)."""
+      # TODO
+      return 0.0
+
+  def latency_breached(inc):
+      """True if p99 latency went from inside the deadline to outside it."""
+      # TODO
+      return False
+
+  def version_correlated(inc, gap=0.1):
+      """True if the drop concentrates on ONE version — i.e. the spread of
+      per-version drops exceeds `gap`."""
+      # TODO
+      return False
+
+  def belief_degraded(inc, factor=1.5):
+      """True if mean NIS rose by more than `factor` — the filter's
+      measurements stopped matching its model."""
+      # TODO
+      return False
+
+  def diagnose(inc):
+      """Return 'deadline-cascade', 'bad-rollout', 'environment-drift',
+      or 'insufficient-telemetry'.
+
+      Check in this order: latency breach, then version correlation, then
+      belief degradation. If a real drop remains unexplained, say so.
+      """
+      # TODO
+      return "insufficient-telemetry"
+
+  for name, inc in INCIDENTS.items():
+      print("%s | drop %.2f  latency_breach=%-5s version_corr=%-5s nis_up=%-5s -> %s" % (
+          name, success_drop(inc), latency_breached(inc),
+          version_correlated(inc), belief_degraded(inc), diagnose(inc)))
+tests: |
+  import numpy as np
+  # All four are real incidents.
+  for _n, _i in INCIDENTS.items():
+      assert success_drop(_i) > 0.09, "incident %s should show a real success drop (got %.2f)" % (_n, success_drop(_i))
+  # A: the pipeline started blowing its deadline; both versions hurt equally.
+  assert latency_breached(INCIDENTS["A"]), "A's p99 crossed the 50 ms deadline"
+  assert not version_correlated(INCIDENTS["A"]), "...and it hit both versions alike"
+  assert diagnose(INCIDENTS["A"]) == "deadline-cascade"
+  # B: only the new version degraded.
+  assert not latency_breached(INCIDENTS["B"]), "B's latency is fine"
+  assert version_correlated(INCIDENTS["B"]), "...but the drop lands entirely on v8"
+  assert diagnose(INCIDENTS["B"]) == "bad-rollout"
+  # C: the world changed - sensors and belief both moved, both versions hurt.
+  assert belief_degraded(INCIDENTS["C"]), "C's NIS more than doubled"
+  assert not version_correlated(INCIDENTS["C"]), "...affecting both versions"
+  assert diagnose(INCIDENTS["C"]) == "environment-drift"
+  # D: the hard one. Everything you measured looks normal.
+  assert not latency_breached(INCIDENTS["D"]), "D's latency is fine"
+  assert not version_correlated(INCIDENTS["D"]), "D hits both versions"
+  assert not belief_degraded(INCIDENTS["D"]), "D's belief layer is healthy"
+  assert diagnose(INCIDENTS["D"]) == "insufficient-telemetry", "D must be reported as unexplained - inventing a cause is worse than admitting the gap"
+  # And the diagnoses must be distinct: one probe alone separates nothing.
+  _labels = [diagnose(i) for i in INCIDENTS.values()]
+  assert len(set(_labels)) == 4, "each incident should get its own diagnosis, got %s" % _labels
+hints:
+  - "success_drop: average `before - after` across the versions in success_by_version."
+  - "latency_breached: `before <= DEADLINE_MS < after`."
+  - "version_correlated: compute each version's drop, then check `max(drops) - min(drops) > gap`."
+  - "belief_degraded: `after > factor * before` on mean_nis."
+  - "diagnose: apply the three checks in order and fall through to 'insufficient-telemetry'. Incident D is the point of the exercise — every probe you have comes back clean while the robots genuinely got worse, and the correct output is that you cannot say, followed by adding the signal you wish you'd had."
+solution: |
+  import numpy as np
+
+  def success_drop(inc):
+      drops = [b - a for b, a in inc["success_by_version"].values()]
+      return float(np.mean(drops))
+
+  def latency_breached(inc):
+      before, after = inc["latency_p99_ms"]
+      return bool(before <= DEADLINE_MS < after)
+
+  def version_correlated(inc, gap=0.1):
+      drops = [b - a for b, a in inc["success_by_version"].values()]
+      return bool(max(drops) - min(drops) > gap)
+
+  def belief_degraded(inc, factor=1.5):
+      before, after = inc["mean_nis"]
+      return bool(after > factor * before)
+
+  def diagnose(inc):
+      if latency_breached(inc):
+          return "deadline-cascade"
+      if version_correlated(inc):
+          return "bad-rollout"
+      if belief_degraded(inc):
+          return "environment-drift"
+      return "insufficient-telemetry"
+
+  for name, inc in INCIDENTS.items():
+      print("%s | drop %.2f  latency_breach=%-5s version_corr=%-5s nis_up=%-5s -> %s" % (
+          name, success_drop(inc), latency_breached(inc),
+          version_correlated(inc), belief_degraded(inc), diagnose(inc)))

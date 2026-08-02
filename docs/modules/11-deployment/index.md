@@ -1,6 +1,6 @@
 # Module 11 · Deployment, Fleet & Safety
 
-**Status:** In progress · **Course III**
+**Status:** Complete · **Course III**
 
 Module 10 asked whether your robot works. This one asks whether it keeps working — on hardware you don't own, in conditions you didn't test, across a fleet you can't watch.
 
@@ -13,7 +13,7 @@ This is the module where your platform-engineering instincts transfer most direc
 3. [Rollout and rollback across a fleet](03-rollout-rollback.md) — **available**
 4. [Fleet telemetry and incident forensics](04-telemetry-forensics.md) — **available**
 5. [Safety cases for learned components](05-safety-cases.md) — **available**
-6. Lab: the incident *(planned)*
+6. [Lab: the incident](06-lab-the-incident.md) — **available**
 
 ## What you'll build
 
