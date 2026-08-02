@@ -60,8 +60,14 @@ Sweep \(\theta_2\) from 0 to \(\pi\) at fixed \(\theta_1\); plot \(\sigma_{min}\
 3. *(Debugging)* Near full extension your arm's hand tracks radial commands with huge error but tangential commands fine. Explain via \(J\)'s column space.
 4. *(System design)* You must specify a workspace region where a 2-link arm guarantees 0.5 m/s in *any* direction with joint speeds ≤ 2 rad/s. State the criterion in terms of \(\sigma_{min}\).
 
-??? note "Answer sketch for Q2"
-    \(\det J = l_1 l_2 \sin\theta_2 = 1\) — right angle at the elbow is (maximally) far from singular.
+??? note "Answer sketches"
+    **1.** It falls out of power conservation (virtual work): \(\tau^\top \dot\theta = F^\top \dot p = F^\top J \dot\theta\) must hold for every \(\dot\theta\), hence \(\tau = J^\top F\). No inversion appears anywhere, which is why the statics map keeps working for non-square and singular \(J\) — precisely where \(J^{-1}\) does not exist.
+
+    **2.** \(\det J = l_1 l_2 \sin\theta_2 = 1\) — right angle at the elbow is (maximally) far from singular.
+
+    **3.** At full extension \(\theta_2 \to 0\) and the two columns of \(J\) become nearly parallel — both point tangentially, perpendicular to the arm. The column space has effectively collapsed onto the tangential direction, so tangential commands are cheap while radial ones lie almost outside the range: \(\sigma_{min} \approx 0\), requested joint speeds scale as \(1/\sigma_{min}\), and whatever caps them (damping or actuator saturation) surfaces as radial tracking error.
+
+    **4.** The worst-case direction is the manipulability ellipse's minor axis, so with \(\|\dot\theta\| \le 2\) rad/s the speed guaranteed in *every* direction is \(2\,\sigma_{min}(J)\); the criterion is \(\sigma_{min}(J) \ge 0.5/2 = 0.25\). Certify the region by evaluating \(\sigma_{min}\) on a grid over configuration (for this arm it is governed by \(\theta_2\)) and admitting only poses that clear the bound — which excludes a band around both \(\theta_2 = 0\) and \(\theta_2 = \pi\).
 
 ### Interactive quiz
 

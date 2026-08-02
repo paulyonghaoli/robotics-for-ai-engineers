@@ -52,8 +52,14 @@ Plan through a narrow gap at several gap widths; plot success rate vs samples fo
 3. *(Debugging)* Your RRT solves an easy scene but the paths oscillate wildly between runs, occasionally 3× longer. Which two mitigations, in what order?
 4. *(System design)* Pick planners for: (a) a warehouse AMR replanning at 2 Hz on a 2-D costmap; (b) a 7-DOF arm doing one-off reaches; (c) the same arm doing thousands of picks in a *fixed* cell. Justify each.
 
-??? note "Answer sketch for Q4"
-    (a) grid/lattice A* — low-dim, needs consistency; (b) RRTConnect — high-dim single query; (c) PRM — amortize the roadmap over queries in the static cell.
+??? note "Answer sketches"
+    **1.** Every tree node owns a Voronoi cell in C-space — the region of samples for which it is the nearest node. Under uniform sampling, a node is selected for extension with probability proportional to the *volume* of its cell, and the nodes with huge cells are exactly the frontier nodes bordering unexplored space; interior nodes are boxed in by their neighbours and own slivers. So the extension probability is automatically an exploration bonus paid out by geometry, and the tree spreads outward instead of thickening where it already is.
+
+    **2.** A uniform sample lands in the passage with probability \(10^{-3}\), so the expected wait is \(1/10^{-3} = 1000\) samples; for 99% confidence, \(n \approx \ln(0.01)/\ln(0.999) \approx 4.6\times 10^3\). A 10-second budget at \(10^4\) samples/s gives \(10^5\) samples — about 100 expected hits, so the passage itself is not the binding constraint here. The caveat that matters: a sample inside the passage only helps if a tree node is close enough to steer through it, so the effective rate is worse than the volume ratio; and passage fraction shrinks *exponentially* with dimension, so the same geometry on a 7-DOF arm blows the budget entirely.
+
+    **3.** This is not a bug — raw RRT gives probabilistic completeness with no optimality claim, so path length is a random variable and the spread is the clause made visible. First mitigation: **shortcut smoothing** on every run — it costs almost nothing, removes the jaggedness that produces most of the excess length, and collapses the worst of the variance. Only if smoothed paths still miss the quality bar, second: **RRT\*** (or run \(k\) seeds and keep the best), which buys asymptotic optimality at a real per-iteration cost — the order matters because you should not pay for rewiring to fix something free post-processing already fixed.
+
+    **4.** (a) grid/lattice A* — low-dim, needs consistency; (b) RRTConnect — high-dim single query; (c) PRM — amortize the roadmap over queries in the static cell.
 
 ### Interactive quiz
 

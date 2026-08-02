@@ -61,8 +61,14 @@ Corridor degeneracy: match two scans of a straight featureless corridor. ICP nai
 3. *(Debugging)* Your scan matcher works everywhere except a warehouse aisle, where poses slide 10–30 cm along the aisle between matches. Diagnose, and name the fix at the *estimator* level.
 4. *(System design)* Design the scan-matching layer for the capstone: match against last scan or against the map? Trimming fraction? What triggers a "don't trust this match" flag?
 
-??? note "Answer sketch for Q2"
-    \(H\) is (proportional to) a 90° rotation generator; SVD gives \(R = VU^\top\) = the 90° rotation itself — a useful sanity case for your implementation.
+??? note "Answer sketches"
+    **1.** The latent variables are the **correspondences** — which point of scan A generated which point of scan B. The nearest-neighbour step is the E-step, but with a *hard* assignment (each point gets one partner, probability 1) rather than a posterior over partners; the Kabsch solve is the M-step, maximizing the likelihood of \((R, t)\) with those assignments held fixed. Hard assignment is exactly what makes it k-means-shaped, and exactly why it commits to the nearest local optimum.
+
+    **2.** \(H\) is (proportional to) a 90° rotation generator; SVD gives \(R = VU^\top\) = the 90° rotation itself — a useful sanity case for your implementation.
+
+    **3.** Degenerate geometry: a long straight aisle constrains the lateral offset but nothing constrains sliding along the aisle axis, so the cost surface is a valley and ICP returns a confident answer from an unconstrained direction — with a low residual, which is why it doesn't look like a failure. The estimator-level fix is not to tune ICP but to *report the degeneracy*: check the conditioning of the cost Hessian (or the smallest eigenvalue of \(J^\top J\)), and when it's rank-deficient inflate the match's covariance along the flat eigenvector so the filter falls back on odometry for the longitudinal component instead of trusting the match.
+
+    **4.** Match **scan-to-map** (against the accumulated local map), not scan-to-scan: scan-to-scan compounds a fresh error at every match, while the local map gives more overlap and bounds drift against already-fused geometry. Always seed from odometry, never cold-start. Trim the worst ~15% of pairs — enough to shrug off a walking person, not so much that you discard real geometry in sparse scans. Raise the "don't trust this match" flag on any of: residual-after-convergence above threshold, inlier fraction below ~60%, an ill-conditioned Hessian (the aisle case above), or a correction that fails a gating test against what odometry says is plausible — and on a flag, fall back to odometry propagation with inflated covariance rather than dropping the update silently.
 
 ### Interactive quiz
 

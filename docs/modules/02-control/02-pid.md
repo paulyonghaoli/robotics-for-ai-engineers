@@ -70,8 +70,14 @@ On the exercise's mass simulator: raise \(k_p\) until sustained oscillation, not
 3. *(Debugging)* A drone's altitude hold works in hover but porpoises violently after aggressive climbs. Which term and which pathology?
 4. *(System design)* Cascade control: why do arms run a fast inner velocity PID inside a slower outer position loop instead of one position PID?
 
-??? note "Answer sketch for Q3"
-    Integral windup: during the climb the thrust saturates, altitude error integrates, and the accumulated integral overshoots the hover point — porpoising. Clamp or freeze integration while saturated.
+??? note "Answer sketches"
+    **1.** P output is strictly proportional to error, so the constant effort that cancels a constant disturbance has to be bought with a permanent error \(e = d/k_p\) — at zero error the controller commands zero. Raising \(k_p\) shrinks the offset (\(y = \frac{k_p}{1+k_p} r\)) but never removes it; only a term that sustains nonzero output at zero error — the integral — can.
+
+    **2.** \(y/r = k_p/(1 + k_p) = 4/5 = 0.8\) — 80% of the setpoint, i.e. 20% steady-state error.
+
+    **3.** Integral windup: during the climb the thrust saturates, altitude error integrates, and the accumulated integral overshoots the hover point — porpoising. Clamp or freeze integration while saturated.
+
+    **4.** Cascade, because the inner loop kills torque-level disturbances (friction, gravity load, back-EMF, gearbox stiction) inside its own fast time constant, before they ever surface as position error — and it hands the outer loop a plant that behaves like a clean integrator of commanded velocity, which is trivial to tune. One position PID would have to cover fast actuator dynamics and slow position dynamics with a single gain set, so it gets detuned to the slower one; cascading also gives you velocity and acceleration limiting for free at the interface.
 
 ### Interactive quiz
 

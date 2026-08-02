@@ -93,8 +93,14 @@ Run numerical IK to targets sweeping from well-inside the workspace to just past
 3. *(Debugging)* Your IK converges but the elbow oscillates between two configurations on alternate calls. Why, and what's the fix?
 4. *(System design)* A 6-DOF arm has infinite IK solutions for most poses (redundancy). Name two useful secondary objectives to spend the redundancy on.
 
-??? note "Answer sketch for Q2"
-    \(D = (1.44 - 2)/2 = -0.28\); \(\theta_2 = \pm 1.855\) rad (±106.3°) — elbow-up and elbow-down, symmetric about the reach line.
+??? note "Answer sketches"
+    **1.** Near a singularity \(\sigma_{min}(J) \to 0\) and the pseudoinverse's \(1/\sigma\) factor blows up; damping replaces it with \(\sigma/(\sigma^2 + \lambda^2)\), bounded by \(1/(2\lambda)\), so joint speeds stay finite and the arm degrades gracefully instead of exploding. Away from singularities you pay the ridge-regression price: the step is shrunk and biased toward zero, so convergence is slower and the residual never quite reaches zero unless you anneal \(\lambda\).
+
+    **2.** \(D = (1.44 - 2)/2 = -0.28\); \(\theta_2 = \pm 1.855\) rad (±106.3°) — elbow-up and elbow-down, symmetric about the reach line.
+
+    **3.** Branch flipping: the solver is re-initialized each call, and the two branches are equally valid minima, so it converges to elbow-up or elbow-down depending purely on where it started. Fix: warm-start from the previous solution — or commit to one branch (fix the sign of \(\theta_2\)) and reject solutions that cross it.
+
+    **4.** Maximize manipulability (push \(\sigma_{min}(J)\) up, keeping the arm off singularities) and stay away from joint limits. Both enter through the null-space projector, \(\Delta\theta = J^{+} e + (I - J^{+}J)\,\nabla h\), so they cost nothing in task-space accuracy; collision clearance and "stay near the previous configuration" are the other two you meet in production.
 
 ### Interactive quiz
 

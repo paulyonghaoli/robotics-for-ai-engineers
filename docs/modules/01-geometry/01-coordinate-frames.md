@@ -120,8 +120,14 @@ Run the round-trip: transform 1,000 random points `sensor → map → sensor` an
 3. *(Debugging)* A teammate's occupancy grid is mirrored left-right relative to reality. Which single-character bug in `rot2` would cause this, and why does composition still "work"?
 4. *(System design)* Your robot has 4 sensors, 2 arms, and a mobile base. How many frames do you define, which transforms are static vs dynamic, and where does each get published?
 
-??? note "Answer sketch for Q2"
-    \(T_{map \leftarrow cam} = T_{map \leftarrow base} T_{base \leftarrow cam}\). The base faces \(+y\), so a mount 0.2 m "ahead" is at \((2, 1.2)\); orientation \(90° - 90° = 0°\) — the camera faces \(+x\) in the map.
+??? note "Answer sketches"
+    **1.** The linear block of a rigid transform is orthogonal, so \(R^{-1} = R^\top\) — the inverse is a transpose plus one matrix-vector product, exact and \(O(n^2)\). A general affine map's linear block carries arbitrary scale and shear, so it has no structural inverse: you need an actual solve, \(O(n^3)\), undefined when the block is singular, and numerically fragile when it is merely close to singular.
+
+    **2.** \(T_{map \leftarrow cam} = T_{map \leftarrow base} T_{base \leftarrow cam}\). The base faces \(+y\), so a mount 0.2 m "ahead" is at \((2, 1.2)\); orientation \(90° - 90° = 0°\) — the camera faces \(+x\) in the map.
+
+    **3.** The minus sign is on the wrong sine: `[[c, s], [-s, c]]` instead of `[[c, -s], [s, c]]`, which builds \(R(-\theta) = R(\theta)^\top\). Composition still "works" because \(R(-\theta_1) R(-\theta_2) = R(-(\theta_1 + \theta_2))\) — the matrices are still orthonormal, still closed under multiplication, and inverse round-trips still pass to machine precision, so every self-consistency check succeeds. What actually happened is that the whole world is reflected about the base x-axis, which for a robot facing \(+x\) reads as a left-right mirrored grid.
+
+    **4.** About 14 frames: `map`, `odom`, `base_link`, one per sensor (4), an arm-base plus per-link frames for each arm, and a tool frame per arm. The mounts (`base_link → sensor_*`, `base_link → arm_*_base`, tool offsets) are static — declare them in the URDF and let `robot_state_publisher` latch them on `/tf_static` rather than hard-coding an offset in application code; the arm's joint edges are dynamic and come from the same node driven by `/joint_states`. `odom → base_link` is published by the wheel-odometry node and `map → odom` by the localizer: one publisher per edge, since two writers on one edge is the inverted-convention and multi-parent failure mode waiting to happen.
 
 ### Interactive quiz
 

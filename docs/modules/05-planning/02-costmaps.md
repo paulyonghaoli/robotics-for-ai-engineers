@@ -56,8 +56,14 @@ On one map, plan with \(w \in \{0, 2, 10\}\): measure path length and minimum cl
 3. *(Debugging)* Your robot suddenly hugs walls after a map update, though no parameters changed. What property of the *distance field* should you check?
 4. *(System design)* Encode "avoid the loading dock 2–3 pm" using costmap machinery. What layer, what update path, what failure if you get the max/sum choice wrong?
 
-??? note "Answer sketch for Q2"
-    \(100 \cdot e^{-2(0.5)} = 100 e^{-1} \approx 36.8\).
+??? note "Answer sketches"
+    **1.** Layers are independent *statements about the same cell*, not independent obstacles: the static layer's wall and the obstacle layer's live reading of that wall are one wall seen twice. Max takes the most pessimistic claim, is idempotent under re-observation, and preserves lethal-as-lethal; sum double-counts correlated evidence, so a cell covered by three moderate skirts accumulates a wall that no layer ever asserted — the 3.5/4.1 correlated-evidence bug wearing planning clothes.
+
+    **2.** \(100 \cdot e^{-2(0.5)} = 100 e^{-1} \approx 36.8\).
+
+    **3.** Check the distance field's **saturation** — the maximum distance it actually computes, and the units it computes it in. The chamfer transform is usually truncated at the inflation radius (and often produced in *cells*, then scaled by resolution); if the new map is more open, or its resolution changed, every cell past the truncation gets the same clamped \(d\), the exponential skirt flattens to a constant, and search sees no clearance gradient at all — so it minimizes length alone and rides the inscribed boundary. Fix: recompute the field in metres over a range wide enough to cover the corridor half-width, and verify cost varies from wall to centreline before blaming the planner.
+
+    **4.** A separate **time-varying policy layer** in the layered costmap, holding a high-but-finite cost polygon over the dock, re-evaluated on the costmap's own update tick from a schedule so it stamps itself at 2 pm and clears at 3 pm without ever touching the static or obstacle layers (which stay debuggable in isolation). Compose by max, and keep the cost finite: sum would stack the policy cost onto the inflation skirt near the dock's walls and manufacture an impassable band the planner can't route around, and a lethal encoding would fail outright on the day the dock is the only connected route — the "cost so high paths can't exist" failure, on a schedule.
 
 ### Interactive quiz
 

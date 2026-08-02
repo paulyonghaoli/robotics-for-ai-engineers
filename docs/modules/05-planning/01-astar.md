@@ -64,8 +64,14 @@ On a 100×100 world with rooms: run Dijkstra (\(h=0\)), A* (octile), and weighte
 3. *(Debugging)* Your A* returns paths 2–5% longer than a colleague's on the same maps, only when routes have long diagonal stretches. Find the bug.
 4. *(System design)* A warehouse robot replans at 2 Hz on a 400×400 costmap with a 20 ms budget. Choose: plain A*, weighted A*, or D*-Lite incremental replanning — and defend it.
 
-??? note "Answer sketch for Q2"
-    \(h = (5+3) + (\sqrt{2}-2)\cdot 3 = 8 - 1.757 = 6.24\); optimal = 3 diagonal + 2 straight = \(3\sqrt{2} + 2 \approx 6.24\). Octile is exact on open ground — the tightest admissible grid heuristic.
+??? note "Answer sketches"
+    **1.** Consistency, \(h(n) \le c(n,n') + h(n')\), makes \(f\) non-decreasing along every path, so the priority queue pops nodes in non-decreasing \(f\) order. Any path discovered later must therefore have \(f\) at least as large as the one already used to expand a node, and cannot improve its \(g\) — the node is final on first pop, no reopening. Admissibility alone gives you optimality *at the goal* but permits a node to be expanded with an inflated \(g\) and improved later, which is exactly what the reopening bookkeeping exists to catch.
+
+    **2.** \(h = (5+3) + (\sqrt{2}-2)\cdot 3 = 8 - 1.757 = 6.24\); optimal = 3 diagonal + 2 straight = \(3\sqrt{2} + 2 \approx 6.24\). Octile is exact on open ground — the tightest admissible grid heuristic.
+
+    **3.** An inadmissible heuristic — almost certainly Manhattan (\(\Delta x + \Delta y\)) copy-pasted from 4-connected code onto 8-connected motion. Manhattan charges 2 for a diagonal step that costs \(\sqrt{2}\), so it *overestimates* cost-to-go by up to \((2-\sqrt{2})\min(\Delta x,\Delta y)\), which is zero on axis-aligned routes and grows exactly with diagonal content — hence the symptom's selectivity. Fix: use the octile heuristic, and add the brute-force-Dijkstra optimality test on random grids so it can't regress.
+
+    **4.** **D\*-Lite.** 400×400 = 160k cells, and a from-scratch A\* only fits 20 ms in the easy case — the moment the route is blocked and the heuristic stops helping, expansion counts spike precisely in the cycle where replanning matters most, which is the wrong place to have a variable-cost planner. Between 2 Hz cycles the costmap changes in a small neighbourhood of the robot, so D\*-Lite repairs only the affected region and its cost tracks the change, not the map. If incremental replanning is too much machinery to own, ship weighted A\* (\(\varepsilon \approx 1.5\)–2) with an anytime deadline and take best-so-far; plain A\* is the option to rule out, since bounded-suboptimal-on-time beats optimal-sometimes for a controller waiting on a path.
 
 ### Interactive quiz
 

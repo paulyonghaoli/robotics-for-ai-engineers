@@ -86,8 +86,14 @@ Drive a simulated robot in a circle (constant \(v_x = 1\) m/s, \(\omega = 0.5\) 
 3. *(Debugging)* A robot commanded to drive straight slowly veers left in odometry but drives straight per an external tracker. List two distinct causes and how to distinguish them.
 4. *(System design)* Odometry can run at 20, 50 or 200 Hz. What trades off, and what would make you pick each?
 
-??? note "Answer sketch for Q2"
-    \(v_x = 1.0\) m/s, \(\omega = 0.8\) rad/s, radius \(= v_x/\omega = 1.25\) m.
+??? note "Answer sketches"
+    **1.** Euler cuts the corner of the arc the same way every step, so the error is a signed bias tied to the turn direction: over \(N\) steps it accumulates as \(O(N)\), while zero-mean sensor noise accumulates as a random walk, \(O(\sqrt N)\). And a filter can shrink noise by averaging and can carry it as process covariance, but a bias that isn't in the motion model is indistinguishable from real motion — it goes straight into the state estimate and stays there.
+
+    **2.** \(v_x = 1.0\) m/s, \(\omega = 0.8\) rad/s, radius \(= v_x/\omega = 1.25\) m.
+
+    **3.** The odometry is wrong, not the motion. Either (a) mismatched effective wheel radii / encoder scale, so equal true wheel speeds are reported as \(v_r \neq v_l\) and \(\omega = (v_r - v_l)/b\) comes out nonzero, or (b) a yaw-rate bias in the gyro, if odometry fuses an IMU. Distinguish by time vs distance: park the robot for a minute — heading that drifts while stationary is gyro bias, since a wheel-scale error only accrues with distance travelled — and as a second check, drive the same path in reverse, which flips a wheel-scale veer to the right while a gyro bias keeps drifting the same way.
+
+    **4.** Run 50 Hz. At 50 Hz with the arc model, discretization error is already below encoder quantization noise (the section G result), whereas 20 Hz adds integration error on fast turns *and* latency to whatever controller consumes `odom → base`, and 200 Hz mostly publishes quantization noise while quadrupling TF buffer traffic and CPU for no accuracy gain. Go to 200 Hz only if an EKF fusing a high-rate IMU wants matched prediction steps; drop to 20 Hz only on a bandwidth-starved link or a genuinely slow robot.
 
 ### Interactive quiz
 

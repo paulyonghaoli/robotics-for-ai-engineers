@@ -11,15 +11,15 @@ Every autonomous robot — warehouse AMR, self-driving car, inspection drone —
 ## B. The loop
 
 ```mermaid
-graph LR
-    S[Sensors<br>camera · LiDAR · IMU · encoders] --> P[Perception<br>detect · segment · track]
-    P --> E[State estimation<br>where am I? filters, fusion]
-    E --> M[Mapping<br>what does the world look like?]
-    M --> PL[Planning<br>global route · local trajectory]
+graph TD
+    S["Sensors<br>camera · LiDAR · IMU · encoders"] --> P["Perception<br>detect · segment · track"]
+    P --> E["State estimation<br>where am I?"]
+    E --> M["Mapping<br>what does the world look like?"]
+    M --> PL["Planning<br>global route · local trajectory"]
     E --> PL
-    PL --> C[Control<br>track the trajectory]
-    C --> A[Actuators<br>motors · steering]
-    A -. physics .-> S
+    PL --> C["Control<br>track the trajectory"]
+    C --> A["Actuators<br>motors · steering"]
+    A -. "physics" .-> S
 ```
 
 The dotted edge is the one ML pipelines don't have: actuation changes the world, which changes the next sensor reading. Everything in Modules 1–6 lives on this diagram.

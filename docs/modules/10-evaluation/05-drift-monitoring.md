@@ -71,8 +71,14 @@ Run the capstone with a slowly-degrading lidar — multiply `RANGE_SIGMA` by 1.0
 3. *(Debugging)* NIS rose two weeks ago and stayed high; success rate is unchanged. Ignore it or investigate?
 4. *(System design)* Design monitoring for a 50-robot fleet: what's measured at each layer, what pages someone, what only appears on a dashboard, and how the reference window is maintained.
 
-??? note "Answer sketch for Q2"
-    \(24 \times 20 \times 0.05 = 24\) false alarms per day — roughly one per hour, from a system where nothing is wrong. This is why persistence requirements and CUSUM are not optional refinements.
+??? note "Answer sketches"
+    **1.** Because the stack has margin. A filter and a controller absorb a degraded sensor — wider innovations, more replanning — and keep completing deliveries until that margin is used up, so the input statistics move first, the belief layer (NIS) second, and success rate only once the reserve is gone. The gap is the useful part because it is the *only* window in which action is cheap: it's the warning budget, and section G's experiment measures its size on your own system.
+
+    **2.** \(24 \times 20 \times 0.05 = 24\) false alarms per day — roughly one per hour, from a system where nothing is wrong. This is why persistence requirements and CUSUM are not optional refinements.
+
+    **3.** Investigate. Two weeks of sustained elevation is exactly what a persistence requirement is designed to pass — this is not single-window noise — and it says the filter's measurements no longer match its model; an unchanged success rate is the outcome layer lagging, which is its documented behaviour, not an exoneration. Pull the input-layer statistics over the same window to localize it (return rate and range histogram falling → physical sensor degradation; inputs clean → calibration or model mismatch), and confirm the reference window itself hasn't drifted into normalizing the problem away.
+
+    **4.** **Input layer:** per-robot lidar return rate, range histogram, and image brightness, aggregated hourly and compared to the reference by KS/PSI — dashboard only, never pages, because lighting moves daily. **Belief layer:** NIS against its χ² band per robot, run through a CUSUM with slack at half the shift you care about; pages the fleet on-call only under persistence (3 consecutive hours over threshold) or when input drift co-fires on the same robot — that conjunction is the real signal. **Outcome layer:** collisions page immediately; intervention rate per robot per week is reviewed on a dashboard and pages when it exceeds its budget. Maintain the reference window as a pinned, curated known-good period, version-controlled and refreshed *deliberately* (after a calibration change or a seasonal shift), never as a rolling window; and give every paging rule a named owner and a runbook, or it is decoration.
 
 ### Interactive quiz
 

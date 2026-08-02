@@ -84,8 +84,14 @@ Run the capstone's reference stack at `--episodes 8`, then 32, then 128, recordi
 3. *(Debugging)* A colleague's stack scores 90% on their suite and 55% on yours, same code. List four candidate causes before concluding either suite is wrong.
 4. *(System design)* You have a 4-hour nightly CI budget; one episode takes 30 seconds. Design the regression suite: how many scenarios, how many repeats, what gets reported, and what triggers a build failure?
 
-??? note "Answer sketch for Q2"
-    \(\hat{p} = 0.72\), \(n = 25\): margin ≈ \(1.96\sqrt{0.72 \cdot 0.28 / 25} \approx 0.176\) — roughly ±18 points, so about 54%–90%. That interval contains 60%, so **no**, you cannot distinguish it from the baseline. This is the arithmetic behind the field's 20%-significance finding.
+??? note "Answer sketches"
+    **1.** The normal approximation's width is driven by \(\sqrt{\hat{p}(1-\hat{p})/n}\), and at \(\hat{p} = 1\) that term is exactly zero — it reports the interval \([100\%, 100\%]\), claiming perfect certainty from eight episodes. Wilson's \(z^2/2n\) term pulls the centre off 1 and its \(z^2/4n^2\) term keeps the width positive, giving roughly **68%–100%** at 8/8: still optimistic, but an honest statement that a 70%-true-rate stack passes eight episodes often enough that you cannot rule it out.
+
+    **2.** \(\hat{p} = 0.72\), \(n = 25\): margin ≈ \(1.96\sqrt{0.72 \cdot 0.28 / 25} \approx 0.176\) — roughly ±18 points, so about 54%–90%. That interval contains 60%, so **no**, you cannot distinguish it from the baseline. This is the arithmetic behind the field's 20%-significance finding.
+
+    **3.** (a) Different difficulty distributions — their suite may be narrow where yours is stratified, so the aggregates are estimating different populations; (b) their stack was tuned against their own suite, which has quietly become a training set; (c) unstated protocol differences — initial-state ranges, reset procedure, sensor-noise constants, timeout length — the variables RoboDojo standardized because they dominated cross-lab gaps; (d) different success definitions or silent truncation, e.g. timed-out episodes dropped on one side and scored as failures on the other. Resolve it by running both stacks paired on the *same* seeds under one success definition and reporting per difficulty band, rather than arguing about which aggregate is right.
+
+    **4.** 4 h ÷ 30 s = 480 episodes; budget 400 and keep the rest for retries. Spend them as **100 pinned scenarios stratified into 4 difficulty bands (25 each) × 4 seeds**, run paired against the last released commit on identical seeds. Report per-band success with Wilson intervals, a bootstrap interval on the paired difference, and p95 (not mean) latency; fail the build only when the difference interval lies entirely below zero **and** the drop exceeds a 3-point effect-size floor, so that statistically real but operationally trivial wobble warns instead of blocking.
 
 ### Interactive quiz
 

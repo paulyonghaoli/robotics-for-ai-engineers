@@ -59,8 +59,14 @@ On the exercise's constrained cart: sweep horizon N ∈ {3, 10, 30} and watch sh
 3. *(Debugging)* Your MPC tracks well but chatters between +u_max and −u_max every step. Which weight is wrong?
 4. *(System design)* Split the capstone's navigation between A* and an MPC local controller: who owns obstacles, who owns dynamics, and at what rates?
 
-??? note "Answer sketch for Q2"
-    Stopping distance \(v^2/2u_{max} = 2\) m; the wall at 2.5 m leaves 0.5 m of margin, but braking takes 2 s = 4 steps — a horizon shorter than ~4 steps literally cannot represent stopping in time.
+??? note "Answer sketches"
+    **1.** The tail of the sequence is optimal for the *predicted* state trajectory, and the model is wrong, so executing it open-loop compounds model error and disturbances for N steps with no correction. Applying only \(u_0\) and re-solving from the freshly measured state is exactly where feedback re-enters — the receding horizon is what turns an open-loop optimization into a closed-loop controller.
+
+    **2.** Stopping distance \(v^2/2u_{max} = 2\) m; the wall at 2.5 m leaves 0.5 m of margin, but braking takes 2 s = 4 steps — a horizon shorter than ~4 steps literally cannot represent stopping in time.
+
+    **3.** \(R\) is too small relative to \(Q\): with no meaningful price on control effort, bang-bang is (marginally) the cheapest way to hold the state target, and nothing in the cost penalizes reversing sign every single step. Raise \(R\), or better, add an input-rate term \(\|u_k - u_{k-1}\|^2_{R_\Delta}\), which attacks the chatter directly without making the controller sluggish overall.
+
+    **4.** A* owns the static map and the global route, replanned at ~1 Hz or on map change; MPC owns dynamics, actuator and velocity/acceleration constraints, and near-field dynamic obstacles at control rate (10–50 Hz) over a 1–2 s horizon, tracking the A* path as its reference. The split follows the blind spots: A* has no dynamics model and cannot run at control rate, while MPC's horizon is far too short to reason its way out of a dead end.
 
 ### Interactive quiz
 

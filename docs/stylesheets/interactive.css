@@ -169,3 +169,26 @@ quiz-bank, code-exercise {
 /* dark scheme tweaks */
 [data-md-color-scheme="slate"] .rai-card { background: rgba(255, 255, 255, 0.03); }
 [data-md-color-scheme="slate"] .rai-opt:hover { background: rgba(255, 255, 255, 0.06); }
+
+
+/* --- Mermaid diagrams -------------------------------------------------
+   Mermaid scales an SVG down to fit its container, which on wide graphs
+   shrinks label text to the point of illegibility. Pin a readable size
+   and let wide diagrams scroll instead of shrink. */
+.mermaid {
+  overflow-x: auto;
+  text-align: center;
+}
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.mermaid .nodeLabel,
+.mermaid .edgeLabel,
+.mermaid .label {
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+}
+.mermaid .edgeLabel {
+  font-size: 13px !important;
+}

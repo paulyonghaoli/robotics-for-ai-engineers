@@ -78,8 +78,14 @@ On the constant-velocity tracker: multiply your assumed \(R\) by 10 (pessimistic
 3. *(Debugging)* RMSE is low but NIS averages 8 on a 1-D measurement. What is wrong and why is it dangerous?
 4. *(System design)* GPS (1 Hz, meters of noise, absolute) + IMU (200 Hz, drifting, relative). Sketch the fusion: what does each sensor's update contribute, and why does the combination beat either alone?
 
-??? note "Answer sketch for Q2"
-    \(K = 4/(4+1) = 0.8\); \(x = 5 + 0.8(6-5) = 5.8\); \(P = (1-0.8)\cdot4 = 0.8\). The posterior sits 80% of the way to the more-confident measurement.
+??? note "Answer sketches"
+    **1.** Predict adds \(Q\) because time passes with no new information and the motion model is imperfect — the belief is pushed forward and smeared. Update is a precision-weighted average of two independent opinions, and combining precisions can only add, so \(P\) strictly shrinks (that's the \((I-KH)\) factor). A \(P\) that never shrinks means \(K \approx 0\): the filter is ignoring its measurements — \(R\) absurdly large, \(H\) wrong or zero in the relevant rows — and is running pure dead reckoning.
+
+    **2.** \(K = 4/(4+1) = 0.8\); \(x = 5 + 0.8(6-5) = 5.8\); \(P = (1-0.8)\cdot4 = 0.8\). The posterior sits 80% of the way to the more-confident measurement.
+
+    **3.** Expected NIS on a 1-D measurement is 1, so an average of 8 says \(S = HPH^\top + R\) is about 8× too small — the filter is overconfident, with \(Q\) and/or \(R\) understated. It's dangerous because the low RMSE is on loan: the gain has collapsed toward 0, so the first real model error or unmodeled maneuver will be met with a filter that ignores exactly the measurements that would correct it, diverging while reporting tiny covariance. Inflate \(Q\) (or fix \(R\) if it was mismeasured) until NIS averages ≈ 1.
+
+    **4.** The IMU at 200 Hz drives predict — smooth, low-latency, and cheap between fixes — but its bias makes position error grow like \(t^2\), so \(P\) inflates fast; the 1 Hz GPS contributes an absolute-position update with a large \(R\) (meters) that resets that accumulated drift every second and, with bias states in \(x\), makes the IMU biases observable. Neither works alone: IMU-only drifts without bound, GPS-only is too slow and too noisy for control and says nothing about attitude. The combination wins because the error structures are complementary — fast-relative and slow-absolute — which is precisely the pair a precision-weighted average exploits best.
 
 ### Interactive quiz
 

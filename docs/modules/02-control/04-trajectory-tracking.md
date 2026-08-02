@@ -62,8 +62,14 @@ Track a figure-eight (two tangent circles — a curvature sign flip at the cross
 3. *(Debugging)* Your robot tracks well everywhere except immediately after passing the figure-eight crossing, where it briefly steers toward the wrong lobe. Diagnose.
 4. *(System design)* Speed-scaled lookahead \(L = kv\): derive what stays constant as speed varies, and why that's the stabilizing property.
 
-??? note "Answer sketch for Q2"
-    \(L^2 = 3.6\); \(\kappa = 1.2/3.6 = 1/3\); \(\omega = 1/3\) rad/s; radius 3 m.
+??? note "Answer sketches"
+    **1.** The law is the curvature of the unique circle through the robot and the goal that is tangent to the current heading; its radius is \(L^2/(2 y_b)\), so once the chord length is pinned at \(L\), the longitudinal component is already accounted for and only the lateral offset carries steering information. A purely longitudinal goal (\(y_b = 0\)) means the goal is dead ahead — zero curvature, drive straight.
+
+    **2.** \(L^2 = 3.6\); \(\kappa = 1.2/3.6 = 1/3\); \(\omega = 1/3\) rad/s; radius 3 m.
+
+    **3.** Nearest-vertex aliasing at the self-crossing: the global nearest-point search snaps onto the *other* branch of the eight, which passes within centimetres, so the lookahead point is drawn from the wrong lobe until the robot moves clear. Fix: track progress along the path monotonically — search for the nearest vertex only forward of the last matched index, within a bounded window.
+
+    **4.** What stays constant is the *lookahead time*, \(L/v = k\): the robot always previews a fixed number of seconds ahead regardless of speed. That is the stabilizing property — at fixed \(L\), doubling \(v\) halves the time available to complete the corrective arc, so effective loop gain grows with speed until it oscillates. Holding the preview time fixed makes closed-loop damping speed-invariant (and note \(\omega = v\kappa = 2 y_b / (k^2 v)\), so commanded turn rate *falls* as speed rises).
 
 ### Interactive quiz
 

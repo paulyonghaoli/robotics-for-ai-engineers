@@ -78,8 +78,14 @@ Take the capstone's episode logs (`results.json` records seed, success, collisio
 3. *(Debugging)* Performance dropped after ingesting a new batch. What provenance fields let you find the cause in minutes rather than weeks?
 4. *(System design)* Design the ingestion pipeline for a 10-robot fleet producing 500 trajectories/day: schema, validation gates, dedup, versioning, and what you keep from failed runs.
 
-??? note "Answer sketch for Q2"
-    38,000 redundant trajectories ÷ 12 per hour × $120 ≈ **$380,000** — for the last 12% of performance. That arithmetic is why curation is a funded engineering discipline rather than a nice-to-have.
+??? note "Answer sketches"
+    **1.** Because the label is embodiment-specific. Two trajectories with near-identical observations but different robots, calibrations, or teleoperators carry *contradictory* action targets, so the policy is fit toward an average of incompatible action distributions rather than either one — negative transfer. A classifier's extra data usually shares label semantics across sources, and its added rows are near-duplicates that cost only compute; here they actively move the conditional mean and crowd out the rare behaviours that carry the signal.
+
+    **2.** 38,000 redundant trajectories ÷ 12 per hour × $120 ≈ **$380,000** — for the last 12% of performance. That arithmetic is why curation is a funded engineering discipline rather than a nice-to-have.
+
+    **3.** `parent_dataset_version` plus `collected_at` isolate the batch; then slicing it by `robot_id`, `firmware_version`, `calibration_id`, `operator_id`, and `scene_id` finds the shared attribute — a miscalibrated arm, one operator's habit, a firmware bump — and `source`/`generator_seed` does the same for synthetic rows. The fix is a re-run with the offending slice held out, measuring per-source contribution rather than trusting that pooling helps; without those fields the only available move is bisecting retrains over the whole batch, which is the weeks-not-minutes version.
+
+    **4.** Ingest against the section C schema with every field required at write time, and gate on it: reject (to a quarantine bucket, never delete) any trajectory missing `outcome`, `calibration_id`, or — for synthetic rows — `generator_seed`, plus sanity checks on duration, sensor ranges, and dropped frames. Dedup nightly by similarity over trajectory features, keeping one representative per cluster and *recording cluster ids* so the discards stay recoverable; 5,000 trajectories/day makes this the difference between a coreset and a landfill. Version by immutable daily append-only snapshots with a weekly tagged release that names its `parent_dataset_version` and carries the coreset manifest — and keep every failure and intervention, labelled as such, since those are the recovery data the field is documented to throw away.
 
 ### Interactive quiz
 

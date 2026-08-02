@@ -86,8 +86,14 @@ Build a 6-frame tree and verify the consistency property: `lookup(a, c)` equals 
 3. *(Debugging)* Every frame downstream of `base` is wrong by the same rotation, but `odom → base` checks out against ground truth. Which edge do you inspect next and why?
 4. *(System design)* A robot arm on a mobile base with a wrist camera: draw the frame tree, mark which edges are static, and state which node publishes each dynamic edge.
 
-??? note "Answer sketch for Q2"
-    Compose left to right: base is at (6, 2) facing +y; the LiDAR mounts 0.5 m along base-x, which points along map +y → (6, 2.5, 90°). (This is the library test case.)
+??? note "Answer sketches"
+    **1.** Two consumers need incompatible guarantees out of the same pose. `odom → base_link` is continuous and differentiable but drifts without bound; `map → odom` is the localizer's discrete correction, so every localization jump lands in *that* edge and leaves `odom → base_link` smooth — controllers take the smooth edge, planners take the composed `map → base_link`. Publishing `map → base_link` directly would force the jumps into the edge controllers differentiate (velocity spikes), and `base_link` can only have one parent anyway.
+
+    **2.** Compose left to right: base is at (6, 2) facing +y; the LiDAR mounts 0.5 m along base-x, which points along map +y → (6, 2.5, 90°). (This is the library test case.)
+
+    **3.** `map → odom`. A common-mode error — the *same* rotation on every child of `base` — cannot come from the per-sensor mount edges, since those are independent and would each be wrong differently; it has to sit on an edge shared by all the paths, and `odom → base` is already cleared against ground truth. Look for a constant yaw offset out of the localizer: a wrong initial-pose heading, or degrees published where radians are expected.
+
+    **4.** Tree: `map → odom → base_link`, with `base_link → arm_base → link_1 … link_6 → wrist → camera_link → camera_optical_frame`, plus the base's own sensor frames hanging off `base_link`. Static edges: `base_link → arm_base`, `wrist → camera_link`, and the optical-frame rotation — mount and calibration values that belong in the URDF and get latched once on `/tf_static`. Dynamic edges: `map → odom` from the localizer, `odom → base_link` from the wheel-odometry node, and each `link_i → link_{i+1}` from `robot_state_publisher` fed by the arm driver's `/joint_states`.
 
 ### Interactive quiz
 

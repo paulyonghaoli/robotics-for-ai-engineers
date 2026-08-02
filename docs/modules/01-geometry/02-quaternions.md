@@ -117,8 +117,14 @@ Compose a small rotation (1° about a tilted axis) with itself 100,000 times, on
 3. *(Debugging)* An attitude estimator's output occasionally "spins" 360° in one frame while the physical IMU moved smoothly. What's the bug?
 4. *(System design)* Your logging format stores orientations. Choose a representation and justify it against: interpolation for replay, storage size, human debuggability, and convention safety across three consumer teams.
 
-??? note "Answer sketch for Q3"
-    Consecutive quaternion estimates crossed the double cover: the filter (or its output serializer) isn't enforcing \(q_k \cdot q_{k-1} \geq 0\). Sign-align each output against the previous one.
+??? note "Answer sketches"
+    **1.** Rotation is the two-sided product \(v' = q\,v\,q^{*}\), so the quaternion's angle gets applied twice — once by \(q\) and once by \(q^{*}\) — and the half-angle is exactly what makes the sandwich come out to \(\theta\). With \(q = [\cos\theta, \sin\theta\,\hat n]\) the sandwich rotates by \(2\theta\), so every rotation doubles and quaternion multiplication no longer corresponds to composing the rotations the factors name.
+
+    **2.** \(\theta = 180°\) about \(\hat n = (0,0,1)\): \(q = [\cos 90°,\; 0,\; 0,\; \sin 90°] = [0, 0, 0, 1]\). Rotating \((1,0,0)\), the first column of \(R(q)\) with \(w = x = y = 0,\, z = 1\) is \([\,1-2(y^2+z^2),\; 2(xy + wz),\; 2(xz - wy)\,] = [\,1-2,\; 0,\; 0\,] = (-1, 0, 0)\) — \(+x\) flips to \(-x\), as it must.
+
+    **3.** Consecutive quaternion estimates crossed the double cover: the filter (or its output serializer) isn't enforcing \(q_k \cdot q_{k-1} \geq 0\). Sign-align each output against the previous one.
+
+    **4.** Store unit quaternions, scalar-first, with the ordering and the frame pair named in the schema header and validated at ingest — 4 floats, directly slerp-able for replay, no gimbal lock, and one documented convention is what stops three consumer teams from each guessing (the schema-drift failure from section D). Canonicalize the sign on write (\(w \geq 0\)) so the double cover never reaches a consumer, and normalize on write so no reader inherits a scale-carrying rotation matrix. Human debuggability is the only real loss: recover it in the log *viewer* by printing derived roll-pitch-yaw beside the raw quaternion, never by storing Euler angles as the source of truth.
 
 ### Interactive quiz
 

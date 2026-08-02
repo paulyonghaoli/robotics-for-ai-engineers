@@ -52,8 +52,14 @@ The exercise's world, extended: drive the loop three times. Plot (a) robot uncer
 3. *(Debugging)* After a long run your map is internally crisp but globally rotated 5° from the surveyor's ground truth. Is this a bug? What structural fact explains it?
 4. *(System design)* You must SLAM a warehouse with 10,000 pallet-corner landmarks. Argue from the math why EKF-SLAM is disqualified and what property the replacement must have.
 
-??? note "Answer sketch for Q3"
-    Not a bug: the map is determined only relative to the start (fact C1); a global rotation is in the unobservable gauge unless something world-anchored (GPS, a surveyed marker) pins it.
+??? note "Answer sketches"
+    **1.** Landmark 1 was initialized from robot poses whose error it inherited, so the joint covariance carries a non-zero off-diagonal block \(P_{1,r}\) between landmark 1 and the robot. Observing landmark 3 produces an innovation that corrects the robot block; because the Kalman gain \(K = P H^\top S^{-1}\) reads the *whole* column of \(P\), and \(H\) touches the robot block, \(K\) has non-zero rows for landmark 1. The correction therefore flows landmark 3 → robot → landmark 1 through the shared history stored in those off-diagonals — the map is corrected where nobody is looking.
+
+    **2.** State dimension \(3 + 2(50) = 103\); the covariance is \(103 \times 103 = 10{,}609\) entries (5,356 unique by symmetry). The cost is dominated by the dense covariance downdate \(P \leftarrow P - K S K^\top\): with a 2-D landmark measurement that's an \(n\times 2\) by \(2\times n\) outer product, \(\approx 2n^2 = 2(103)^2 \approx 2.1 \times 10^4\) multiply-adds per observation — small here, and quadratic in \(N\), which is the whole story.
+
+    **3.** Not a bug: the map is determined only relative to the start (fact C1); a global rotation is in the unobservable gauge unless something world-anchored (GPS, a surveyed marker) pins it.
+
+    **4.** At \(N = 10{,}000\), \(n = 3 + 20{,}000 = 20{,}003\): the covariance alone is \(\approx 4\times 10^8\) entries (~3.2 GB in float64) and each observation's downdate costs \(\approx 2n^2 \approx 8 \times 10^8\) multiply-adds — per landmark, per update, at sensor rate. EKF-SLAM is disqualified by the \(O(N^2)\) densification, not by any modelling flaw. The replacement must keep the information **sparse**: the pose-graph/factor-graph formulation of 4.4, where each measurement is an edge touching exactly two nodes, so the information matrix stays sparse and a well-ordered sparse Cholesky solves it in near-linear time.
 
 ### Interactive quiz
 

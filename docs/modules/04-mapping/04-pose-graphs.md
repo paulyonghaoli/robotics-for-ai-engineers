@@ -59,8 +59,14 @@ The exercise's square loop, extended: sweep the loop-closure edge's information 
 3. *(Debugging)* After adding place recognition, maps are usually better but occasionally fold catastrophically in repetitive warehouses. Explain both halves.
 4. *(System design)* Design the capstone's v3 SLAM: what makes edges, what triggers optimization, and which of Module 3's tools guards the front-end's proposals?
 
-??? note "Answer sketch for Q2"
-    Pinned \(x_0 = 0\); three chain edges want steps of 1.0 (sum 3.0), the loop edge wants \(x_3 = 2.4\) — a 0.6 disagreement across four equally-weighted edges. Least squares gives each edge a residual of 0.15: steps shrink to 0.85, so \(x_3 = 2.55\) (and the loop edge is missed by 0.15 too). The correction is *distributed*, not dumped at the closure.
+??? note "Answer sketches"
+    **1.** Because the objective is a sum over *all* edges, not a constraint to satisfy at one node. Snapping only the closing pose would zero the loop edge's residual at the price of one enormous residual on the odometry edge next to it, and squared cost punishes that concentration hard — \(k\) small residuals beat one \(k\)-sized residual. The stationary point instead spreads the disagreement around the cycle in inverse proportion to each edge's stiffness \(\Omega\), so every spring stretches a little and confident edges stretch least.
+
+    **2.** Pinned \(x_0 = 0\); three chain edges want steps of 1.0 (sum 3.0), the loop edge wants \(x_3 = 2.4\) — a 0.6 disagreement across four equally-weighted edges. Least squares gives each edge a residual of 0.15: steps shrink to 0.85, so \(x_3 = 2.55\) (and the loop edge is missed by 0.15 too). The correction is *distributed*, not dumped at the closure.
+
+    **3.** Better usually: genuine closures add long edges that cancel accumulated odometry drift, so global error drops everywhere the loop touches. Catastrophic occasionally: repetitive warehouses are perceptual aliasing machines — aisle 7 looks exactly like aisle 3, so the front-end proposes a confident edge between poses that are not the same place, and the back-end, having no way to doubt it, folds the map to satisfy the lie. Both halves are the same mechanism (edges are trusted at their stated \(\Omega\)); the defense is geometric verification before accepting a proposal plus a robust kernel so a surviving lie can be downweighted.
+
+    **4.** Nodes are keyframes, added every ~0.5 m or 30° of travel rather than every scan (a graph is cheap, but not free). Odometry edges come from scan matching (4.2) between consecutive keyframes with covariance from the match's Hessian — including the degeneracy inflation from that lesson. Loop-closure edges come from scan-matching the current keyframe against past keyframes inside the current pose covariance's search ellipse, seeded by the drifted estimate. Optimize on closure events (plus a cheap incremental pass between them), not per scan. The Module 3 guard on the front-end is the \(\chi^2\) gating test from 3.5: score the proposed relative pose against the graph's predicted relative pose and its covariance, and reject proposals that are statistically implausible before they ever reach the back-end — Huber kernels are the second line, not the first.
 
 ### Interactive quiz
 

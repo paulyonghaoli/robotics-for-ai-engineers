@@ -74,8 +74,14 @@ Initialize the EKF progressively farther from the truth (0.5 m, 2 m, 5 m, plus 9
 3. *(Debugging)* Your EKF tracks well until the robot drives directly toward a landmark, then briefly misbehaves. Which entries of \(H\) become ill-conditioned and why?
 4. *(System design)* You must estimate 3D pose + velocity + IMU biases (15 states) at 200 Hz on an embedded CPU. EKF, UKF, or PF — and what did each cost you?
 
-??? note "Answer sketch for Q2"
-    \(\delta = (4, 3)\), \(q = 25\), \(\sqrt{q} = 5\): \(H = \begin{bmatrix} -0.8 & -0.6 & 0 \\ 0.12 & -0.16 & -1 \end{bmatrix}\).
+??? note "Answer sketches"
+    **1.** The mean is a single point, and the best estimate of where that point goes is the true \(f\) and \(h\) — linearizing them would throw away accuracy for nothing. Covariance transport, by contrast, has a closed form only under a *linear* map (\(P \leftarrow F P F^\top + Q\)), so the Jacobian supplies the local tangent plane the Gaussian machinery needs. Nonlinear function for the point, its derivative for the spread.
+
+    **2.** \(\delta = (4, 3)\), \(q = 25\), \(\sqrt{q} = 5\): \(H = \begin{bmatrix} -0.8 & -0.6 & 0 \\ 0.12 & -0.16 & -1 \end{bmatrix}\).
+
+    **3.** As the robot closes on the landmark \(q = \|\delta\|^2 \to 0\), and the bearing row's position entries \(\delta_y/q,\, -\delta_x/q\) blow up like \(1/\|\delta\|\) — at short range a centimetre of lateral error swings the bearing by a large angle, so the linearization is valid over a vanishing neighbourhood and \(S\) becomes ill-conditioned. The range row stays bounded but its direction degenerates too. Fix: gate out landmarks below a minimum range, or drop the bearing row and fuse range-only when \(q\) is small.
+
+    **4.** Take the EKF — in error-state form, IMU-driven propagation, hand-checked Jacobians. The PF is disqualified outright: 15 dimensions means an exponentially infeasible particle count. The UKF would cost \(2n+1 = 31\) sigma points pushed through \(f\) every step at 200 Hz, roughly 31× the propagation work, and it buys accuracy only where the nonlinearity bends appreciably across the belief — which it does not for a well-initialized tight-belief tracking filter on an embedded budget. What the EKF costs you: derivatives you must derive and verify against finite differences, and no recovery from a bad initialization, so budget a separate bootstrap/global-alignment path.
 
 ### Interactive quiz
 

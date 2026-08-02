@@ -65,8 +65,14 @@ Drive the capstone simulator's robot on a fixed loop while mapping with **ground
 3. *(Debugging)* Your map shows a faint ring of obstacles at exactly 6 m radius around everywhere the robot has been. What's the bug?
 4. *(System design)* A delivery robot's map must "forget" parked cars within ~10 minutes but keep buildings forever. Design the update rule.
 
-??? note "Answer sketch for Q2"
-    \(l = 3(0.85) - 0.4 = 2.15\); \(p = 1 - 1/(1+e^{2.15}) \approx 0.896\).
+??? note "Answer sketches"
+    **1.** A beam stops only when something stops it, so a hit is a positive detection that is hard to fabricate; a pass-through, by contrast, is consistent with both "empty" and "an obstacle the beam missed" — thin poles, glass, grazing incidence, a chair leg between two rays. The inverse sensor model encodes that evidence gap directly as \(|l_{occ}| > |l_{free}|\), so one hit outweighs several free passes and thin structures survive being repeatedly carved by neighbouring rays.
+
+    **2.** \(l = 3(0.85) - 0.4 = 2.15\); \(p = 1 - 1/(1+e^{2.15}) \approx 0.896\).
+
+    **3.** Beam endpoint bookkeeping: 6 m is the lidar's max range, and max-range returns ("nothing came back") are being fed through the normal hit path, depositing \(l_{occ}\) at the far end of every unreturned ray. Fix: classify a reading as max-range when \(z \ge z_{max} - \epsilon\) and update it as *all free along the ray, no occupied endpoint* — Bresenham to the range limit, then stop.
+
+    **4.** Split the belief into two layers composed by maximum, Nav2-style: a **static layer** built offline from SLAM, saturated and never decayed (buildings), and a **dynamic obstacle layer** with a deliberately tight clamp so free evidence can win quickly. Size the clamp against the revisit rate: with \(l_{max} = 2.0\) and \(l_{free} = -0.4\), a fully saturated cell falls below \(p = 0.5\) after 5 free passes, so a route that re-observes the curb roughly every 2 minutes forgets a departed car in ~10 minutes, while the static layer is untouched by any amount of free evidence.
 
 ### Interactive quiz
 

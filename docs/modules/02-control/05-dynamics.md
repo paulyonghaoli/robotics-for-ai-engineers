@@ -56,8 +56,14 @@ The exercise's 1-link arm: hold \(\theta = 0\) (horizontal, worst case) with (a)
 3. *(Debugging)* An arm holds every setpoint perfectly except near vertical, where it oscillates slowly. Which term of the dynamics is mismodeled, and why does it show *there*?
 4. *(System design)* A pick-and-place arm's payload varies 0–5 kg per task. Design the compensation strategy — where does the payload estimate come from?
 
-??? note "Answer sketch for Q2"
-    \(\tau_g = m g (l/2) \cos 0 = 2 \cdot 9.81 \cdot 0.25 = 4.9\) N·m.
+??? note "Answer sketches"
+    **1.** P-control only produces torque in proportion to error, so holding a load of \(\tau_g\) requires a standing error of \(e = \tau_g/k_p\) — that error *is* the sag. Feedforward pays \(\tau_g(\theta)\) open-loop from the model, so zero error becomes an equilibrium and the feedback term is left with only the small unpredictable residual.
+
+    **2.** \(\tau_g = m g (l/2) \cos 0 = 2 \cdot 9.81 \cdot 0.25 = 4.9\) N·m.
+
+    **3.** Friction — stiction, the term the model leaves out. Near vertical \(\cos\theta \to 0\), so the gravity torque passes through zero: everywhere else the standing gravity load keeps the drivetrain preloaded on one side and the command comfortably outside the stiction band, but at vertical the command sits *inside* the deadband and the joint hunts across it in a slow limit cycle. Add friction feedforward or dither, or accept a small deadband around the setpoint.
+
+    **4.** Keep \(g(\theta)\) as feedforward with payload mass as an explicit parameter, and get that parameter from measurement rather than the task description: right after each grasp, hold a known pose and regress the joint-torque residual \(\tau_{meas} - \tau_{model}\) onto the payload's moment arm to identify \(m\). Leave a slow integral term in as backstop for estimate error, and re-identify on release — a dropped or mis-grasped part then shows up as an identifiable mismatch instead of a bias you keep injecting.
 
 ### Interactive quiz
 

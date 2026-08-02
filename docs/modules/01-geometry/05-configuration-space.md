@@ -81,8 +81,14 @@ Build the C-space map for two workspace obstacles and vary the *robot*: fatten t
 3. *(Debugging)* An arm planner produces paths where the elbow swings wildly between adjacent waypoints although the hand barely moves. What's the likely metric bug?
 4. *(System design)* Your warehouse robot is rectangular (1.2 × 0.6 m). Circular inflation by which radius is safe? What do you lose, and what would fix it?
 
-??? note "Answer sketch for Q4"
-    Safe: circumscribed radius \(\sqrt{0.6^2+0.3^2} \approx 0.67\) m — but narrow aisles the robot could pass lengthwise become blocked in C-space. Fix: plan in \((x, y, \theta)\) with the true footprint (Nav2's footprint-based collision checking), paying the extra dimension.
+??? note "Answer sketches"
+    **1.** For a disk robot the occupied set is \(A(q) = \mathrm{disk}(q, r)\), which merely *translates* with \(q\) — so it intersects an obstacle exactly when \(q\) lies within \(r\) of that obstacle, making \(\mathcal{C}_{obs}\) precisely \(\mathcal{O}\) dilated by \(r\) (the Minkowski sum) and collapsing the robot to a point. For a non-circular robot \(A(q)\) also depends on \(\theta\), so no single 2D dilation is correct: inflating by the circumscribed radius is conservative and blocks gaps the robot would actually fit through, inflating by the inscribed radius admits real collisions, and the honest fix is to keep \(\theta\) as a dimension.
+
+    **2.** The differential-drive base contributes \(SE(2)\), i.e. 3 configuration dimensions \((x, y, \theta)\); the arm adds 6 and the gripper 1, so \(\dim \mathcal{C} = 3 + 6 + 1 = 10\). Note that "DOF" is ambiguous here: the base is nonholonomic, so it has only 2 controls \((v_x, \omega)\) — 9 independent velocity inputs against a 10-dimensional C-space, which is why the base's motion is planned with the twist model of lesson 1.4 rather than as free \((x, y, \theta)\).
+
+    **3.** Distance is being measured in the workspace — end-effector position or pose — instead of in C-space, so an elbow-up and an elbow-down configuration whose hands nearly coincide score as neighbours despite being far apart in joint space. Fix: use a joint-space metric for both edge cost and interpolation — weighted L2 over the joint angles, with each difference wrapped to \((-\pi, \pi]\) so the torus topology is respected.
+
+    **4.** Safe: circumscribed radius \(\sqrt{0.6^2+0.3^2} \approx 0.67\) m — but narrow aisles the robot could pass lengthwise become blocked in C-space. Fix: plan in \((x, y, \theta)\) with the true footprint (Nav2's footprint-based collision checking), paying the extra dimension.
 
 ### Interactive quiz
 

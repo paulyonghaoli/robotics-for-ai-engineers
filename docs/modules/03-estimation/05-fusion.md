@@ -60,8 +60,14 @@ On the exercise's setup: sweep the gate threshold from 2σ to 10σ under (a) cle
 3. *(Debugging)* After a hard bump, your robot's filter rejects every GPS fix for 30 s, then snaps 2 m sideways. Reconstruct the sequence.
 4. *(System design)* Design the fusion for the capstone robot gaining a magnetometer: which states does it update, what gate, and what happens near the loading dock's steel door (lesson 3.4, Q3)?
 
-??? note "Answer sketch for Q3"
-    The bump jolted the state; honest GPS now looks like an outlier (gate death spiral); dead reckoning drifts 2 m; eventually an innovation squeaks under the gate — or a rejection cap fires — and the filter lurches to reality. Fix: consecutive-rejection cap + covariance inflation on impact detection.
+??? note "Answer sketches"
+    **1.** Each update is exact Bayesian conditioning, and conditioning on independent measurements factorizes: \(p(x \mid z_1, z_2) \propto p(z_1 \mid x)\, p(z_2 \mid x)\, p(x)\). So folding in sensor 1 and then using that posterior as the prior for sensor 2 lands on the same Gaussian as one stacked update with block-diagonal \(R\). The assumption that breaks it is exactly that block-diagonality — correlated sensor noise (two estimates derived from the same wheel encoders, or a shared clock/calibration error) gets counted twice and the filter comes out overconfident.
+
+    **2.** Reject: 14 > 9.21. NIS is a squared Mahalanobis distance, so 14 is \(\sqrt{14} \approx 3.7\sigma\) against a gate sitting at \(\sqrt{9.21} \approx 3.0\sigma\). For 2 degrees of freedom the tail is exactly \(e^{-x/2}\), so \(P(\text{NIS} > 14) = e^{-7} \approx 9\times10^{-4}\) — under the assumed model this is a 1-in-1100 event, which is far better explained by a lying sensor (multipath) than by unlucky data.
+
+    **3.** The bump jolted the state; honest GPS now looks like an outlier (gate death spiral); dead reckoning drifts 2 m; eventually an innovation squeaks under the gate — or a rejection cap fires — and the filter lurches to reality. Fix: consecutive-rejection cap + covariance inflation on impact detection.
+
+    **4.** The magnetometer testifies to one thing only — yaw — so it gets a single row of \(H\) touching heading (and the gyro bias states only indirectly, through the filter's own correlations); it must never be allowed to nudge position or velocity. Gate it at 1-D \(\chi^2(0.99) = 6.63\) on a *wrapped* angular residual, behind a hard pre-gate on field magnitude and inclination versus the surveyed local field. Near the steel door the field bends and the innovations go persistently biased rather than noisy, so the gate starts rejecting — which is the correct behaviour: coast on the gyro and let yaw covariance widen honestly. Crucially, the consecutive-rejection cap from failure mode 2 must *not* force-accept here, because the disturbance is a sustained bias, not a transient; disable the sensor by magnetic-anomaly detection or a mapped no-mag zone instead.
 
 ### Interactive quiz
 

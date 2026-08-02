@@ -65,8 +65,14 @@ Set up a doorway 1.2× the robot's width. Sweep the clearance weight β and reco
 3. *(Debugging)* Your robot traverses open space fine but stops 1.5 m before every doorway, creeps, then darts through. Which weight, which direction, and why the *dart*?
 4. *(System design)* Divide responsibilities between global planner, DWA, and the recovery system for the "person steps into the doorway" scenario — who detects, who reacts, who owns backing out?
 
-??? note "Answer sketch for Q2"
-    \([0.6, 1.0]\) m/s — the window is *small*; DWA's agility comes from re-choosing 10× a second, not from a big menu.
+??? note "Answer sketches"
+    **1.** Because deceleration is bounded, so a command is a commitment: once you issue \(v\), the robot needs \(v^2/(2\dot v)\) of room to come to rest no matter what the next cycle decides. Screening on current clearance would admit velocities that are collision-free at this instant but leave no room to stop before the arc's nearest obstacle — you'd discover the problem in a cycle where every remaining option already collides. The test \(v \le \sqrt{2\,\dot v\, dist(v,\omega)}\) inverts that: it admits only candidates whose own stopping distance fits inside the clearance they will meet, so a feasible emergency stop exists at every step.
+
+    **2.** \([0.6, 1.0]\) m/s — the window is *small*; DWA's agility comes from re-choosing 10× a second, not from a big menu.
+
+    **3.** β (clearance) is too high; lower it. As the robot nears the doorway, clearance collapses for every forward candidate while remaining generous for \(v \approx 0\), so \(\beta\cdot\text{clearance}\) swamps \(\alpha\cdot\text{progress}\) and the winner is a near-stop — a partial freeze, at a standoff distance set by where the clearance gradient starts to bite. The *dart* is the same term losing its grip: once the robot is inside the doorway, clearance is uniformly poor across the whole window, the term stops discriminating between candidates, and progress and velocity take over unopposed — straight to max \(v\). Beyond lowering β, normalize or saturate the clearance term beyond a couple of robot radii so it can't dominate on the approach and can't vanish in the gap.
+
+    **4.** **Detection** belongs to the local costmap: the obstacle layer sees the person within a cycle or two, and DWA registers it as every door-crossing arc failing the admissibility check. **Immediate reaction** belongs to DWA, and stopping is the correct answer — a one-step planner facing a blocked doorway should decline, not improvise. **Backing out belongs to neither**: a one-step horizon structurally cannot see that reversing buys progress, which is the freezing-robot problem, so do not try to fix it with weights. Give a supervising recovery layer the escape: it watches for "no progress for N seconds while the global path is still valid," waits a beat first (people move on their own more often than robots do), then rotates to clear the sensor footprint, and finally asks the global planner for a route on the updated costmap. The global planner owns route-level replanning on those triggers only — never per control cycle.
 
 ### Interactive quiz
 

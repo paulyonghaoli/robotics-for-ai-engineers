@@ -69,8 +69,14 @@ Take the capstone's world generator and compute coverage over (obstacle count ×
 3. *(Debugging)* Your suite's aggregate score improved 4 points after a change, but field failures went up. Give two suite-design explanations.
 4. *(System design)* Design a 200-episode nightly suite for the capstone: which parameters vary, which are held out, how you stratify, and what triggers a build failure.
 
-??? note "Answer sketch for Q2"
-    \(0.9(0.98) + 0.1(0.40) = 0.922\) — a healthy-looking 92%, concealing a hard-case failure rate of 60%. If hard cases are 10% of the suite but 30% of real deliveries, the aggregate is not just optimistic, it's the wrong estimator.
+??? note "Answer sketches"
+    **1.** Because a score change has to be attributable. If the sampler draws the robot's noise and actuator limits alongside the world, a drop between runs could be the planner getting worse or simply a harder robot, and the two are inseparable after the fact. Fixing the robot leaves the world as the only random factor, so seeds can be paired across stacks and the residual difference belongs to the code.
+
+    **2.** \(0.9(0.98) + 0.1(0.40) = 0.922\) — a healthy-looking 92%, concealing a hard-case failure rate of 60%. If hard cases are 10% of the suite but 30% of real deliveries, the aggregate is not just optimistic, it's the wrong estimator.
+
+    **3.** (a) The suite is unstratified and reported in aggregate, so a change that helps the dominant easy band by 5 points while degrading the rare hard band still moves the headline up — and the hard band is what the field encounters; (b) the suite has been iterated against until it passes and is now effectively a training set, so the 4 points measure fit to those fixed scenarios rather than generalization. Both are diagnosed the same way: report per band, and check the change against held-out scenarios you have never tuned on.
+
+    **4.** Vary the world only — obstacle count and size, corridor width, start–goal distance, goal placement, mover count — and hold the robot fixed (sensor-noise constants, actuator limits, controller gains stay module constants), with a recorded seed per episode. Stratify into 4 density bands of 40 episodes each, and reserve one seed block of 40 (10 per band) as a holdout you never tune against. Report per-band success with intervals plus a coverage number over (density × start–goal distance); fail the build when any band's Wilson lower bound falls below its pinned floor or the holdout diverges from the tuned blocks by more than a few points — never on the aggregate alone, which is the number this design exists to distrust.
 
 ### Interactive quiz
 

@@ -64,8 +64,14 @@ Take the capstone's v1 stack as baseline. Introduce a deliberate small regressio
 3. *(Debugging)* Your gate fires most nights but the flagged scenarios differ each time and the aggregate is flat. Diagnose.
 4. *(System design)* Design the nightly gate for the capstone: episode count, paired or not, what blocks a merge versus what only warns, and how a scenario enters and leaves quarantine.
 
-??? note "Answer sketch for Q2"
-    No. The interval contains zero, so the observed −0.03 is consistent with no change. Blocking here trains the team to ignore the gate — and note that this is the *same* arithmetic as lesson 10.1's 18-of-25 problem, applied nightly.
+??? note "Answer sketches"
+    **1.** Most of the variance in a success rate comes from *which worlds you drew*, not from the code. On identical seeds baseline and candidate meet the same hard world, so \(\mathrm{Var}(b - a) = \mathrm{Var}(a) + \mathrm{Var}(b) - 2\,\mathrm{Cov}(a,b)\) collapses as the covariance term grows — and since episodes needed scale with the variance of the quantity you're testing, cancelling scenario difficulty buys the sensitivity you would otherwise have to pay for in rollouts.
+
+    **2.** No. The interval contains zero, so the observed −0.03 is consistent with no change. Blocking here trains the team to ignore the gate — and note that this is the *same* arithmetic as lesson 10.1's 18-of-25 problem, applied nightly.
+
+    **3.** This is unquarantined flakes, not a regression: a flat aggregate with a rotating cast of flagged scenarios is the signature of cliff-edge scenarios flipping on sampler noise, and a gate that alerts on per-scenario pass/fail will catch a fresh handful every night forever. Fix it by moving the gate onto the paired aggregate difference with an effect-size floor, and by tracking per-scenario flip rates so the genuine coin-flippers can be quarantined and reported separately.
+
+    **4.** Run **100 pinned scenarios × 2 seeds = 200 episodes**, paired on identical seeds against the last released commit as a pinned baseline. Block the merge only when the bootstrap interval on the mean paired difference lies entirely below zero **and** the point estimate is worse than δ = 3 points; everything else — an interval that excludes zero but a sub-δ drop, a p95 latency rise, individual scenario flips — warns without blocking. A scenario enters quarantine when it flips on more than 20% of the last 10 nights with unchanged code, still runs and is still reported but is excluded from the gate, and leaves after 10 consecutive stable nights; re-baselining is a deliberate, logged act, never an automatic response to a red night.
 
 ### Interactive quiz
 

@@ -65,8 +65,14 @@ The corridor-with-doors world from the exercise: run with N ∈ {50, 200, 2000} 
 3. *(Debugging)* After adding a high-precision sensor, the filter *diverges more often*. Explain via the weighting step.
 4. *(System design)* 2D localization needs ~2,000 particles. Estimate the need for 6-DOF (3D) localization and justify choosing a different estimator.
 
-??? note "Answer sketch for Q2"
-    \(N_{eff} = 1/(0.49+0.01+0.01+0.01) = 1/0.52 \approx 1.92\). With N = 4, threshold 2: yes, resample (barely).
+??? note "Answer sketches"
+    **1.** The particle filter's belief is a set of weighted samples, so nothing stops half the swarm from sitting in corridor A and half in corridor B — the representation carries the two hypotheses literally, and their weights carry the odds. A Kalman filter's belief is one Gaussian, parameterized only by a mean and a covariance; asked to cover both corridors it reports the mean *between* them — a spot the robot is certainly not in — with a covariance wide enough to span both, which reads as a single confident answer at an impossible location.
+
+    **2.** \(N_{eff} = 1/(0.49+0.01+0.01+0.01) = 1/0.52 \approx 1.92\). With N = 4, threshold 2: yes, resample (barely).
+
+    **3.** Weight degeneracy from a too-sharp likelihood: a high-precision sensor makes \(p(z \mid x_i)\) fall off steeply with error, so unless a particle sits almost exactly on the truth its weight underflows to ~0, one particle takes everything, \(N_{eff}\) drops to ≈ 1, and resampling clones that single — possibly wrong — hypothesis. Fix by softening the measurement model (use a σ noticeably larger than the sensor's true σ, or add a flat mixture component), and by raising motion noise or N so some particle lands close enough to be credited.
+
+    **4.** The required N grows exponentially with state dimension, so going from 3-DOF (x, y, θ) to 6-DOF at the same per-axis resolution squares the count: \(2000^{2} = 4\times10^{6}\) particles, each needing a full likelihood evaluation per step — hopeless at sensor rate. Use an EKF or UKF (in practice an error-state EKF) for 6-DOF: cost is cubic in dimension, not exponential, and the Gaussian assumption is affordable because 6-DOF pose tracking is a *tight-belief* problem. Buy back the one thing you lose — global initialization — with a place-recognition or low-dimensional global localizer to bootstrap the filter, rather than a 6-D particle filter.
 
 ### Interactive quiz
 

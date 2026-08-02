@@ -67,8 +67,14 @@ Extend the exercise: simulate the same gyro with bias estimated as a filter stat
 3. *(Debugging)* Your robot's fused pose is perfect indoors but veers consistently near the loading dock's steel door. Which sensor, which failure?
 4. *(System design)* You get one absolute sensor for a warehouse robot: GPS (useless indoors), UWB beacons, or ceiling-marker camera. Choose and defend via error structure.
 
-??? note "Answer sketch for Q2"
-    \(0.01 \times 60 = 0.6\) rad ≈ 34° — from a bias that looks like a flat line in any 5-second log.
+??? note "Answer sketches"
+    **1.** Integration treats the two error terms completely differently: zero-mean white noise integrates into a random walk whose heading error grows as \(\sigma_n\sqrt{t}\), while a bias is a persistent offset that integrates to \(b\cdot t\). Linear beats \(\sqrt{t}\) quickly — with \(\sigma_n = 0.01\ \text{rad}/\sqrt{\text{s}}\) and \(b = 0.01\ \text{rad/s}\), at 60 s the noise contributes ≈ 0.077 rad but the bias 0.6 rad, nearly an order of magnitude more. That gap is the whole argument for estimating bias as a state rather than burying it in \(Q\).
+
+    **2.** \(0.01 \times 60 = 0.6\) rad ≈ 34° — from a bias that looks like a flat line in any 5-second log.
+
+    **3.** The magnetometer: the steel door, its rebar, and its motor bend the local field, so "north" is displaced by a large, *repeatable* amount in that one location. This is a bias, not noise — the filter fuses it as an honest absolute heading fix and the fused pose veers the same way every pass. Fix: pre-gate the magnetometer on field magnitude and inclination against the surveyed local field, gate its innovation on χ², and let gyro + another absolute source carry heading through the anomaly zone.
+
+    **4.** UWB beacons. Ceiling markers give beautifully bounded pose but only while a marker is in view, so their error structure is really "bounded when visible, unbounded odometry drift otherwise" — and warehouses supply occlusion, dust, and racking that moves. UWB gives continuous absolute ranges at tens of Hz with decimetre noise that does not accumulate with driving time, and it degrades gracefully: losing anchors widens the covariance instead of cutting the absolute fix off at a cliff. The cost you accept is anchor survey/installation and NLOS multipath near metal racking, which is a mode switch — gate it, don't model it as Gaussian.
 
 ### Interactive quiz
 
