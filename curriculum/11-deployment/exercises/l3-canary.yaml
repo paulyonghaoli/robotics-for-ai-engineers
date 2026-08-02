@@ -1,0 +1,113 @@
+id: dep-l3-canary
+title: "How big does the canary need to be?"
+lesson: modules/11-deployment/03-rollout-rollback
+description: >-
+  "We ran it overnight on one robot and it looked fine." Work out what
+  that sentence is actually worth. Build the canary's hypothesis test,
+  compute its power against regressions of different sizes, and derive
+  the episode count you'd need to defend a promotion.
+setup_code: |
+  from math import comb
+
+  BASELINE = 0.02        # current fleet failure rate
+
+  def binom_cdf(k, n, p):
+      """P(X <= k) for X ~ Binomial(n, p)."""
+      if k < 0:
+          return 0.0
+      k = min(k, n)
+      return sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(k + 1))
+starter_code: |
+  import numpy as np
+  # Provided: binom_cdf(k, n, p), BASELINE = 0.02.
+
+  def alarm_threshold(n, p0=BASELINE, alpha=0.05):
+      """Smallest failure count k such that P(X <= k) >= 1 - alpha under
+      the BASELINE rate. Seeing more than k failures raises the alarm.
+
+      (Choosing it this way holds the false-alarm rate at about alpha.)
+      """
+      # TODO: scan k upward until binom_cdf(k, n, p0) >= 1 - alpha
+      return n
+
+  def false_alarm_rate(n, p0=BASELINE, alpha=0.05):
+      """Probability of alarming when the new policy is actually FINE."""
+      # TODO: 1 - binom_cdf(threshold, n, p0)
+      return 0.0
+
+  def detection_power(n, p_bad, p0=BASELINE, alpha=0.05):
+      """Probability of alarming when the true failure rate is p_bad."""
+      # TODO: 1 - binom_cdf(threshold, n, p_bad)
+      return 0.0
+
+  def min_canary_size(p_bad, target_power=0.9, p0=BASELINE, alpha=0.05):
+      """Smallest n from the candidate list below reaching target_power."""
+      for n in (50, 100, 250, 500, 1000, 2000, 4000, 8000):
+          # TODO: return the first n whose detection_power clears target_power
+          pass
+      return None
+
+  print("n       thr   power(5%)  power(3%)  false-alarm")
+  for n in (50, 100, 250, 500, 1000, 2000):
+      print("%-7d %-5d %.2f       %.2f       %.3f" % (
+          n, alarm_threshold(n), detection_power(n, 0.05),
+          detection_power(n, 0.03), false_alarm_rate(n)))
+  print()
+  print("to catch a 2%% -> 5%% regression with 90%% power: %s episodes" % min_canary_size(0.05))
+  print("to catch a 2%% -> 3%% regression with 90%% power: %s episodes" % min_canary_size(0.03))
+tests: |
+  import numpy as np
+  # Threshold behaves sensibly and holds the false-alarm rate near alpha.
+  assert alarm_threshold(100) >= 4, "with 2 expected failures in 100, the threshold should sit a few above the mean"
+  assert false_alarm_rate(500) < 0.08, "false-alarm rate should stay near alpha (got %.3f)" % false_alarm_rate(500)
+  assert false_alarm_rate(1000) < 0.08, "...at every size"
+  # THE HEADLINE: a small canary is nearly blind to a doubling of failures.
+  _p50 = detection_power(50, 0.05)
+  assert _p50 < 0.35, "a 50-episode canary should MISS a 2%%->5%% regression most of the time (power %.2f)" % _p50
+  _p500 = detection_power(500, 0.05)
+  assert _p500 > 0.9, "500 episodes should catch it reliably (power %.2f)" % _p500
+  assert _p500 > 3 * _p50, "power must grow sharply with canary size (%.2f vs %.2f)" % (_p500, _p50)
+  # Subtle regressions are far more expensive to detect.
+  assert detection_power(500, 0.03) < 0.6, "500 episodes is NOT enough for a 2%%->3%% shift (got %.2f)" % detection_power(500, 0.03)
+  _n_big = min_canary_size(0.05)
+  _n_subtle = min_canary_size(0.03)
+  assert _n_big is not None and _n_subtle is not None, "both should be reachable within the candidate sizes"
+  assert _n_subtle > 4 * _n_big, "catching a subtle regression should cost many times more episodes (%s vs %s)" % (_n_subtle, _n_big)
+  assert _n_big <= 500, "a doubling should be catchable within ~500 episodes (got %s)" % _n_big
+  # Power must increase monotonically with n.
+  _series = [detection_power(n, 0.05) for n in (50, 100, 250, 500)]
+  assert all(_series[i] >= _series[i - 1] for i in range(1, 4)), "power is monotone in canary size"
+hints:
+  - "alarm_threshold: loop k from 0 to n and return the first k with `binom_cdf(k, n, p0) >= 1 - alpha`."
+  - "Both false_alarm_rate and detection_power are the same expression `1 - binom_cdf(threshold, n, rate)` — evaluated at the baseline rate for one and the bad rate for the other."
+  - "min_canary_size: inside the loop, `if detection_power(n, p_bad, p0, alpha) >= target_power: return n`."
+  - "Interpretation: the 50-episode row is why 'we ran it overnight and it looked fine' is close to no evidence. A promotion note should state which regression sizes the canary could actually have detected."
+solution: |
+  import numpy as np
+
+  def alarm_threshold(n, p0=BASELINE, alpha=0.05):
+      for k in range(n + 1):
+          if binom_cdf(k, n, p0) >= 1 - alpha:
+              return k
+      return n
+
+  def false_alarm_rate(n, p0=BASELINE, alpha=0.05):
+      return 1.0 - binom_cdf(alarm_threshold(n, p0, alpha), n, p0)
+
+  def detection_power(n, p_bad, p0=BASELINE, alpha=0.05):
+      return 1.0 - binom_cdf(alarm_threshold(n, p0, alpha), n, p_bad)
+
+  def min_canary_size(p_bad, target_power=0.9, p0=BASELINE, alpha=0.05):
+      for n in (50, 100, 250, 500, 1000, 2000, 4000, 8000):
+          if detection_power(n, p_bad, p0, alpha) >= target_power:
+              return n
+      return None
+
+  print("n       thr   power(5%)  power(3%)  false-alarm")
+  for n in (50, 100, 250, 500, 1000, 2000):
+      print("%-7d %-5d %.2f       %.2f       %.3f" % (
+          n, alarm_threshold(n), detection_power(n, 0.05),
+          detection_power(n, 0.03), false_alarm_rate(n)))
+  print()
+  print("to catch a 2%% -> 5%% regression with 90%% power: %s episodes" % min_canary_size(0.05))
+  print("to catch a 2%% -> 3%% regression with 90%% power: %s episodes" % min_canary_size(0.03))

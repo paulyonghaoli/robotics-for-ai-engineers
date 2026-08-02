@@ -1,0 +1,71 @@
+id: dep-l3-canary-quiz
+title: "Quiz — fleet rollout and rollback"
+lesson: modules/11-deployment/03-rollout-rollback
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A 50-episode canary against a 2% baseline detects a regression to 5% only 24% of the time. What does 'no alarm' from it justify?"
+    options:
+      - text: "Very little — it would have stayed silent three-quarters of the time even if failures had more than doubled. It rules out only catastrophic regressions"
+        correct: true
+        explanation: "Absence of evidence from an underpowered test is not evidence of absence. The honest promotion note states which regression sizes the canary could actually have seen."
+      - text: "That the new policy is safe to promote"
+        explanation: "That inference requires power the canary doesn't have."
+      - text: "That the regression is smaller than 5%"
+        explanation: "It's consistent with a regression to 5% — which is exactly the problem."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "With a 2% baseline, roughly how many canary episodes are needed to detect a regression to 3% with 90% power? (nearest thousand)"
+    answer: 4000
+    tolerance: 1200
+    explanation: "About 4,000 — eight times the ~500 needed to catch a doubling to 5%. Subtle regressions are enormously more expensive to detect, which for many fleets means weeks."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why is rollback harder on a robot fleet than in a web service?"
+    options:
+      - text: "A robot mid-task can't revert mid-grasp — rollback means complete-or-safely-abort, then swap, so the mitigation window is minutes rather than milliseconds"
+        correct: true
+        explanation: "And the damage already done doesn't roll back at all, which is why blast radius has to be bounded up front rather than mitigated after."
+      - text: "Robot software is larger to transfer"
+        explanation: "Transfer time is minor next to the physical-state problem."
+      - text: "It isn't — rollback works the same way"
+        explanation: "Web rollback assumes stateless, interruptible requests. Neither holds here."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Fleet success drops 3 points the week after a rollout. How do you tell a bad policy from a changed world?"
+    options:
+      - text: "Keep a control group on the old version — if it dropped too, the world changed; if only the new-version robots dropped, it's the policy"
+        correct: true
+        explanation: "Without a holdout the two are indistinguishable, which is why the ramp should retain a permanent control slice rather than going to 100%."
+      - text: "Roll back and see if it recovers"
+        explanation: "Slow, disruptive, and still confounded if the world changed back too."
+      - text: "Check the release notes"
+        explanation: "Tells you what changed in the software, not whether that's what moved the metric."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Which health signal should gate a canary promotion?"
+    options:
+      - text: "Intervention rate — it moves earlier than success rate, so a gate watching only outcomes reacts last"
+        correct: true
+        explanation: "Lesson 10.5's layered monitoring applied to rollout. By the time success rate moves, the canary robots have been degrading for a while."
+      - text: "Success rate, since it's what users care about"
+        explanation: "It's the right *goal* and the wrong *trigger*, because it lags."
+      - text: "CPU utilization"
+        explanation: "Worth watching for other reasons; it says little about behaviour quality."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Should canary thresholds be symmetric between false alarms and missed regressions?"
+    options:
+      - text: "No — promoting a bad policy to the whole fleet costs far more than delaying a good one by a day, so accept a higher false-alarm rate than a web system would"
+        correct: true
+        explanation: "The cost asymmetry is physical and irreversible on one side and merely inconvenient on the other. Tune for power against the regressions you fear."
+      - text: "Yes — statistical rigor requires symmetric treatment"
+        explanation: "Rigor requires stating your error rates, not making them equal when the costs aren't."
+      - text: "Yes, otherwise you'll never ship"
+        explanation: "A staged ramp lets you ship while bounding exposure; the threshold and the ramp are separate levers."
