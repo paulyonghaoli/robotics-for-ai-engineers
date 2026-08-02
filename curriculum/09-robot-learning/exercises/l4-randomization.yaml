@@ -1,0 +1,140 @@
+id: rl-l4-randomization
+title: "Measure the randomization tax"
+lesson: modules/09-robot-learning/04-sim-to-real
+description: >-
+  Your simulator is missing a force that reality has. Tune a controller on
+  the simulator alone and it scores 100% there and 0% on the real robot.
+  Train it across randomized simulators instead and it works on both — for
+  a price. Measure that price, then over-randomize and watch it grow.
+setup_code: |
+  import numpy as np
+
+  LANE_LIMIT, PROC_NOISE, MEAS_NOISE, THRESHOLD = 1.2, 0.02, 0.06, 0.25
+  GAIN_GRID = np.round(np.arange(0.4, 2.35, 0.1), 2)
+
+  # The simulator models a plant of 1.30 and nothing else. REALITY also
+  # shoves the robot outward once it strays past THRESHOLD - a force the
+  # simulator's author never knew about. push_gain = 0.0 is the nominal
+  # simulator; reality is push_gain = 1.5.
+  REALITY_PUSH = 1.5
+
+  def _push(x, g):
+      return g * np.sign(x) * max(0.0, abs(x) - THRESHOLD)
+
+  def episode(k, push_gain, seed, horizon=60, x0=0.6):
+      """Returns (survived, mean |x|) — success and tracking quality."""
+      rng = np.random.default_rng(seed)
+      x, total = x0, 0.0
+      for _ in range(horizon):
+          a = -k * (x + rng.normal(0, MEAS_NOISE))
+          x = 1.30 * x + _push(x, push_gain) + a + rng.normal(0, PROC_NOISE)
+          total += abs(x)
+          if abs(x) > LANE_LIMIT:
+              return False, total / horizon
+      return True, total / horizon
+starter_code: |
+  import numpy as np
+  # Provided: episode(k, push_gain, seed) -> (survived, mean_abs_x),
+  #           GAIN_GRID (candidate gains), REALITY_PUSH = 1.5.
+  # push_gain = 0.0 is the nominal simulator; 1.5 is reality.
+
+  def evaluate(k, push_gain, n=60):
+      """Return (success_rate, mean tracking cost over surviving episodes).
+      If nothing survives, return (0.0, 99.0)."""
+      # TODO
+      return 0.0, 99.0
+
+  def train_on_nominal():
+      """Pick the gain that performs best on the nominal simulator alone:
+      maximize success, break ties by LOWEST tracking cost."""
+      # TODO
+      return GAIN_GRID[0]
+
+  def train_randomized(max_push, n_samples=6):
+      """Train across simulators with push_gain sampled evenly over
+      [0, max_push]. Score each gain by its WORST-CASE success across those
+      simulators, breaking ties by mean tracking cost."""
+      # TODO
+      return GAIN_GRID[0]
+
+  k_nom = train_on_nominal()
+  k_rand = train_randomized(REALITY_PUSH)
+  k_over = train_randomized(4.0)
+
+  for name, k in [("nominal-only", k_nom), ("randomized", k_rand), ("over-randomized", k_over)]:
+      s_sim, c_sim = evaluate(k, 0.0)
+      s_real, c_real = evaluate(k, REALITY_PUSH)
+      print("%-16s k=%.1f | sim %.2f (cost %.3f) | real %.2f (cost %.3f)" % (
+          name, k, s_sim, c_sim, s_real, c_real))
+tests: |
+  import numpy as np
+  _s, _c = evaluate(0.8, 0.0)
+  assert _s == 1.0, "gain 0.8 should be fine on the NOMINAL simulator"
+  _s2, _c2 = evaluate(0.8, REALITY_PUSH)
+  assert _s2 == 0.0, "...and fail completely on reality (got %.2f)" % _s2
+  _kn = train_on_nominal()
+  assert 0.6 <= _kn <= 1.1, "nominal training should pick a modest gain (got %.1f)" % _kn
+  _sn_sim, _cn_sim = evaluate(_kn, 0.0)
+  _sn_real, _ = evaluate(_kn, REALITY_PUSH)
+  assert _sn_sim == 1.0, "the nominal-trained policy is perfect in its own simulator"
+  assert _sn_real < 0.2, "...and transfers terribly (got %.2f) - 100%% in sim, ~0%% in reality" % _sn_real
+  _kr = train_randomized(REALITY_PUSH)
+  _sr_sim, _cr_sim = evaluate(_kr, 0.0)
+  _sr_real, _ = evaluate(_kr, REALITY_PUSH)
+  assert _kr > _kn, "randomization should force a more aggressive gain (%.1f vs %.1f)" % (_kr, _kn)
+  assert _sr_real > 0.9, "the randomized policy must actually transfer (got %.2f)" % _sr_real
+  assert _sr_sim > 0.9, "...while still working in the nominal simulator"
+  # THE TAX: it works everywhere, but it is worse on the nominal condition.
+  assert _cr_sim > _cn_sim, "the randomized policy should track WORSE in sim (%.3f vs %.3f) - that is the tax" % (_cr_sim, _cn_sim)
+  assert _cr_sim < 2.0 * _cn_sim, "...but the tax should be modest, not catastrophic"
+  # Over-randomizing keeps working and keeps charging you.
+  _ko = train_randomized(4.0)
+  _so_sim, _co_sim = evaluate(_ko, 0.0)
+  assert _ko >= _kr, "a wider distribution needs an even more aggressive gain"
+  assert _co_sim > _cr_sim, "over-randomization costs MORE nominal performance (%.3f vs %.3f)" % (_co_sim, _cr_sim)
+hints:
+  - "evaluate: run `episode(k, push_gain, s)` for s in range(n); success = fraction survived; cost = mean of the returned cost over SURVIVING episodes only (return 99.0 if none survive, so a gain that always crashes never wins a tie-break)."
+  - "train_on_nominal: for each k in GAIN_GRID compute evaluate(k, 0.0), then pick `max` by (success, -cost)."
+  - "train_randomized: `pushes = np.linspace(0, max_push, n_samples)`; for each k take the MINIMUM success across those pushes (worst case) and the mean cost; pick max by (worst_success, -mean_cost). Worst-case rather than average is what makes it robust rather than merely lucky."
+  - "Expect roughly: nominal picks k~0.8 (great in sim, 0% real); randomized picks k~1.4 (works in both, ~28% worse tracking in sim); over-randomized picks a much higher gain that still transfers but now FAILS most nominal episodes."
+solution: |
+  import numpy as np
+
+  def evaluate(k, push_gain, n=60):
+      results = [episode(k, push_gain, s) for s in range(n)]
+      survived = [c for ok, c in results if ok]
+      success = sum(ok for ok, _ in results) / n
+      if not survived:
+          return 0.0, 99.0
+      return success, float(np.mean(survived))
+
+  def train_on_nominal():
+      best, best_key = GAIN_GRID[0], (-1.0, -99.0)
+      for k in GAIN_GRID:
+          s, c = evaluate(k, 0.0)
+          key = (s, -c)
+          if key > best_key:
+              best, best_key = k, key
+      return best
+
+  def train_randomized(max_push, n_samples=6):
+      pushes = np.linspace(0.0, max_push, n_samples)
+      best, best_key = GAIN_GRID[0], (-1.0, -99.0)
+      for k in GAIN_GRID:
+          evals = [evaluate(k, p) for p in pushes]
+          worst = min(s for s, _ in evals)
+          cost = float(np.mean([c for _, c in evals]))
+          key = (worst, -cost)
+          if key > best_key:
+              best, best_key = k, key
+      return best
+
+  k_nom = train_on_nominal()
+  k_rand = train_randomized(REALITY_PUSH)
+  k_over = train_randomized(4.0)
+
+  for name, k in [("nominal-only", k_nom), ("randomized", k_rand), ("over-randomized", k_over)]:
+      s_sim, c_sim = evaluate(k, 0.0)
+      s_real, c_real = evaluate(k, REALITY_PUSH)
+      print("%-16s k=%.1f | sim %.2f (cost %.3f) | real %.2f (cost %.3f)" % (
+          name, k, s_sim, c_sim, s_real, c_real))

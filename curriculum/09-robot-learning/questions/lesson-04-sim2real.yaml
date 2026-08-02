@@ -1,0 +1,76 @@
+id: rl-l4-sim2real
+title: "Quiz — sim-to-real and domain randomization"
+lesson: modules/09-robot-learning/04-sim-to-real
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is a domain-randomized policy typically suboptimal on every individual condition, including the real one?"
+    options:
+      - text: "It maximizes performance averaged over a family of simulators, and the maximizer of an average is generally optimal for no member of it"
+        correct: true
+        explanation: "A property of the objective, not a defect of the method. The policy hedges against the heaviest, slowest, noisiest robot in the distribution, and that hedge is dead weight on any particular one."
+      - text: "Randomization adds noise to the training gradients"
+        explanation: "Optimization noise is incidental; the effect persists with perfect optimization."
+      - text: "Randomized policies are always undertrained"
+        explanation: "Train to convergence and the trade remains — it's structural."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "A sim-tuned policy scores 100% in simulation and 0% on the real robot. A randomized one scores 100% in both with 28% worse tracking error. Tracking error costs $1/unit; a failure costs $500. Deploy which?"
+    options:
+      - text: "The randomized one, and it isn't close — the tax is a fraction of a small number, the alternative fails every episode"
+        correct: true
+        explanation: "The tax is denominated in performance, the failure in outcomes, and outcomes dominate. Even one episode a day makes the sim-optimal policy cost $500/day."
+      - text: "The sim-tuned one, since it has better tracking"
+        explanation: "Better tracking on a robot that crashes every time is not a benefit."
+      - text: "Neither — retrain from scratch"
+        explanation: "You already have a working policy; discarding it to avoid a 28% tracking penalty is the expensive option."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your policy transfers fine to a lab robot but fails in a warehouse. You randomized mass, friction, and sensor noise. Most likely missing axis?"
+    options:
+      - text: "Latency — a warehouse adds network hops, sensor traffic, and compute contention, all lengthening perception-to-actuation delay"
+        correct: true
+        explanation: "The axis teams most reliably forget. A policy trained at zero latency has learned timing that no longer holds, and it's measurable in an afternoon."
+      - text: "Gravity"
+        explanation: "Identical in both places."
+      - text: "Wheel radius"
+        explanation: "Same robot, same wheels — and it would have failed in the lab too."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Over-randomizing (a distribution far wider than reality) produces…"
+    options:
+      - text: "A policy that still transfers but degrades badly on the nominal condition — in the exercise it dropped to 35% success there"
+        correct: true
+        explanation: "The tax stops being a modest premium and starts breaking ordinary operation, because the policy is hedging against robots that don't exist."
+      - text: "Strictly better robustness with no downside"
+        explanation: "There is always a downside; wide enough and it dominates."
+      - text: "A policy that fails to train at all"
+        explanation: "It trains fine. It just optimizes for a world you don't live in."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "How do system identification and domain randomization relate?"
+    options:
+      - text: "They're partners — identification narrows the distribution you must hedge against, which directly reduces the randomization tax"
+        correct: true
+        explanation: "Every parameter you measure is one you no longer randomize. Identify what's few, stable, and measurable; randomize what's many, drifting, or unmeasurable."
+      - text: "They're alternatives; using both wastes effort"
+        explanation: "Most real programmes do both, and they compound."
+      - text: "Identification replaces randomization once accurate enough"
+        explanation: "Only for parameters you can measure and that stay put — friction across surfaces and wear over months are neither."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Your policy's simulated behaviour looks suspiciously clean — smoother than any real robot. What should you suspect?"
+    options:
+      - text: "Sim exploitation — the policy has found and is relying on an artifact of your simulator, such as slight interpenetration in contacts"
+        correct: true
+        explanation: "An optimizer handed a flawed model will exploit the flaw. Randomize contact parameters, and treat implausibly clean behaviour as a signal rather than a success."
+      - text: "The policy has converged well"
+        explanation: "Possible, but 'too good for the physics' warrants a look before celebration."
+      - text: "The simulator is more accurate than expected"
+        explanation: "Cleanliness beyond what real hardware could achieve is evidence of the opposite."
