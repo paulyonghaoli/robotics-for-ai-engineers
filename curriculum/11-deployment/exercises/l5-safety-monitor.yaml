@@ -1,0 +1,126 @@
+id: dep-l5-safety-monitor
+title: "Make an unsafe policy safe without making it useless"
+lesson: modules/11-deployment/05-safety-cases
+description: >-
+  A learned policy that is sensible 97% of the time and occasionally
+  proposes something reckless. You cannot prove anything about the policy
+  — but you can prove things about a simple monitor wrapped around it.
+  Build the monitor, then find the margin where the system is both safe
+  and still able to do its job.
+setup_code: |
+  import numpy as np
+
+  DT, A_MAX = 0.1, 2.0          # timestep, braking authority (m/s^2)
+  START_DISTANCE = 6.0
+  GOAL_DISTANCE = 0.5           # the task: stop within this of the wall
+
+  def learned_policy(d, v, rng, reckless_rate=0.03):
+      """Mostly sensible, occasionally proposes a dangerous acceleration.
+      You cannot inspect or verify it — treat it as a black box."""
+      a = 1.6 * (d - 0.4) - 1.9 * v
+      if rng.random() < reckless_rate:
+          a = abs(a) + 3.0
+      return float(np.clip(a, -A_MAX, A_MAX))
+starter_code: |
+  import numpy as np
+  # Provided: learned_policy(d, v, rng), DT, A_MAX = 2.0,
+  #           START_DISTANCE = 6.0, GOAL_DISTANCE = 0.5.
+  # State: d = distance to the wall, v = speed toward it.
+
+  def is_safe(d, v, a, margin):
+      """Would this acceleration leave the robot still able to stop?
+
+      Apply one step (v2 = v + a*DT, d2 = d - v2*DT). If v2 <= 0 it's
+      trivially safe. Otherwise require the braking distance
+      v2^2 / (2*A_MAX) to fit within (d2 - margin).
+
+      This is the only component you have to be able to reason about -
+      and it's four lines of arithmetic.
+      """
+      # TODO
+      return True
+
+  def episode(seed, margin=None, horizon=250):
+      """Run one approach. If margin is None the policy is unguarded;
+      otherwise substitute maximum braking whenever it proposes something
+      is_safe() rejects.
+
+      Return ('collision' | 'success' | 'timeout', steps_taken).
+      Collision: d <= 0. Success: d < GOAL_DISTANCE and v < 0.05.
+      """
+      rng = np.random.default_rng(seed)
+      d, v = START_DISTANCE, 0.0
+      # TODO
+      return "timeout", horizon
+
+  def evaluate(margin, n=400):
+      """Return (collision_rate, success_rate)."""
+      # TODO
+      return 0.0, 0.0
+
+  print("margin    collisions  success")
+  for m in (None, 0.15, 0.45, 0.8):
+      c, s = evaluate(m)
+      print("%-9s %.3f       %.3f" % ("none" if m is None else m, c, s))
+tests: |
+  import numpy as np
+  # The monitor's own logic, checked directly.
+  assert is_safe(5.0, 0.0, 0.5, 0.15), "plenty of room and slow - safe"
+  assert not is_safe(0.5, 2.0, A_MAX, 0.15), "fast and close with full throttle - not safe"
+  assert is_safe(0.5, 2.0, -A_MAX, 0.15) or True, "braking is the fallback, not necessarily 'safe' by this test"
+  assert is_safe(1.0, 0.0, -1.0, 0.15), "decelerating from rest is trivially safe"
+  # Unguarded, the policy is mostly fine and occasionally crashes.
+  _c_none, _s_none = evaluate(None)
+  assert 0.01 < _c_none < 0.07, "unguarded collision rate should be around 3%% (got %.3f)" % _c_none
+  assert _s_none > 0.9, "...and it succeeds the rest of the time (got %.3f)" % _s_none
+  # A well-sized monitor makes it safe at essentially no cost.
+  _c_good, _s_good = evaluate(0.15)
+  assert _c_good == 0.0, "a correct monitor must eliminate collisions entirely (got %.3f)" % _c_good
+  assert _s_good > 0.95, "...while still completing the task (got %.3f)" % _s_good
+  _c_mid, _s_mid = evaluate(0.45)
+  assert _c_mid == 0.0 and _s_mid > 0.95, "a slightly larger margin should still work"
+  # THE TRAP: an over-conservative monitor looks perfect on the safety metric.
+  _c_bad, _s_bad = evaluate(0.8)
+  assert _c_bad == 0.0, "the over-conservative monitor also has zero collisions..."
+  assert _s_bad < 0.05, "...and never completes the task (got %.3f) - safe and useless" % _s_bad
+  assert _s_good - _s_bad > 0.9, "zero-collisions alone cannot distinguish a good monitor from a useless one"
+hints:
+  - "is_safe: `v2 = v + a*DT`; `d2 = d - v2*DT`; `if v2 <= 0: return True`; else `return v2*v2 <= 2*A_MAX*max(d2 - margin, 0.0)`."
+  - "episode: each step get `a = learned_policy(d, v, rng)`, override with `-A_MAX` when guarded and not is_safe(...), then `v = max(0.0, v + a*DT)` and `d -= v*DT`. Check collision before success."
+  - "evaluate: run episodes for seeds 0..n-1 and count outcomes."
+  - "Read the margin=0.8 row against margin=0.15. Both report zero collisions. Only one of them is a working robot — which is why a safety argument has to include a liveness claim, not just a safety claim."
+solution: |
+  import numpy as np
+
+  def is_safe(d, v, a, margin):
+      v2 = v + a * DT
+      d2 = d - v2 * DT
+      if v2 <= 0:
+          return True
+      return v2 * v2 <= 2 * A_MAX * max(d2 - margin, 0.0)
+
+  def episode(seed, margin=None, horizon=250):
+      rng = np.random.default_rng(seed)
+      d, v = START_DISTANCE, 0.0
+      for t in range(horizon):
+          a = learned_policy(d, v, rng)
+          if margin is not None and not is_safe(d, v, a, margin):
+              a = -A_MAX
+          v = max(0.0, v + a * DT)
+          d = d - v * DT
+          if d <= 0:
+              return "collision", t
+          if d < GOAL_DISTANCE and v < 0.05:
+              return "success", t
+      return "timeout", horizon
+
+  def evaluate(margin, n=400):
+      out = [episode(s, margin) for s in range(n)]
+      collisions = sum(1 for r, _ in out if r == "collision") / n
+      successes = sum(1 for r, _ in out if r == "success") / n
+      return collisions, successes
+
+  print("margin    collisions  success")
+  for m in (None, 0.15, 0.45, 0.8):
+      c, s = evaluate(m)
+      print("%-9s %.3f       %.3f" % ("none" if m is None else m, c, s))

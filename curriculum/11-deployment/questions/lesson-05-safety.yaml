@@ -1,0 +1,71 @@
+id: dep-l5-safety-quiz
+title: "Quiz — safety cases for learned components"
+lesson: modules/11-deployment/05-safety-cases
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "You can't verify a 6B-parameter policy. What's the workable response?"
+    options:
+      - text: "Don't make the learned component safe — make the system safe despite it, by wrapping it in a verifiable monitor with a trusted fallback"
+        correct: true
+        explanation: "Runtime assurance / the simplex architecture. The thing you reason about becomes four lines of arithmetic instead of a network."
+      - text: "Test it until the failure rate is provably low"
+        explanation: "For rare failures that needs hundreds of millions of miles per candidate version — and would repeat for every change."
+      - text: "Use a smaller model you can verify"
+        explanation: "Formal verification remains impractical well below 6B parameters, and you'd give up the capability that motivated learning."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Two monitors both report ZERO collisions. One has 100% task success, the other 0%. What does this show?"
+    options:
+      - text: "A safety argument needs a liveness claim too — evaluated only on collisions, a robot that never moves scores perfectly"
+        correct: true
+        explanation: "The over-conservative monitor's margin exceeded the clearance the task required. Safe and useless is a failure mode, and the safety metric cannot see it."
+      - text: "The second monitor is better, since safety comes first"
+        explanation: "A robot that cannot do its job has not solved the problem, it has avoided it."
+      - text: "The success metric must be broken"
+        explanation: "It's working correctly — that's how you found the problem."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "A monitor shows 0 collisions in 400 episodes. Using Wilson, roughly what upper bound on the true collision rate does that support? (as a percentage)"
+    answer: 0.9
+    tolerance: 0.4
+    explanation: "About 0.9% — the evidence is consistent with nearly one collision in a hundred. Useful for a warehouse robot, nowhere near a safety-critical claim, and that gap is what architecture must close."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Your monitor reports zero violations, yet the robot has collided twice. Two candidate explanations?"
+    options:
+      - text: "The monitor isn't conservative (optimistic braking or unmodelled latency), or it was bypassed/starved — missed its deadline, ran on stale state, or wasn't active in that mode"
+        correct: true
+        explanation: "Both are diagnosed the same way: log every monitor decision beside the outcome and check whether the collisions had a certifying decision, or none at all."
+      - text: "The collisions were unavoidable"
+        explanation: "Possible, but then the monitor should have reported that it could not guarantee safety."
+      - text: "Sensor noise"
+        explanation: "Noise is a reason a monitor must be conservative — which is the first explanation restated."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why is an action-level monitor a strong defence against data poisoning and semantic jailbreaks in a VLA?"
+    options:
+      - text: "It constrains what the robot may DO, so it's agnostic to how the policy was compromised"
+        correct: true
+        explanation: "With 0.31% of episodes achieving 98–99% backdoor success in 2026 results, model-level defences are hard. Architectural constraints don't care why the proposal was bad."
+      - text: "Monitors detect adversarial inputs"
+        explanation: "They generally don't inspect inputs at all — that's what makes them robust to novel attacks."
+      - text: "It retrains the policy when attacked"
+        explanation: "A monitor rejects actions; it doesn't modify the policy."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "What makes 'this robot is safe' an unevaluable claim?"
+    options:
+      - text: "No stated operating context — safety is only meaningful within a bounded envelope of speed, environment, and conditions"
+        correct: true
+        explanation: "'Safe below 1.2 m/s, indoors, on flat floors, with up to six non-cooperative movers' can be defended and tested. The capstone's published envelope is a small instance of the same discipline."
+      - text: "Safety can never be claimed for any robot"
+        explanation: "It can, within a defined context and with evidence — that's what a safety case is."
+      - text: "The word 'safe' has no technical definition"
+        explanation: "It has several precise ones; the missing piece here is the context they apply to."

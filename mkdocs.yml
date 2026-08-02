@@ -107,6 +107,7 @@ nav:
       - "11.2 Edge inference": modules/11-deployment/02-edge-inference.md
       - "11.3 Rollout and rollback": modules/11-deployment/03-rollout-rollback.md
       - "11.4 Telemetry and forensics": modules/11-deployment/04-telemetry-forensics.md
+      - "11.5 Safety cases": modules/11-deployment/05-safety-cases.md
   - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md
