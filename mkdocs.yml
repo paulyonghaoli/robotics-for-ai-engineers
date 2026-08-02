@@ -101,6 +101,9 @@ nav:
       - "Project: PF localization (autograded)": modules/03-estimation/project-localization.md
   - "Course I exam": course-1-exam.md
   - "Course II exam": course-2-exam.md
+  - "Module 11 · Deployment, Fleet & Safety":
+      - Overview: modules/11-deployment/index.md
+      - "11.1 Latency budgets": modules/11-deployment/01-latency-budgets.md
   - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md

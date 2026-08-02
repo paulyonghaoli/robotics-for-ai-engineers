@@ -1,0 +1,124 @@
+id: dep-l1-latency
+title: "Find the stage that's actually blowing your deadline"
+lesson: modules/11-deployment/01-latency-budgets
+description: >-
+  Four pipeline stages and a 50 ms control period. One stage has by far
+  the largest mean latency. A different one causes almost all the deadline
+  misses. Build the budget analysis that tells them apart, then confirm
+  which stage is worth optimizing.
+setup_code: |
+  import numpy as np
+
+  DEADLINE_MS = 50.0
+  _rng = np.random.default_rng(0)
+  _N = 20000
+
+  # Measured latencies per stage, in milliseconds, under realistic load.
+  STAGES = {
+      "perception": _rng.gamma(9, 1.6, _N),
+      "estimation": _rng.gamma(4, 0.8, _N),
+      # Planning is usually cheap but occasionally does a full replan.
+      "planning": np.where(_rng.random(_N) < 0.06,
+                           _rng.gamma(9, 4.0, _N),
+                           _rng.gamma(3, 1.0, _N)),
+      "control": _rng.gamma(3, 0.7, _N),
+  }
+starter_code: |
+  import numpy as np
+  # Provided: STAGES (4 arrays of per-cycle latencies in ms),
+  #           DEADLINE_MS = 50.0.
+
+  def stage_stats(stages):
+      """Return {name: (mean, p95, p99)} per stage."""
+      # TODO
+      return {}
+
+  def end_to_end(stages):
+      """Total latency per cycle — the stages run in sequence."""
+      # TODO
+      return np.zeros(1)
+
+  def miss_rate(total, deadline=DEADLINE_MS):
+      """Fraction of cycles that blow the deadline."""
+      # TODO
+      return 0.0
+
+  def sum_of_p95s(stages):
+      """Naive budget: add each stage's p95."""
+      # TODO
+      return 0.0
+
+  def miss_rate_if_halved(stages, name, deadline=DEADLINE_MS):
+      """Miss rate if THIS stage's latency were halved, others unchanged."""
+      # TODO
+      return 0.0
+
+  stats = stage_stats(STAGES)
+  total = end_to_end(STAGES)
+  print("stage        mean    p95     p99")
+  for k, (m, p95, p99) in stats.items():
+      print("%-12s %5.1f  %5.1f  %5.1f" % (k, m, p95, p99))
+  print("%-12s %5.1f  %5.1f  %5.1f" % ("END-TO-END", total.mean(),
+                                       np.percentile(total, 95), np.percentile(total, 99)))
+  print("sum of stage p95s: %.1f   (end-to-end p95: %.1f)" % (
+      sum_of_p95s(STAGES), np.percentile(total, 95)))
+  print("deadline miss rate: %.3f" % miss_rate(total))
+  for k in STAGES:
+      print("  halve %-11s -> miss %.3f" % (k, miss_rate_if_halved(STAGES, k)))
+tests: |
+  import numpy as np
+  _s = stage_stats(STAGES)
+  assert set(_s) == set(STAGES), "report every stage"
+  assert _s["perception"][0] > 2.5 * _s["planning"][0], "perception should have by far the largest MEAN (%.1f vs %.1f)" % (_s["perception"][0], _s["planning"][0])
+  assert _s["planning"][2] > _s["perception"][2], "...while planning has the largest p99 (%.1f vs %.1f) - that inversion is the whole exercise" % (_s["planning"][2], _s["perception"][2])
+  _t = end_to_end(STAGES)
+  assert len(_t) == len(STAGES["control"]), "one total per cycle"
+  assert abs(_t.mean() - sum(v.mean() for v in STAGES.values())) < 1e-6, "means add exactly"
+  # Tails do NOT add the way means do.
+  _p95_sum = sum_of_p95s(STAGES)
+  _p95_e2e = float(np.percentile(_t, 95))
+  assert _p95_e2e < _p95_sum - 5, "end-to-end p95 (%.1f) must be well BELOW the sum of stage p95s (%.1f) - slow moments rarely coincide" % (_p95_e2e, _p95_sum)
+  _mr = miss_rate(_t)
+  assert 0.02 < _mr < 0.08, "baseline miss rate should be a few percent (got %.3f)" % _mr
+  # The payoff: optimizing the biggest mean is NOT the best move.
+  _halved = {k: miss_rate_if_halved(STAGES, k) for k in STAGES}
+  assert _halved["planning"] < _halved["perception"] / 3, "halving PLANNING should cut misses far more than halving perception (%.3f vs %.3f)" % (_halved["planning"], _halved["perception"])
+  assert _halved["planning"] < 0.01, "halving the tail-heavy stage should nearly eliminate misses (got %.3f)" % _halved["planning"]
+  assert min(_halved, key=_halved.get) == "planning", "the best stage to optimize is the tail-dominant one, not the mean-dominant one"
+hints:
+  - "stage_stats: for each array return (v.mean(), np.percentile(v, 95), np.percentile(v, 99))."
+  - "end_to_end: the stages are sequential, so add the arrays elementwise — `sum(STAGES.values())` works."
+  - "miss_rate_if_halved: rebuild the total with that one stage multiplied by 0.5, then call miss_rate on it."
+  - "Read the result carefully. Perception has ~3x planning's mean and halving it barely helps; planning's occasional full replan produces a p99 of ~47 ms, which is what actually crosses the 50 ms line."
+solution: |
+  import numpy as np
+
+  def stage_stats(stages):
+      return {k: (float(v.mean()), float(np.percentile(v, 95)), float(np.percentile(v, 99)))
+              for k, v in stages.items()}
+
+  def end_to_end(stages):
+      return sum(stages.values())
+
+  def miss_rate(total, deadline=DEADLINE_MS):
+      return float(np.mean(np.asarray(total) > deadline))
+
+  def sum_of_p95s(stages):
+      return float(sum(np.percentile(v, 95) for v in stages.values()))
+
+  def miss_rate_if_halved(stages, name, deadline=DEADLINE_MS):
+      total = sum(v * 0.5 if k == name else v for k, v in stages.items())
+      return miss_rate(total, deadline)
+
+  stats = stage_stats(STAGES)
+  total = end_to_end(STAGES)
+  print("stage        mean    p95     p99")
+  for k, (m, p95, p99) in stats.items():
+      print("%-12s %5.1f  %5.1f  %5.1f" % (k, m, p95, p99))
+  print("%-12s %5.1f  %5.1f  %5.1f" % ("END-TO-END", total.mean(),
+                                       np.percentile(total, 95), np.percentile(total, 99)))
+  print("sum of stage p95s: %.1f   (end-to-end p95: %.1f)" % (
+      sum_of_p95s(STAGES), np.percentile(total, 95)))
+  print("deadline miss rate: %.3f" % miss_rate(total))
+  for k in STAGES:
+      print("  halve %-11s -> miss %.3f" % (k, miss_rate_if_halved(STAGES, k)))

@@ -34,7 +34,7 @@ Three courses, eleven modules. **Courses I and II's classical stack are complete
 | 8 · Manipulation | Manipulator kinematics, grasping, motion planning, visual servoing | ⬜ planned |
 | 9 · Robot learning & embodied AI | Imitation (ACT, diffusion policy), the data engine & human-in-the-loop, RL, sim-to-real, world models, VLA evaluation | ⬜ planned |
 | [**10 · Evaluation & data systems**](modules/10-evaluation/index.md) | Statistical rigor, scenario suites, regression from logs, dataset lifecycle, drift monitoring | 🔨 first lesson live |
-| 11 · Deployment, fleet & safety | Latency budgets, edge inference, rollout/rollback, fleet telemetry, safety cases, incident forensics | ⬜ planned |
+| [**11 · Deployment, fleet & safety**](modules/11-deployment/index.md) | Latency budgets, edge inference, rollout/rollback, fleet telemetry, safety cases, incident forensics | 🔨 first lesson live |
 
 Modules 10 and 11 were split from a single "production robotics" module because [the 2026 frontier research](frontier.md) ranks evaluation and data infrastructure as the **highest-leverage area** for this curriculum's audience — and because the field is in a documented evaluation crisis. Module 10 is deliberately being written early, out of numerical order.
 

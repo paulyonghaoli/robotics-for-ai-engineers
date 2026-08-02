@@ -1,0 +1,76 @@
+id: dep-l1-latency-quiz
+title: "Quiz — latency budgets"
+lesson: modules/11-deployment/01-latency-budgets
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is latency in a feedback loop a stability parameter rather than just a performance metric?"
+    options:
+      - text: "A delay τ inserts phase lag −ωτ, eating the phase margin the controller was tuned with — a stable controller can become an oscillating one"
+        correct: true
+        explanation: "At 10 rad/s, 78 ms of delay consumes 45° of margin outright. The correction isn't merely late; it's computed from a state the robot has already left."
+      - text: "Slow loops consume more CPU"
+        explanation: "Resource use is a separate concern from closed-loop stability."
+      - text: "It isn't — robots tolerate latency like any other system"
+        explanation: "Open-loop systems tolerate it; feedback systems change character."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Four stages have p95 latencies of 23, 6, 26, and 4 ms. The end-to-end p95 is…"
+    options:
+      - text: "Less than 59 ms — for independent stages, slow moments rarely coincide, so the sum's p95 sits below the sum of p95s (measured: 45 ms)"
+        correct: true
+        explanation: "Budgeting each stage at its p95 is therefore safe but conservative, and will push you to over-engineer stages that were never the constraint."
+      - text: "Exactly 59 ms — percentiles add like means"
+        explanation: "Only means add. Percentiles of a sum depend on how the tails co-occur."
+      - text: "More than 59 ms, because tails compound"
+        explanation: "That would require the slow moments to be positively correlated; independent stages give the opposite."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your loop misses a 50 ms deadline 4% of the time. Perception has three times the mean latency of planning. Which do you optimize?"
+    options:
+      - text: "Planning — it has the heavier tail, and halving it cuts misses to 0.4% while halving perception only reaches 2.6%"
+        correct: true
+        explanation: "Deadline misses live entirely in the tail. Plot per-stage p99 next to mean; the gap between them names the culprit immediately."
+      - text: "Perception — the largest mean dominates end-to-end latency"
+        explanation: "It dominates the *average*, which is nearly irrelevant to how often you miss a deadline."
+      - text: "Both equally, since latency is additive"
+        explanation: "Means are additive; misses are a tail phenomenon and are not shared evenly."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Your global planner sometimes takes 300 ms; the control loop needs 20 ms. The right architecture is…"
+    options:
+      - text: "Take the planner out of the control loop — run it asynchronously, have the fast loop consume the latest published plan, and define behaviour when that plan goes stale"
+        correct: true
+        explanation: "Lesson 0.2's rate hierarchy used as engineering rather than description. Make the planner anytime so a capped budget returns best-so-far instead of nothing."
+      - text: "Optimize the planner until it fits in 20 ms"
+        explanation: "Sometimes possible, but the architecture should not depend on it — and a global planner genuinely needs more time than a control period."
+      - text: "Slow the control loop to 300 ms"
+        explanation: "That's the one thing you cannot do; the control rate is set by the plant, not by convenience."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Pipeline A always takes 30 ms. Pipeline B usually takes 5 ms but occasionally 80 ms. Which is easier to build a controller around?"
+    options:
+      - text: "A — a constant delay can be modelled and even compensated, while unpredictable jitter cannot be tuned for at both extremes"
+        correct: true
+        explanation: "Predictability beats speed. B has the better average and is the harder engineering problem, which is why bounding jitter often matters more than reducing latency."
+      - text: "B — its average latency is six times lower"
+        explanation: "The average is not what the controller experiences at the moment it matters."
+      - text: "Equivalent, since both are under 100 ms"
+        explanation: "The variance is the whole difference."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Adding automatic retries when a stage runs slow tends to…"
+    options:
+      - text: "Make it worse — retries add load exactly when the system is already struggling, converting a slow moment into a queue"
+        correct: true
+        explanation: "Familiar from distributed systems and it transfers intact. The robotics answer is anytime algorithms with hard caps: return best-so-far rather than trying again."
+      - text: "Help, by giving the stage another chance to finish quickly"
+        explanation: "The second attempt runs under the same contention that slowed the first, plus the extra work."
+      - text: "Have no effect on the tail"
+        explanation: "It's precisely the tail that retries amplify."
