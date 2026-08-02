@@ -1,0 +1,126 @@
+id: eval-l5-drift
+title: "Detect the drift before the success rate moves"
+lesson: modules/10-evaluation/05-drift-monitoring
+description: >-
+  200 days of fleet telemetry with a lidar degrading from day 90. Build a
+  windowed KS test and a CUSUM detector, then measure the thing that
+  matters: how many days of warning each layer buys you before the
+  outcome metric finally drops. Also included — a lighting change that
+  shifts the inputs and means nothing, which your detector must not
+  panic about.
+setup_code: |
+  import numpy as np
+
+  N_DAYS = 220
+  _rng = np.random.default_rng(5)
+
+  # Layer 1: sensor input. A lidar degrading steadily from day 90.
+  _deg = np.clip((np.arange(N_DAYS) - 90) * 0.030, 0, None)[:, None]
+  SENSOR = _rng.normal(4.0 + _deg * 0.5, 0.30 + _deg * 0.10, (N_DAYS, 40))
+
+  # A harmless TRANSIENT: a two-day lighting change on day 40 that shifts
+  # the input distribution and affects nothing downstream. Requiring
+  # persistence is what stops this from paging someone at 3am.
+  SENSOR[40:42] += 0.55
+
+  # Layer 2: filter consistency (NIS ~ 1 when healthy), lagging the input.
+  _nis_lag = np.clip((np.arange(N_DAYS) - 125) * 0.020, 0, None)
+  NIS = _rng.normal(1.0 + _nis_lag, 0.12, N_DAYS)
+
+  # Layer 3: outcome — moves last, and is smoothed because daily success
+  # rates are noisy enough to cross any fixed line by chance.
+  _succ = np.clip(0.95 - np.clip((np.arange(N_DAYS) - 155) * 0.004, 0, None), 0, 1)
+  SUCCESS = _rng.binomial(200, _succ, N_DAYS) / 200.0
+
+  def rolling_mean(x, w=7):
+      return np.convolve(np.asarray(x, dtype=float), np.ones(w) / w, mode="valid")
+
+  REFERENCE = slice(0, 35)     # a known-good baseline period
+starter_code: |
+  import numpy as np
+  # Provided: SENSOR (200 days x 40 readings), NIS (200), SUCCESS (200),
+  #           REFERENCE = slice(0, 35) — a known-good baseline period.
+
+  def ks_statistic(reference, window):
+      """Two-sample Kolmogorov-Smirnov D = max |F_ref(x) - F_win(x)|.
+
+      Pool and sort all values, then compare empirical CDFs at each point.
+      """
+      # TODO
+      return 0.0
+
+  def drift_days(series_2d, ref=REFERENCE, threshold=0.35, persistence=3):
+      """First day whose KS statistic vs the reference exceeds `threshold`
+      for `persistence` CONSECUTIVE days. Return None if never.
+
+      Each day's window is that day's row of readings.
+      """
+      # TODO
+      return None
+
+  def cusum_alarm(series, mu0=1.0, slack=0.15, threshold=2.5):
+      """First index where the one-sided CUSUM exceeds `threshold`.
+      S_t = max(0, S_{t-1} + (x_t - mu0) - slack). Return None if never."""
+      # TODO
+      return None
+
+  ref_vals = SENSOR[REFERENCE].ravel()
+  print("input drift detected on day: ", drift_days(SENSOR))
+  print("belief drift (CUSUM on NIS): ", cusum_alarm(NIS))
+  print("outcome drop below 0.90 on:  ", int(np.argmax(rolling_mean(SUCCESS) < 0.90)))
+tests: |
+  import numpy as np
+  _a = np.random.default_rng(0).normal(0, 1, 500)
+  assert ks_statistic(_a, _a) < 1e-9, "KS of a sample against itself is 0"
+  _b = np.random.default_rng(1).normal(3.0, 1, 500)
+  assert ks_statistic(_a, _b) > 0.8, "KS between well-separated samples should be near 1 (got %.2f)" % ks_statistic(_a, _b)
+  assert 0.0 <= ks_statistic(_a, _b) <= 1.0, "KS is bounded in [0, 1]"
+  _input_day = drift_days(SENSOR)
+  assert _input_day is not None, "the sensor degradation must be detected"
+  assert _input_day > 60, "the day-40 LIGHTING CHANGE must not trigger the alarm (fired on day %s) - it is a real input shift with no consequence, and persistence is what filters it" % _input_day
+  assert 90 <= _input_day <= 140, "input drift should be caught in the degradation ramp, got day %s" % _input_day
+  _nis_day = cusum_alarm(NIS)
+  assert _nis_day is not None, "CUSUM must catch the NIS rise"
+  assert _nis_day > _input_day, "belief drift should follow input drift, not precede it (%s vs %s)" % (_nis_day, _input_day)
+  _outcome_day = int(np.argmax(rolling_mean(SUCCESS) < 0.90))
+  assert _input_day < _outcome_day, "the whole point: input drift must fire BEFORE the outcome drops (day %s vs %s)" % (_input_day, _outcome_day)
+  assert _outcome_day - _input_day >= 15, "the warning budget should be substantial - got only %d days" % (_outcome_day - _input_day)
+  _flat = np.full(120, 1.0)
+  assert cusum_alarm(_flat) is None, "CUSUM must not alarm on a flat, healthy series"
+hints:
+  - "ks_statistic: `allv = np.sort(np.concatenate([reference, window]))`; `cdf_r = np.searchsorted(np.sort(reference), allv, 'right')/len(reference)`; same for window; return `np.max(np.abs(cdf_r - cdf_w))`."
+  - "drift_days: track a run counter across days; reset it to 0 whenever the day's KS is below threshold, and return `day` when the counter reaches `persistence`."
+  - "The day-40 lighting spike is a genuine distribution shift, but it lasts only two days — shorter than the persistence window. That is exactly what persistence is for: transients are real and usually irrelevant."
+solution: |
+  import numpy as np
+
+  def ks_statistic(reference, window):
+      r = np.sort(np.asarray(reference).ravel())
+      w = np.sort(np.asarray(window).ravel())
+      allv = np.sort(np.concatenate([r, w]))
+      cdf_r = np.searchsorted(r, allv, side="right") / len(r)
+      cdf_w = np.searchsorted(w, allv, side="right") / len(w)
+      return float(np.max(np.abs(cdf_r - cdf_w)))
+
+  def drift_days(series_2d, ref=REFERENCE, threshold=0.35, persistence=3):
+      reference = np.asarray(series_2d)[ref].ravel()
+      run = 0
+      for day in range(len(series_2d)):
+          d = ks_statistic(reference, series_2d[day])
+          run = run + 1 if d > threshold else 0
+          if run >= persistence:
+              return day
+      return None
+
+  def cusum_alarm(series, mu0=1.0, slack=0.15, threshold=2.5):
+      s = 0.0
+      for i, x in enumerate(np.asarray(series)):
+          s = max(0.0, s + (x - mu0) - slack)
+          if s > threshold:
+              return i
+      return None
+
+  ref_vals = SENSOR[REFERENCE].ravel()
+  print("input drift detected on day: ", drift_days(SENSOR))
+  print("belief drift (CUSUM on NIS): ", cusum_alarm(NIS))
+  print("outcome drop below 0.90 on:  ", int(np.argmax(rolling_mean(SUCCESS) < 0.90)))

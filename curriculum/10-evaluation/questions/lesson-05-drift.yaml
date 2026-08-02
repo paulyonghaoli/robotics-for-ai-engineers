@@ -1,0 +1,71 @@
+id: eval-l5-drift-quiz
+title: "Quiz — drift monitoring"
+lesson: modules/10-evaluation/05-drift-monitoring
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "You run a drift test hourly at α = 0.05 across 20 metrics. How many false alarms per day should you expect when nothing is wrong?"
+    answer: 24
+    tolerance: 1
+    explanation: "24 × 20 × 0.05 = 24 — about one an hour, from a perfectly healthy fleet. This is why persistence requirements and CUSUM are not optional refinements."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why monitor sensor inputs when the outcome metric is what you actually care about?"
+    options:
+      - text: "Input drift precedes outcome drift, and that gap is your entire warning budget — by the time success rate moves, the fleet has been degrading for days"
+        correct: true
+        explanation: "Detect early, alert on outcomes. The useful signal is usually a conjunction: inputs shifted AND belief consistency degraded."
+      - text: "Input metrics are more accurate"
+        explanation: "They're noisier and less meaningful in isolation — lighting changes daily and means nothing. Their value is timing."
+      - text: "Outcome metrics are expensive to compute"
+        explanation: "Both are cheap. Latency of detection is the issue."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "NIS has been elevated for two weeks; success rate is unchanged. You should…"
+    options:
+      - text: "Investigate — the estimator's measurements no longer match its model, and outcomes are the last layer to move"
+        correct: true
+        explanation: "This is the belief layer doing its job: sustained inconsistency with intact outcomes is a warning, not a false alarm."
+      - text: "Ignore it — the robot is still succeeding"
+        explanation: "That's waiting for the failure you were given advance notice of."
+      - text: "Re-baseline NIS to the new level"
+        explanation: "Normalizing away the signal is how a monitor is quietly disabled."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A CUSUM detector beats a per-window threshold test mainly because…"
+    options:
+      - text: "It accumulates small sustained deviations while its slack term prevents noise from accumulating — sensitive to real drift, resistant to single-window flukes"
+        correct: true
+        explanation: "A fixed threshold either misses slow drift or fires on noise; CUSUM separates those cases by integrating."
+      - text: "It requires no reference window"
+        explanation: "It needs a reference mean μ₀ just the same."
+      - text: "It's faster to compute"
+        explanation: "Both are trivial; the difference is statistical behaviour."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "A transient input shift — a two-day lighting change — should be handled by…"
+    options:
+      - text: "A persistence requirement: it's a genuine distribution shift, but a real monitor only cares about shifts that stay"
+        correct: true
+        explanation: "Transients are real and usually irrelevant. Requiring k consecutive windows filters them without lowering sensitivity to sustained drift."
+      - text: "Raising the threshold until it stops firing"
+        explanation: "That also blinds you to the sustained degradation you built the monitor for."
+      - text: "Removing the sensor metric from monitoring"
+        explanation: "Discarding the earliest layer to avoid one nuisance is a bad trade."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Which failure can runtime monitoring NOT catch, no matter how well built?"
+    options:
+      - text: "An unobservable error — e.g. a constant sensor offset absorbed into the state, leaving NEES bad but NIS perfectly healthy"
+        correct: true
+        explanation: "Lesson 3.6's fourth pattern. Only ground truth exposes it, which is why simulation-time NEES auditing complements runtime NIS rather than duplicating it."
+      - text: "Gradual sensor degradation"
+        explanation: "That's exactly what the layered monitor is good at."
+      - text: "A sudden environment change"
+        explanation: "Also well within reach — input drift fires immediately."

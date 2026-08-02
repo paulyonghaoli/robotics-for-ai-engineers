@@ -1,0 +1,144 @@
+id: eval-l7-audit
+title: "Audit four submitted results"
+lesson: modules/10-evaluation/07-lab-benchmark-lied
+description: >-
+  Four benchmark results, each arithmetically correct and reproducible.
+  One is honest. Write the checks that expose the other three — an
+  unsupported sample size, a saturated benchmark, and a result a trivial
+  baseline matches — and confirm the good one survives all of them.
+setup_code: |
+  import numpy as np
+
+  Z95 = 1.959963985
+
+  # Four submissions. Each has raw per-episode outcomes, plus the outcomes
+  # of a deliberately trivial baseline on the SAME episodes, plus the
+  # scores every competing method got on that benchmark.
+  _r = np.random.default_rng(4)
+
+  SUBMISSIONS = {
+      # Big claim, tiny sample: 88% of 25 looks strong and supports nothing.
+      "tiny_sample": dict(
+          outcomes=(_r.random(25) < 0.88).astype(int),
+          trivial_baseline=(_r.random(25) < 0.30).astype(int),
+          peer_scores=[0.55, 0.61, 0.58, 0.66],
+      ),
+      # Saturated: everyone is at 96-98%, including this.
+      "saturated": dict(
+          outcomes=(_r.random(400) < 0.97).astype(int),
+          trivial_baseline=(_r.random(400) < 0.31).astype(int),
+          peer_scores=[0.96, 0.97, 0.98, 0.96, 0.97],
+      ),
+      # A trivial baseline matches it: the benchmark isn't measuring the
+      # capability its name claims.
+      "trivial_matches": dict(
+          outcomes=(_r.random(400) < 0.71).astype(int),
+          trivial_baseline=(_r.random(400) < 0.69).astype(int),
+          peer_scores=[0.60, 0.65, 0.55, 0.68],
+      ),
+      # The honest one: adequate n, real margin over a trivial baseline,
+      # and a benchmark that still separates methods.
+      "sound": dict(
+          outcomes=(_r.random(400) < 0.78).astype(int),
+          trivial_baseline=(_r.random(400) < 0.34).astype(int),
+          peer_scores=[0.52, 0.61, 0.70, 0.58],
+      ),
+  }
+starter_code: |
+  import numpy as np
+  # Provided: SUBMISSIONS (4 entries, each with 'outcomes',
+  # 'trivial_baseline', and 'peer_scores'), Z95.
+
+  def wilson(successes, n, z=Z95):
+      """Wilson score interval (lesson 10.1). Return (low, high)."""
+      # TODO
+      return (0.0, 0.0)
+
+  def underpowered(sub, max_width=0.20):
+      """True if the result's 95% interval is wider than max_width —
+      i.e. the sample can't support a precise claim."""
+      # TODO
+      return False
+
+  def saturated(sub, ceiling=0.95):
+      """True if this result AND every peer score sit above `ceiling`.
+      A benchmark everyone maxes out has stopped discriminating."""
+      # TODO
+      return False
+
+  def trivially_matched(sub, margin=0.10):
+      """True if the trivial baseline comes within `margin` of the result —
+      the benchmark isn't measuring the capability it advertises."""
+      # TODO
+      return False
+
+  def audit(sub):
+      """Return a sorted list of defect names, empty if the result is sound.
+      Names: 'underpowered', 'saturated', 'trivially-matched'."""
+      # TODO
+      return []
+
+  for name, sub in SUBMISSIONS.items():
+      rate = sub["outcomes"].mean()
+      lo, hi = wilson(sub["outcomes"].sum(), len(sub["outcomes"]))
+      print("%-16s %.2f  CI[%.2f,%.2f]  n=%3d  ->  %s" % (
+          name, rate, lo, hi, len(sub["outcomes"]), audit(sub) or "SOUND"))
+tests: |
+  import numpy as np
+  _lo, _hi = wilson(18, 25)
+  assert 0.50 < _lo < 0.56 and 0.85 < _hi < 0.89, "Wilson on 18/25 should be about [0.52, 0.86]"
+  assert underpowered(SUBMISSIONS["tiny_sample"]), "25 episodes gives an interval far too wide to support the claim"
+  assert not underpowered(SUBMISSIONS["sound"]), "400 episodes is enough for a usable interval"
+  assert saturated(SUBMISSIONS["saturated"]), "everyone above 95%% means the benchmark has stopped discriminating"
+  assert not saturated(SUBMISSIONS["sound"]), "the sound benchmark still separates methods"
+  assert trivially_matched(SUBMISSIONS["trivial_matches"]), "a trivial baseline within 2 points is a red flag about what's being measured"
+  assert not trivially_matched(SUBMISSIONS["sound"]), "the sound result beats its trivial baseline by a wide margin"
+  assert audit(SUBMISSIONS["sound"]) == [], "exactly one submission should pass clean, got %s" % audit(SUBMISSIONS["sound"])
+  assert "underpowered" in audit(SUBMISSIONS["tiny_sample"]), "tiny_sample must be flagged underpowered"
+  assert "saturated" in audit(SUBMISSIONS["saturated"]), "saturated must be flagged"
+  assert "trivially-matched" in audit(SUBMISSIONS["trivial_matches"]), "trivial_matches must be flagged"
+  _flagged = [n for n in SUBMISSIONS if audit(SUBMISSIONS[n])]
+  assert len(_flagged) == 3, "exactly three of the four should be flagged, got %s" % _flagged
+hints:
+  - "wilson: reuse lesson 10.1's implementation — center = (p + z²/2n)/(1 + z²/n), half = z·sqrt(p(1-p)/n + z²/4n²)/(1 + z²/n)."
+  - "underpowered: compute the interval from the submission's own outcomes and check `hi - lo > max_width`."
+  - "saturated: `rate > ceiling and all(p > ceiling for p in sub['peer_scores'])` — one method scoring high is success; EVERY method scoring high is a dead benchmark."
+  - "trivially_matched: `sub['outcomes'].mean() - sub['trivial_baseline'].mean() < margin`."
+solution: |
+  import numpy as np
+
+  def wilson(successes, n, z=Z95):
+      p = successes / n
+      denom = 1.0 + z**2 / n
+      center = (p + z**2 / (2 * n)) / denom
+      half = z * np.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / denom
+      return (max(0.0, center - half), min(1.0, center + half))
+
+  def underpowered(sub, max_width=0.20):
+      o = sub["outcomes"]
+      lo, hi = wilson(int(o.sum()), len(o))
+      return bool(hi - lo > max_width)
+
+  def saturated(sub, ceiling=0.95):
+      rate = float(sub["outcomes"].mean())
+      return bool(rate > ceiling and all(p > ceiling for p in sub["peer_scores"]))
+
+  def trivially_matched(sub, margin=0.10):
+      gap = float(sub["outcomes"].mean() - sub["trivial_baseline"].mean())
+      return bool(gap < margin)
+
+  def audit(sub):
+      flags = []
+      if underpowered(sub):
+          flags.append("underpowered")
+      if saturated(sub):
+          flags.append("saturated")
+      if trivially_matched(sub):
+          flags.append("trivially-matched")
+      return sorted(flags)
+
+  for name, sub in SUBMISSIONS.items():
+      rate = sub["outcomes"].mean()
+      lo, hi = wilson(sub["outcomes"].sum(), len(sub["outcomes"]))
+      print("%-16s %.2f  CI[%.2f,%.2f]  n=%3d  ->  %s" % (
+          name, rate, lo, hi, len(sub["outcomes"]), audit(sub) or "SOUND"))

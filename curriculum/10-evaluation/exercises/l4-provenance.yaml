@@ -1,0 +1,109 @@
+id: eval-l4-provenance
+title: "Find the bad batch in minutes, not weeks"
+lesson: modules/10-evaluation/04-dataset-lifecycle
+description: >-
+  Model performance dropped after ingesting new data. You have 900
+  trajectory records with provenance. Write the queries that isolate the
+  cause — then discover that the second problem in this dataset is
+  invisible to performance metrics entirely, and only a completeness
+  audit finds it.
+setup_code: |
+  import numpy as np
+
+  _rng = np.random.default_rng(17)
+  ROBOTS = ["rb-01", "rb-02", "rb-03", "rb-04"]
+  OPERATORS = ["op-a", "op-b", "op-c"]
+
+  def _make():
+      recs = []
+      for i in range(900):
+          robot = ROBOTS[i % 4]
+          # rb-03 was recalibrated badly partway through collection
+          bad = (robot == "rb-03" and i > 500)
+          rec = {
+              "trajectory_id": "t%04d" % i,
+              "robot_id": robot,
+              "firmware": "2.3.1" if i <= 500 else "2.4.0",
+              "calibration_id": ("cal-bad" if bad else "cal-%s" % robot),
+              "operator_id": OPERATORS[i % 3],
+              "source": "teleop" if i % 10 else "sim",
+              "outcome": "success" if _rng.random() < (0.45 if bad else 0.9) else "failure",
+              # provenance gap: synthetic rows are missing their seed
+              "generator_seed": None if i % 10 == 0 else int(_rng.integers(0, 99999)),
+          }
+          recs.append(rec)
+      return recs
+
+  RECORDS = _make()
+  REQUIRED_FIELDS = ["trajectory_id", "robot_id", "firmware", "calibration_id",
+                     "operator_id", "source", "outcome", "generator_seed"]
+starter_code: |
+  import numpy as np
+  # Provided: RECORDS (900 dicts), REQUIRED_FIELDS, ROBOTS, OPERATORS
+
+  def success_rate_by(records, field):
+      """Success rate grouped by a provenance field.
+      Return {value: rate} using outcome == 'success'."""
+      # TODO
+      return {}
+
+  def find_suspect(records, field, threshold=0.7):
+      """Values of `field` whose success rate falls below threshold.
+      Return a sorted list."""
+      # TODO
+      return []
+
+  def completeness(records, fields=None):
+      """Fraction of records with a non-None value, per field.
+      Return {field: fraction}."""
+      # TODO
+      return {}
+
+  print("by robot:      ", {k: round(v, 2) for k, v in success_rate_by(RECORDS, "robot_id").items()})
+  print("by calibration:", {k: round(v, 2) for k, v in success_rate_by(RECORDS, "calibration_id").items()})
+  print("suspect calibrations:", find_suspect(RECORDS, "calibration_id"))
+  print("completeness:  ", {k: round(v, 2) for k, v in completeness(RECORDS).items()})
+tests: |
+  import numpy as np
+  _br = success_rate_by(RECORDS, "robot_id")
+  assert set(_br) == set(ROBOTS), "should group by every robot present"
+  assert all(0.0 <= v <= 1.0 for v in _br.values()), "rates must be fractions"
+  assert _br["rb-03"] < _br["rb-01"] - 0.1, "rb-03 should look visibly worse in aggregate (%.2f vs %.2f)" % (_br["rb-03"], _br["rb-01"])
+  # ...but robot_id is the wrong granularity: rb-03 was fine before recalibration.
+  _bc = success_rate_by(RECORDS, "calibration_id")
+  assert "cal-bad" in _bc, "calibration_id should isolate the bad batch"
+  assert _bc["cal-bad"] < 0.6, "the bad calibration should be clearly bad (got %.2f)" % _bc["cal-bad"]
+  assert _bc["cal-rb-03"] > 0.8, "rb-03's GOOD calibration should look healthy - the robot isn't the problem, one calibration is"
+  _susp = find_suspect(RECORDS, "calibration_id")
+  assert _susp == ["cal-bad"], "exactly one calibration should be flagged, got %s" % _susp
+  assert find_suspect(RECORDS, "operator_id") == [], "no operator is at fault - a good query must not manufacture suspects"
+  # The second problem: a provenance gap that performance metrics cannot see.
+  _c = completeness(RECORDS)
+  assert set(_c) == set(REQUIRED_FIELDS), "audit every required field"
+  assert _c["robot_id"] == 1.0, "robot_id is fully populated"
+  assert _c["generator_seed"] < 0.95, "generator_seed is MISSING on the synthetic rows (%.2f) - nothing in the outcome data reveals this, and without it that data cannot be regenerated" % _c["generator_seed"]
+hints:
+  - "success_rate_by: build {value: [outcomes]} then average `o == 'success'` per group."
+  - "completeness: for each field, `sum(r.get(f) is not None for r in records) / len(records)`."
+  - "The point of the two-part exercise: aggregating by robot_id blames rb-03 entirely, but rb-03 was fine until recalibration. Granular provenance turns 'a robot is bad' (replace hardware) into 'a calibration is bad' (drop 100 rows, recollect). And the missing seeds are invisible to every performance metric — only an explicit completeness audit surfaces them."
+solution: |
+  import numpy as np
+
+  def success_rate_by(records, field):
+      groups = {}
+      for r in records:
+          groups.setdefault(r[field], []).append(r["outcome"] == "success")
+      return {k: float(np.mean(v)) for k, v in groups.items()}
+
+  def find_suspect(records, field, threshold=0.7):
+      return sorted(k for k, v in success_rate_by(records, field).items() if v < threshold)
+
+  def completeness(records, fields=None):
+      fields = fields or REQUIRED_FIELDS
+      n = len(records)
+      return {f: sum(r.get(f) is not None for r in records) / n for f in fields}
+
+  print("by robot:      ", {k: round(v, 2) for k, v in success_rate_by(RECORDS, "robot_id").items()})
+  print("by calibration:", {k: round(v, 2) for k, v in success_rate_by(RECORDS, "calibration_id").items()})
+  print("suspect calibrations:", find_suspect(RECORDS, "calibration_id"))
+  print("completeness:  ", {k: round(v, 2) for k, v in completeness(RECORDS).items()})

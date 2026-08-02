@@ -1,0 +1,76 @@
+id: eval-l7-drills
+title: "Diagnosis drills — auditing a benchmark result"
+lesson: modules/10-evaluation/07-lab-benchmark-lied
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Result:** 88% success, 25 rollouts, no interval reported, beating a 61% baseline. Verdict?"
+    options:
+      - text: "Unsupported — at n=25 the interval spans roughly ±13 points, so 88% and a strong baseline are not cleanly separated, and no interval was offered to check"
+        correct: true
+        explanation: "This is the single most common defect in the literature. The number may be real; the claim built on it isn't established."
+      - text: "Strong result — a 27-point gap is decisive"
+        explanation: "Gaps are only decisive relative to their uncertainty, and 25 rollouts buys very little."
+      - text: "Invalid — 25 rollouts is never usable"
+        explanation: "Overcorrection: n=25 supports coarse claims fine. It just can't support a precise one."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Result:** 97% on a benchmark where the other five published methods score 96–98%. Verdict?"
+    options:
+      - text: "The benchmark is saturated — it no longer discriminates, so the score conveys almost no information about relative capability"
+        correct: true
+        explanation: "How LIBERO stopped being informative. The right response is harder scenarios, not a victory lap."
+      - text: "Excellent — it's state of the art"
+        explanation: "State of the art on a measurement that can no longer tell methods apart."
+      - text: "Suspicious — the result is probably fabricated"
+        explanation: "Nothing suggests fraud; the benchmark simply ran out of range."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Result:** A 0.09B-parameter probe with no language encoder and no robotics pretraining matches the published SOTA. What does this establish?"
+    options:
+      - text: "The benchmark is not measuring the capability its name claims — whatever the big models are being credited for, this task doesn't require it"
+        correct: true
+        explanation: "A real 2026 finding, and the fastest single check you can run on any benchmark: what does a trivial baseline get?"
+      - text: "The small model is secretly very capable"
+        explanation: "Far more likely the task is easier than advertised — which is the informative reading."
+      - text: "The SOTA model is broken"
+        explanation: "It performs as reported. The benchmark's construct validity is what's in question."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Result:** 95% on the benchmark; 30% when the camera moves 15 cm. Verdict?"
+    options:
+      - text: "The 95% described performance on the training distribution — some of these models were shown to be memorizing trajectories rather than using visual feedback"
+        correct: true
+        explanation: "The LIBERO-Plus collapse. Perturbation testing belongs in every robot evaluation protocol precisely because the headline number cannot reveal this."
+      - text: "The camera calibration is wrong"
+        explanation: "The perturbation is deliberate and known — the collapse IS the finding."
+      - text: "Expected — all models degrade off-distribution"
+        explanation: "Some degradation is expected; a 65-point collapse from a small viewpoint change is a different claim about what was learned."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "Your team has iterated against the same evaluation suite for six months, and scores have climbed steadily. What's the risk?"
+    options:
+      - text: "The suite became a training set — the climb may reflect fit to those specific scenarios rather than capability that generalizes"
+        correct: true
+        explanation: "Slow, invisible, and it makes every subsequent number optimistic. Held-out scenarios you never tune against are the only defense."
+      - text: "No risk — improvement is improvement"
+        explanation: "Improvement *on the thing you optimized* is not evidence about anything else."
+      - text: "The suite will become too hard"
+        explanation: "The opposite: relative to your tuned system it becomes easier, which is why the scores climb."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "Across all these defects, what do they share that makes them hard to catch?"
+    options:
+      - text: "Every one produces a number that is arithmetically correct and reproducible — there's no bug, no exception, nothing to find in the code"
+        correct: true
+        explanation: "The defense isn't debugging, it's a habit of asking what a measurement can and cannot support. That's honesty before it's statistics."
+      - text: "They all involve fabricated data"
+        explanation: "None of them require any dishonesty at all, which is what makes them widespread."
+      - text: "They only occur in simulation"
+        explanation: "Real-robot evaluations are, if anything, more exposed — because their sample sizes are smaller."

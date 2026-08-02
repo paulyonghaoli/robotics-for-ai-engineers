@@ -126,3 +126,7 @@ nav:
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md
       - "10.2 Scenario-suite design": modules/10-evaluation/02-scenario-suites.md
       - "10.3 Regression testing": modules/10-evaluation/03-regression-from-logs.md
+      - "10.4 Dataset lifecycle": modules/10-evaluation/04-dataset-lifecycle.md
+      - "10.5 Drift monitoring": modules/10-evaluation/05-drift-monitoring.md
+      - "10.6 Neural real-to-sim evaluation": modules/10-evaluation/06-neural-real-to-sim.md
+      - "10.7 Lab: the benchmark that lied": modules/10-evaluation/07-lab-benchmark-lied.md

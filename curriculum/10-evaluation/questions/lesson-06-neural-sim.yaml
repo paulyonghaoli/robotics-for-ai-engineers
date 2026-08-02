@@ -1,0 +1,64 @@
+id: eval-l6-neural-sim
+title: "Quiz — neural real-to-sim evaluation"
+lesson: modules/10-evaluation/06-neural-real-to-sim
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "The shift from 'simulate to train' to 'simulate to evaluate' works because…"
+    options:
+      - text: "Preserving the RANKING of policies is a much weaker requirement than physical fidelity — and weaker requirements are achievable"
+        correct: true
+        explanation: "A simulator whose absolute success rates are off by twenty points is still useful if it orders policies correctly. Rank correlation is the metric, not realism."
+      - text: "Learned simulators are now physically accurate"
+        explanation: "They aren't, and they don't need to be for this purpose — that's the insight."
+      - text: "Training in simulation stopped working"
+        explanation: "Sim co-training remains standard; evaluation is an additional use, not a replacement."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why is 2,000 simulated trials per checkpoint versus 100 real ones a qualitative change, not just a quantitative one?"
+    options:
+      - text: "It moves confidence intervals from roughly ±20 points to ±2 — the difference between a claim you can't support and one you can"
+        correct: true
+        explanation: "Lesson 10.1's arithmetic, applied. Sample size is what made real-robot evaluation statistically toothless."
+      - text: "Simulated trials are more realistic than real ones"
+        explanation: "Obviously not — the win is entirely in volume and cost."
+      - text: "It removes the need for real evaluation"
+        explanation: "It replaces the middle of the funnel, not the bottom."
+  - id: q3
+    type: single
+    difficulty: stretch
+    prompt: "A neural evaluator reports r = 0.989 with real-world rankings. The most important caveat is…"
+    options:
+      - text: "That correlation was measured on the policies that existed at the time — a genuinely novel policy is out of distribution for the *evaluator*"
+        correct: true
+        explanation: "The evaluator inherits its training data's coverage. The policy you most want to check is the one it has least reason to be right about."
+      - text: "Pearson r is the wrong statistic"
+        explanation: "Spearman was also reported at 0.970; the statistic isn't the issue."
+      - text: "0.989 is not high enough to be useful"
+        explanation: "It's remarkably high — the caveat is about generalization, not magnitude."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "Grading policies with a learned model carries a risk familiar from ML. Which?"
+    options:
+      - text: "Reward hacking — a policy can exploit the grader's blind spots, because you're optimizing against a model rather than reality"
+        correct: true
+        explanation: "The same circularity as learned reward models. It's the strongest argument for keeping a smaller real evaluation as ground truth at the bottom of the funnel."
+      - text: "Overfitting the training set"
+        explanation: "A concern for the simulator's own training, but not the circularity that makes model-based grading distinctive."
+      - text: "Vanishing gradients"
+        explanation: "Unrelated to the evaluation-protocol question."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "The capstone harness in this curriculum is already an instance of this stance because…"
+    options:
+      - text: "It ranks stacks and its rankings are treated as meaningful, while no claim is made that its absolute numbers transfer to real hardware"
+        correct: true
+        explanation: "Simulate-to-evaluate, arrived at from first principles — and the honest-status page says exactly that about hardware transfer."
+      - text: "It uses a neural network for physics"
+        explanation: "It's a hand-written physics simulator; the shared property is the evaluation stance, not the implementation."
+      - text: "It was validated against a real robot"
+        explanation: "It was not, which the curriculum states plainly."

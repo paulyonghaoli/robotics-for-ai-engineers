@@ -1,0 +1,83 @@
+id: eval-l4-data
+title: "Quiz — dataset lifecycle"
+lesson: modules/10-evaluation/04-dataset-lifecycle
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Adding more robot data can make a policy *worse* — 'negative transfer'. The mechanism is…"
+    options:
+      - text: "Sources with different embodiments, dynamics, or label semantics get pooled as if interchangeable, so the model averages over incompatible behaviours"
+        correct: true
+        explanation: "Naive cross-embodiment scaling plateaued for exactly this reason. The fix is measuring per-source contribution rather than assuming more is additive."
+      - text: "Larger datasets always overfit"
+        explanation: "Backwards — more data usually reduces overfitting. The problem here is heterogeneity, not size."
+      - text: "Training runs out of memory"
+        explanation: "An engineering constraint, not the statistical effect being described."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "40,000 trajectories collected; a 5% coreset recovers 88% of performance. Collection costs $120/hour at 12 trajectories/hour. What did the redundant 95% cost, in dollars?"
+    answer: 380000
+    tolerance: 5000
+    explanation: "38,000 ÷ 12 × $120 = $380,000 for the last 12% of performance. That arithmetic is why curation is a funded discipline, not a nice-to-have."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Exact hashing finds almost no duplicates in robot trajectory data because…"
+    options:
+      - text: "Continuous sensor and pose values never repeat bit-for-bit — the redundancy is *near*-duplication and needs similarity, not equality"
+        correct: true
+        explanation: "Fifteen repeats of the same pick differ by millimetres. Cluster on trajectory features and keep a representative per cluster."
+      - text: "Trajectories are too large to hash"
+        explanation: "Hashing megabytes is trivial; the problem is that the hashes all differ."
+      - text: "Hash collisions corrupt the results"
+        explanation: "Collisions are vanishingly rare and not the issue."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Model performance dropped after a new batch. Grouping success rate by `robot_id` blames robot rb-03. Grouping by `calibration_id` shows rb-03's usual calibration is healthy and one batch is bad. The practical difference is…"
+    options:
+      - text: "'Replace the hardware' versus 'drop a hundred rows and recollect' — granular provenance changes the remedy, not just the diagnosis"
+        correct: true
+        explanation: "This is the whole business case for provenance fields. Coarse attribution produces expensive, wrong actions."
+      - text: "No difference; both identify rb-03"
+        explanation: "One says the robot is defective, the other says a specific calibration event was. Those lead to very different weeks."
+      - text: "The calibration grouping is over-fitting to noise"
+        explanation: "A batch at 44% against 93% for the same robot's other data is a clean, large signal."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "10% of your records are missing `generator_seed`. No performance metric flags anything. Why does it matter?"
+    options:
+      - text: "Those synthetic trajectories can never be regenerated or audited — the data exists but its origin is unrecoverable, and only an explicit completeness audit surfaces this"
+        correct: true
+        explanation: "Provenance gaps are invisible to outcome metrics by construction. That's precisely why completeness is a separate, scheduled check."
+      - text: "It biases the success rate"
+        explanation: "It doesn't affect outcomes at all — which is what makes it so easy to miss."
+      - text: "It breaks training"
+        explanation: "Training proceeds happily. The cost lands later, when you need to reproduce or remove that data."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Selecting a coreset by picking the examples with highest model loss is risky because…"
+    options:
+      - text: "It couples the dataset to the model that scored it, baking that model's blind spots into every model trained afterwards"
+        correct: true
+        explanation: "Geometry-based selection (farthest-point over features) avoids the circularity. Loss-based selection quietly makes your dataset a function of one checkpoint."
+      - text: "High-loss examples are always mislabeled"
+        explanation: "Some are, but the structural problem is the model-dataset coupling."
+      - text: "It's computationally infeasible"
+        explanation: "It's cheap — one forward pass per example. The objection is methodological."
+  - id: q7
+    type: single
+    difficulty: core
+    prompt: "Pipelines that keep only successful demonstrations discard…"
+    options:
+      - text: "The interventions and recoveries that teach a policy what to do when things go wrong — often the highest-value samples per unit collected"
+        correct: true
+        explanation: "Recovery is a named open problem with dedicated workshops, and the data that would address it is being thrown away by a collection policy nobody revisits."
+      - text: "Nothing important — failures are noise"
+        explanation: "A failed rollout contains the approach, the error, and often the correction. That's dense supervision."
+      - text: "Only storage costs"
+        explanation: "The storage is the cheapest part of the trajectory by orders of magnitude."

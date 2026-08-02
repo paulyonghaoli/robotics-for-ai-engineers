@@ -1,0 +1,119 @@
+id: eval-l4-coreset
+title: "Find the 5% that carries the dataset"
+lesson: modules/10-evaluation/04-dataset-lifecycle
+description: >-
+  1,200 trajectories, most of them near-duplicates of each other — a
+  teleoperator repeating the same pick with millimetre variation. Build
+  near-duplicate detection and greedy coreset selection, then show that
+  120 well-chosen trajectories cover the space better than 120 random
+  ones. This is the mechanism behind the 5%-recovers-90% result.
+setup_code: |
+  import numpy as np
+
+  # Each trajectory is a 4-d feature vector (object position, approach
+  # angle, grasp height, speed). The collection is realistically lumpy:
+  # a few dense clusters of repeated demos, plus a thin tail of rare
+  # situations that are the only evidence for whole regions of the space.
+  _rng = np.random.default_rng(3)
+  _clusters = _rng.uniform(0.15, 0.85, (6, 4))
+  _dense = np.vstack([c + _rng.normal(0, 0.012, (180, 4)) for c in _clusters])
+  _tail = _rng.uniform(0.0, 1.0, (120, 4))
+  TRAJECTORIES = np.clip(np.vstack([_dense, _tail]), 0.0, 1.0)
+  _rng.shuffle(TRAJECTORIES)
+
+  def space_coverage(subset, bins=4):
+      """Fraction of the 4x4 grid over the FIRST TWO feature dimensions
+      that the subset touches — a cheap proxy for how much of the
+      situation space a dataset actually represents."""
+      if len(subset) == 0:
+          return 0.0
+      idx = np.clip((np.asarray(subset)[:, :2] * bins).astype(int), 0, bins - 1)
+      return len(set(map(tuple, idx))) / float(bins * bins)
+starter_code: |
+  import numpy as np
+  # Provided: TRAJECTORIES (1200, 4), space_coverage(subset)
+
+  def near_duplicate_groups(data, radius=0.05):
+      """Greedy clustering: walk the trajectories in order; each one either
+      joins the first existing group whose representative is within
+      `radius` (euclidean), or starts a new group.
+
+      Return a list of groups, each a list of indices into `data`.
+      """
+      # TODO
+      return [[i] for i in range(len(data))]
+
+  def greedy_coreset(data, k, seed=0):
+      """Farthest-point traversal: start from one trajectory, then
+      repeatedly add the one FARTHEST from everything already selected.
+      Return an array of k indices."""
+      rng = np.random.default_rng(seed)
+      # TODO: maintain a min-distance-to-selected array and argmax it
+      return np.arange(k)
+
+  groups = near_duplicate_groups(TRAJECTORIES)
+  core = greedy_coreset(TRAJECTORIES, 120)
+  rand = np.random.default_rng(0).choice(len(TRAJECTORIES), 120, replace=False)
+  print("groups: %d (from %d trajectories)" % (len(groups), len(TRAJECTORIES)))
+  print("coverage — coreset %.2f, random %.2f, full %.2f" % (
+      space_coverage(TRAJECTORIES[core]), space_coverage(TRAJECTORIES[rand]),
+      space_coverage(TRAJECTORIES)))
+tests: |
+  import numpy as np
+  _g = near_duplicate_groups(TRAJECTORIES)
+  _sizes = sorted(len(x) for x in _g)
+  assert sum(_sizes) == len(TRAJECTORIES), "every trajectory belongs to exactly one group"
+  assert len(_g) < 400, "near-duplicate detection should collapse the dense clusters hard (got %d groups from 1200)" % len(_g)
+  assert max(_sizes) > 50, "the biggest group should be large - those are the repeated demos"
+  assert sum(1 for s in _sizes if s == 1) > 30, "the rare tail should survive as singleton groups, NOT be merged away"
+  _core = greedy_coreset(TRAJECTORIES, 120)
+  assert len(set(map(int, _core))) == 120, "coreset must return 120 DISTINCT indices"
+  _cov_core = space_coverage(TRAJECTORIES[_core])
+  _cov_rand = np.mean([space_coverage(TRAJECTORIES[np.random.default_rng(s).choice(len(TRAJECTORIES), 120, replace=False)]) for s in range(5)])
+  assert _cov_core >= _cov_rand, "a coreset must cover at least as much as random sampling (%.2f vs %.2f)" % (_cov_core, _cov_rand)
+  assert _cov_core >= 0.95, "farthest-point selection should reach near-total coverage of the grid (got %.2f)" % _cov_core
+  # The headline result: at a fixed budget, selection roughly DOUBLES the
+  # space you cover compared with sampling at random.
+  _s32 = greedy_coreset(TRAJECTORIES, 32)
+  _cov32 = space_coverage(TRAJECTORIES[_s32])
+  _rand32 = np.mean([space_coverage(TRAJECTORIES[np.random.default_rng(s).choice(len(TRAJECTORIES), 32, replace=False)]) for s in range(10)])
+  assert _cov32 > 0.8, "32 well-chosen trajectories (2.7%% of the set) should cover most of the space (got %.2f)" % _cov32
+  assert _cov32 > 1.8 * _rand32, "at the same budget the coreset should roughly DOUBLE random sampling's coverage (%.2f vs %.2f)" % (_cov32, _rand32)
+hints:
+  - "near_duplicate_groups: keep `reps` (list of representative vectors). For each point, `d = [np.linalg.norm(p - r) for r in reps]`; if any `d < radius`, append the index to that group; else start a new group with this point as its representative."
+  - "greedy_coreset: `sel = [0]`; `mind = np.linalg.norm(data - data[0], axis=1)`; repeat k-1 times — `nxt = int(np.argmax(mind))`, append it, then `mind = np.minimum(mind, np.linalg.norm(data - data[nxt], axis=1))`."
+  - "Why farthest-point beats random: random sampling draws proportionally to density, so 85%% of your picks come from the dense clusters you already understand. Farthest-point deliberately spends the budget on the parts of the space nothing else covers."
+solution: |
+  import numpy as np
+
+  def near_duplicate_groups(data, radius=0.05):
+      reps, groups = [], []
+      for i, p in enumerate(data):
+          placed = False
+          for gi, r in enumerate(reps):
+              if np.linalg.norm(p - r) < radius:
+                  groups[gi].append(i)
+                  placed = True
+                  break
+          if not placed:
+              reps.append(p)
+              groups.append([i])
+      return groups
+
+  def greedy_coreset(data, k, seed=0):
+      data = np.asarray(data)
+      sel = [0]
+      mind = np.linalg.norm(data - data[0], axis=1)
+      for _ in range(k - 1):
+          nxt = int(np.argmax(mind))
+          sel.append(nxt)
+          mind = np.minimum(mind, np.linalg.norm(data - data[nxt], axis=1))
+      return np.array(sel)
+
+  groups = near_duplicate_groups(TRAJECTORIES)
+  core = greedy_coreset(TRAJECTORIES, 120)
+  rand = np.random.default_rng(0).choice(len(TRAJECTORIES), 120, replace=False)
+  print("groups: %d (from %d trajectories)" % (len(groups), len(TRAJECTORIES)))
+  print("coverage — coreset %.2f, random %.2f, full %.2f" % (
+      space_coverage(TRAJECTORIES[core]), space_coverage(TRAJECTORIES[rand]),
+      space_coverage(TRAJECTORIES)))

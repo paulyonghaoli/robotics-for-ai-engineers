@@ -1,6 +1,6 @@
 # Module 10 · Evaluation & Data Systems
 
-**Status:** In progress (being written early, out of order) · **Course III**
+**Status:** Complete (written early, out of numerical order) · **Course III**
 
 The [frontier research](../../frontier.md) ranks this module's content as the **highest-leverage area** for an ML or data engineer entering robotics — and documents a field-wide evaluation crisis in which only about 20% of state-of-the-art claims on the dominant benchmarks are statistically significant.
 
@@ -11,10 +11,10 @@ It's also the module whose lab you already have: the [capstone harness](../capst
 1. [Statistical rigor: how many episodes justify a claim?](01-statistical-rigor.md) — **available**
 2. [Scenario-suite design: what to randomize, and what not to](02-scenario-suites.md) — **available**
 3. [Regression testing a stochastic system](03-regression-from-logs.md) — **available**
-4. Dataset lifecycle: curation, provenance, versioning *(planned)*
-5. Drift monitoring in deployment *(planned)*
-6. Neural real-to-sim evaluation *(planned)*
-7. Lab: the benchmark that lied *(planned)*
+4. [Dataset lifecycle: curation, provenance, versioning](04-dataset-lifecycle.md) — **available**
+5. [Drift monitoring: noticing before the robot does](05-drift-monitoring.md) — **available**
+6. [Neural real-to-sim evaluation](06-neural-real-to-sim.md) — **available**
+7. [Lab: the benchmark that lied](07-lab-benchmark-lied.md) — **available**
 
 ## Why this is a separate module
 
