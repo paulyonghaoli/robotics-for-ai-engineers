@@ -1,0 +1,132 @@
+id: rl-l6-tokenization
+title: "Action tokenization: how coarse is too coarse?"
+lesson: modules/09-robot-learning/06-vla-evaluation
+description: >-
+  VLAs emit actions as discrete tokens. Implement the tokenizer, then run
+  the controller through it at several vocabulary sizes. You'll find 256
+  bins is indistinguishable from continuous control — and that a hopeless
+  4-bin tokenizer still scores 0.97 on success rate, which is a lesson
+  about your metric rather than about tokens.
+setup_code: |
+  import numpy as np
+
+  A_LOW, A_HIGH = -1.5, 1.5       # the action range a VLA would tokenize
+  LANE_LIMIT, PROC_NOISE, MEAS_NOISE = 1.2, 0.02, 0.04
+  TOLERANCE = 0.10                # "precise" means holding within this
+
+  def _push(x):
+      return 1.5 * np.sign(x) * max(0.0, abs(x) - 0.25)
+
+  def plant_step(x, a, rng):
+      return 1.30 * x + _push(x) + a + rng.normal(0, PROC_NOISE)
+starter_code: |
+  import numpy as np
+  # Provided: plant_step(x, a, rng), A_LOW/-A_HIGH action range,
+  #           LANE_LIMIT, MEAS_NOISE, TOLERANCE = 0.10.
+
+  def tokenize(a, n_bins):
+      """Continuous action -> integer token in [0, n_bins-1].
+      Clamp actions outside [A_LOW, A_HIGH] into the end bins."""
+      # TODO
+      return 0
+
+  def detokenize(token, n_bins):
+      """Token -> the CENTRE of that bin's action interval."""
+      # TODO
+      return 0.0
+
+  def max_quantization_error(n_bins):
+      """Worst-case |a - detokenize(tokenize(a))| — half a bin width."""
+      # TODO
+      return 0.0
+
+  def episode(n_bins, seed, gain=1.4, horizon=80, x0=0.6, settle=20):
+      """Run the controller, passing every action through the tokenizer
+      when n_bins is not None. Returns (survived, fraction of post-settle
+      steps held within TOLERANCE)."""
+      rng = np.random.default_rng(seed)
+      x, inside = x0, 0
+      # TODO: each step compute a = -gain * (x + measurement noise);
+      #       if n_bins: a = detokenize(tokenize(a, n_bins), n_bins);
+      #       advance with plant_step; bail out if |x| > LANE_LIMIT;
+      #       after `settle` steps, count steps with |x| < TOLERANCE
+      return True, 0.0
+
+  def evaluate(n_bins, n=60):
+      runs = [episode(n_bins, s) for s in range(n)]
+      success = sum(ok for ok, _ in runs) / n
+      prec = np.mean([p for ok, p in runs if ok]) if success else 0.0
+      return success, float(prec)
+
+  print("bins    success  in-tolerance  max quant err")
+  for K in (None, 4, 16, 64, 256):
+      s, p = evaluate(K)
+      q = 0.0 if K is None else max_quantization_error(K)
+      print("%-7s %.2f     %.2f          %.4f" % (K or "exact", s, p, q))
+tests: |
+  import numpy as np
+  # Tokenizer basics.
+  assert tokenize(A_LOW, 8) == 0, "the lowest action lands in bin 0"
+  assert tokenize(A_HIGH, 8) == 7, "the highest action lands in the last bin"
+  assert tokenize(-99.0, 8) == 0 and tokenize(99.0, 8) == 7, "out-of-range actions must clamp, not crash or wrap"
+  _c = detokenize(tokenize(0.0, 256), 256)
+  assert abs(_c) < 0.01, "with 256 bins, zero should round-trip to nearly zero (got %.4f)" % _c
+  assert abs(max_quantization_error(4) - 0.375) < 1e-6, "4 bins over a 3.0-wide range: half a bin is 0.375"
+  assert abs(max_quantization_error(256) - 3.0 / 256 / 2) < 1e-9, "256 bins gives ~0.006"
+  # Round-trip error must shrink as the vocabulary grows.
+  _errs = [max_quantization_error(k) for k in (4, 16, 64, 256)]
+  assert all(_errs[i] < _errs[i - 1] for i in range(1, 4)), "quantization error must fall with more bins"
+  # Closed loop.
+  _ex_s, _ex_p = evaluate(None)
+  assert _ex_s == 1.0 and _ex_p > 0.85, "continuous control should be reliable and precise (%.2f, %.2f)" % (_ex_s, _ex_p)
+  _s4, _p4 = evaluate(4)
+  _s256, _p256 = evaluate(256)
+  assert _p256 > 0.85, "256 bins should match continuous control (got %.2f)" % _p256
+  assert abs(_p256 - _ex_p) < 0.06, "...indistinguishably so (%.2f vs %.2f) - which is why RT uses 256" % (_p256, _ex_p)
+  assert _p4 < 0.45, "4 bins should wreck precision (got %.2f)" % _p4
+  # THE POINT: the success metric barely notices.
+  assert _s4 > 0.9, "...yet 4 bins still SUCCEEDS most episodes (got %.2f)" % _s4
+  assert (_s4 - _s256) < 0.1, "success rate hides the degradation almost entirely (%.2f vs %.2f) while precision fell by more than half" % (_s4, _s256)
+hints:
+  - "tokenize: `frac = (a - A_LOW) / (A_HIGH - A_LOW)`; `return int(np.clip(frac * n_bins, 0, n_bins - 1))`."
+  - "detokenize: `A_LOW + (token + 0.5) * (A_HIGH - A_LOW) / n_bins` — the bin's centre, not its edge."
+  - "max_quantization_error: half a bin width, `(A_HIGH - A_LOW) / n_bins / 2`."
+  - "episode: standard loop — noisy measurement, action, optional tokenize/detokenize round trip, plant_step, bail on |x| > LANE_LIMIT, and count in-tolerance steps only after the settling period."
+solution: |
+  import numpy as np
+
+  def tokenize(a, n_bins):
+      frac = (a - A_LOW) / (A_HIGH - A_LOW)
+      return int(np.clip(frac * n_bins, 0, n_bins - 1))
+
+  def detokenize(token, n_bins):
+      return A_LOW + (token + 0.5) * (A_HIGH - A_LOW) / n_bins
+
+  def max_quantization_error(n_bins):
+      return (A_HIGH - A_LOW) / n_bins / 2.0
+
+  def episode(n_bins, seed, gain=1.4, horizon=80, x0=0.6, settle=20):
+      rng = np.random.default_rng(seed)
+      x, inside = x0, 0
+      for t in range(horizon):
+          a = -gain * (x + rng.normal(0, MEAS_NOISE))
+          if n_bins:
+              a = detokenize(tokenize(a, n_bins), n_bins)
+          x = plant_step(x, a, rng)
+          if abs(x) > LANE_LIMIT:
+              return False, 0.0
+          if t >= settle and abs(x) < TOLERANCE:
+              inside += 1
+      return True, inside / (horizon - settle)
+
+  def evaluate(n_bins, n=60):
+      runs = [episode(n_bins, s) for s in range(n)]
+      success = sum(ok for ok, _ in runs) / n
+      prec = np.mean([p for ok, p in runs if ok]) if success else 0.0
+      return success, float(prec)
+
+  print("bins    success  in-tolerance  max quant err")
+  for K in (None, 4, 16, 64, 256):
+      s, p = evaluate(K)
+      q = 0.0 if K is None else max_quantization_error(K)
+      print("%-7s %.2f     %.2f          %.4f" % (K or "exact", s, p, q))

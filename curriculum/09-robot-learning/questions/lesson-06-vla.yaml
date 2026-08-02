@@ -1,0 +1,76 @@
+id: rl-l6-vla
+title: "Quiz — VLAs and honest evaluation"
+lesson: modules/09-robot-learning/06-vla-evaluation
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A 4-bin action tokenizer scores 0.97 success but holds tolerance only 24% of the time (continuous: 92%). What's the lesson?"
+    options:
+      - text: "Binary success can hide a precision collapse entirely — the metric, not the tokenizer, is what failed to reveal it"
+        correct: true
+        explanation: "The tokenizer is obviously too coarse, and the success rate says it's fine. Choose metrics that can see the failure you care about."
+      - text: "4 bins is adequate for robot control"
+        explanation: "It destroyed precision by a factor of nearly four; only the metric disagreed."
+      - text: "The success threshold should be raised"
+        explanation: "Raising it might help, but the structural point is that a binary outcome can't express precision at all."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why do RT-1 and RT-2 use 256 bins per action dimension rather than 16 or 4096?"
+    options:
+      - text: "256 is where quantization becomes indistinguishable from continuous control, without spending vocabulary you don't need"
+        correct: true
+        explanation: "The exercise measures exactly this: 256 bins reproduces continuous performance, 16 visibly degrades it, and more bins buy nothing while enlarging the output space."
+      - text: "256 is the largest vocabulary a transformer supports"
+        explanation: "Vocabularies of tens of thousands are routine; the choice is empirical."
+      - text: "Bins must be a power of two for tokenization to work"
+        explanation: "Convenient, not required."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "A VLA paper reports 94% on LIBERO. How much should that move your assessment?"
+    options:
+      - text: "Very little — the benchmark is saturated above 95%, collapses to under 30% under perturbation, and a 0.09B probe with no language encoder matches state of the art on it"
+        correct: true
+        explanation: "A number from a saturated, memorization-prone benchmark is close to uninformative. Ask for pairwise real-hardware comparison and perturbation results instead."
+      - text: "Substantially — 94% is a strong result"
+        explanation: "Strong relative to what? Everything scores high there, which is the definition of a benchmark that stopped measuring."
+      - text: "It's disqualifying — the authors are being dishonest"
+        explanation: "Reporting a standard benchmark isn't dishonest. It's just weak evidence, and should be treated as such rather than as a red flag."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "You give a VLA a deliberately wrong instruction and its behaviour doesn't change. This tells you…"
+    options:
+      - text: "The model isn't conditioning on language — a documented finding, and it means the 'language' in vision-language-action is doing less work than advertised"
+        correct: true
+        explanation: "The 2026 result was that vision, not language, is the limiting component, and that instruction augmentation can move a task from 0% to 90% precisely because the channel was inert."
+      - text: "The model is robust to noisy instructions"
+        explanation: "Robustness would mean handling paraphrases; ignoring a contradictory instruction is a different thing entirely."
+      - text: "The task doesn't require language"
+        explanation: "Possibly — which is worth knowing before you credit the model with instruction-following."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why does this curriculum teach evaluating VLAs rather than training them?"
+    options:
+      - text: "Training is lab-scale capital, while honest evaluation is tractable, in demand, and something the field is measurably bad at"
+        correct: true
+        explanation: "Roughly 80% of published manipulation claims fail a significance check. Being the person who can evaluate credibly is both rarer and more employable than having fine-tuned a checkpoint."
+      - text: "VLAs aren't important enough to train"
+        explanation: "They're the field's most visible bet; the argument is about tractability and leverage, not importance."
+      - text: "Training requires proprietary data"
+        explanation: "Substantial open datasets exist. Compute and engineering scale are the real barriers."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Absolute success rates aren't comparable across labs, which is why RoboArena went pairwise and double-blind. What differs between labs?"
+    options:
+      - text: "Reset procedures, lighting, object sets, and workspace layout — unstated variables that turned out to dominate cross-lab differences"
+        correct: true
+        explanation: "RoboDojo went further and standardized the physical protocol for the same reason. Two labs reporting '70%' may not be measuring the same task."
+      - text: "The random seeds"
+        explanation: "Seeds matter within a lab; they don't explain systematic cross-lab gaps."
+      - text: "The model architectures"
+        explanation: "That's what you're trying to compare — the confound is everything around it."
