@@ -127,6 +127,7 @@ nav:
       - "9.2 Multimodality": modules/09-robot-learning/02-multimodality.md
       - "9.3 The data engine": modules/09-robot-learning/03-data-engine.md
       - "9.4 Sim-to-real": modules/09-robot-learning/04-sim-to-real.md
+      - "9.5 World models": modules/09-robot-learning/05-world-models.md
   - "Module 10 · Evaluation & Data Systems":
       - Overview: modules/10-evaluation/index.md
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md

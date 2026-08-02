@@ -12,7 +12,7 @@ The [frontier research](../../frontier.md) is blunt about where the leverage is.
 2. [Multimodality: why regression averages your demonstrations](02-multimodality.md) — **available**
 3. [The data engine: interventions and human-in-the-loop](03-data-engine.md) — **available**
 4. [Sim-to-real and domain randomization](04-sim-to-real.md) — **available**
-5. World models: learn the dynamics, plan through it *(planned)*
+5. [World models: learn the dynamics, plan through it](05-world-models.md) — **available**
 6. Vision-language-action models: inference and honest evaluation *(planned)*
 7. Lab: the policy that memorized *(planned)*
 

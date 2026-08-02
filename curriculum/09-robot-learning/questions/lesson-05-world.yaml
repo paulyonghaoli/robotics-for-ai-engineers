@@ -1,0 +1,76 @@
+id: rl-l5-world
+title: "Quiz — world models"
+lesson: modules/09-robot-learning/05-world-models
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A world model has 4-step prediction error wider than the lane, yet controls the system to 0.08 tracking error. How?"
+    options:
+      - text: "Control needs the immediate ranking of actions to be right, not the future to be accurate — and only the first action of each plan is executed before re-observing"
+        correct: true
+        explanation: "Errors that would compound over four imagined steps never accumulate in the real trajectory, because every step restarts the rollout from a measured state."
+      - text: "The tracking metric is measured differently"
+        explanation: "Both are distances in the same units on the same system."
+      - text: "The model must actually be more accurate than reported"
+        explanation: "It isn't — and it doesn't need to be, which is the point."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why does a model trained to minimize ONE-step error compound badly over multi-step rollouts?"
+    options:
+      - text: "Nothing in the objective rewards accuracy under self-composition — you optimize f, then use f∘f∘f∘f"
+        correct: true
+        explanation: "Fix it by training on multi-step rollouts directly or penalizing divergence over a horizon. And report multi-step error, since one-step validation says nothing about what the planner depends on."
+      - text: "One-step training uses too little data"
+        explanation: "Every transition is a one-step example — data volume is not the issue."
+      - text: "Floating-point error accumulates"
+        explanation: "Model bias dominates numerical error by orders of magnitude here."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your planner keeps steering toward a region where the real system performs terribly. Diagnosis?"
+    options:
+      - text: "Model exploitation — outside the training data the model extrapolates optimistically, and an optimizer seeks optima wherever it can find them"
+        correct: true
+        explanation: "The planner is doing its job against a flawed objective. Cheapest fix: constrain rollouts to stay near the logged data, before reaching for uncertainty-penalized ensembles."
+      - text: "The planner has a bug"
+        explanation: "It is finding a genuine optimum of the model you gave it. The model is the problem."
+      - text: "The cost function is wrong"
+        explanation: "Possible in general, but the signature here — good in imagination, bad in reality — points squarely at the model's valid region."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A model twice as accurate but four times slower per query, on a 20 Hz controller. Take it?"
+    options:
+      - text: "No — replanning rate is what compensates for model error, so quartering it to halve the error trades away the mechanism that was covering for you"
+        correct: true
+        explanation: "This is exactly the trade the 2026 world-action models pay at 590–800 ms per chunk, and why lighter architectures stay competitive despite being less accurate per query."
+      - text: "Yes — accuracy always wins"
+        explanation: "Not when the budget it consumes is the thing making the system work."
+      - text: "Yes, and reduce the horizon to compensate"
+        explanation: "A shorter horizon is a real option, but you've now given up both replanning rate and lookahead to buy accuracy you didn't need."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "How does compounding model error relate to lesson 9.1's compounding policy error?"
+    options:
+      - text: "Same arithmetic, different victim — there the policy's errors moved the real state off-distribution, here the model's errors move the imagined state off-distribution"
+        correct: true
+        explanation: "And the cures rhyme: DAgger fixes coverage of the states the policy visits; staying near the data fixes coverage of the states the model is asked about."
+      - text: "They're unrelated — one is about policies, one about models"
+        explanation: "Both are self-referential error growth from composing an imperfect function with itself."
+      - text: "Model error is bounded while policy error isn't"
+        explanation: "Neither is bounded in general; both compound until something re-grounds them in observation."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Planning through a learned model shares a risk with using a learned model to *evaluate* policies (lesson 10.6). Which?"
+    options:
+      - text: "Circularity — optimizing or scoring against a model means optimizing against its mistakes, so a policy can exploit the grader"
+        correct: true
+        explanation: "Same structural hazard in both directions, and the same mitigation: keep something grounded in reality at the bottom of the loop."
+      - text: "Both require GPUs"
+        explanation: "An implementation detail, not a structural risk."
+      - text: "Both need labelled data"
+        explanation: "True but incidental; the circularity is the shared hazard."

@@ -1,0 +1,157 @@
+id: rl-l5-world-model
+title: "Plan through a model you learned"
+lesson: modules/09-robot-learning/05-world-models
+description: >-
+  Fit a dynamics model from logged transitions, then plan through it with
+  lesson 2.6's sampling MPC — the swap that turns model predictive control
+  into model-based RL. Measure how fast imagined rollouts drift from
+  reality, then discover that replanning makes a badly-drifting model
+  perfectly usable anyway.
+setup_code: |
+  import numpy as np
+
+  BOUND = 3.0
+
+  def true_step(x, a):
+      """The real system: an outward force that saturates. Your logs will
+      only ever sample it near the origin."""
+      return float(np.clip(x + a + 0.45 * np.tanh(1.8 * x), -BOUND, BOUND))
+
+  def collect_logs(n=900, seed=0):
+      """Transitions from ordinary operation — all near the origin."""
+      rng = np.random.default_rng(seed)
+      X = rng.uniform(-0.35, 0.35, n)
+      A = rng.uniform(-0.35, 0.35, n)
+      Y = np.array([true_step(x, a) for x, a in zip(X, A)])
+      return X, A, Y
+
+  LOG_X, LOG_A, LOG_Y = collect_logs()
+starter_code: |
+  import numpy as np
+  # Provided: true_step(x, a), LOG_X / LOG_A / LOG_Y (900 logged
+  # transitions), BOUND = 3.0.
+
+  def fit_model(X, A, Y):
+      """Least-squares fit x' = c0*x + c1*a + c2. Return (c0, c1, c2)."""
+      # TODO: build the design matrix [X, A, 1] and use np.linalg.lstsq
+      return (1.0, 1.0, 0.0)
+
+  def learned_step(coef, x, a):
+      """Predict one step. Clip to +/-BOUND, as any sane model would."""
+      # TODO
+      return 0.0
+
+  def rollout_error(coef, horizon, n=40, x0=0.6, seed=5):
+      """Apply the SAME random action sequence to the real system and to
+      the model, and return the mean final |true - predicted|."""
+      rng = np.random.default_rng(seed)
+      # TODO
+      return 0.0
+
+  def plan(coef, x, horizon, rng, n_samples=400):
+      """Sampling MPC through the LEARNED model (lesson 2.6). Sample
+      action sequences in [-0.7, 0.7], score by sum of x^2 along the
+      imagined rollout, return the best SEQUENCE."""
+      # TODO
+      return np.zeros(horizon)
+
+  def run_open_loop(coef, horizon, seed, x0=0.6):
+      """Plan once, then execute the whole sequence without looking."""
+      # TODO: return final |x|
+      return 0.0
+
+  def run_replanning(coef, horizon, seed, x0=0.6):
+      """Replan every step, execute only the first action each time."""
+      # TODO: return final |x|
+      return 0.0
+
+  coef = fit_model(LOG_X, LOG_A, LOG_Y)
+  print("learned: x' = %.3f x + %.3f a + %.3f" % coef)
+  print("imagined-vs-real drift:", " ".join(
+      "H=%d:%.2f" % (h, rollout_error(coef, h)) for h in (1, 2, 4)))
+  for h in (4, 8, 16):
+      ol = np.mean([run_open_loop(coef, h, s) for s in range(10)])
+      cl = np.mean([run_replanning(coef, h, s) for s in range(10)])
+      print("horizon %2d | open-loop %.3f | replanning %.3f" % (h, ol, cl))
+tests: |
+  import numpy as np
+  _c = fit_model(LOG_X, LOG_A, LOG_Y)
+  assert abs(_c[1] - 1.0) < 0.1, "the action coefficient should come out near 1.0 (got %.2f)" % _c[1]
+  assert _c[0] > 1.4, "the model should learn an unstable-looking state coefficient (got %.2f)" % _c[0]
+  # One step is accurate near the data; far outside it is not.
+  assert abs(learned_step(_c, 0.2, 0.0) - true_step(0.2, 0.0)) < 0.03, "near the logged region the model should be accurate"
+  assert abs(learned_step(_c, 1.2, 0.0) - true_step(1.2, 0.0)) > 0.2, "far outside it, the linear model should be visibly wrong"
+  # Imagination drifts, and fast.
+  _e = [rollout_error(_c, h) for h in (1, 2, 4)]
+  assert _e[0] < 0.25, "one-step error should be small (got %.3f)" % _e[0]
+  assert _e[2] > 4 * _e[0], "error must COMPOUND over the rollout (%.3f -> %.3f)" % (_e[0], _e[2])
+  assert _e[1] > _e[0] and _e[2] > _e[1], "drift must grow monotonically with horizon"
+  # ...and yet the same model controls well, provided you replan.
+  for _h in (4, 8):
+      _ol = np.mean([run_open_loop(_c, _h, s) for s in range(10)])
+      _cl = np.mean([run_replanning(_c, _h, s) for s in range(10)])
+      assert _cl < 0.4, "replanning should regulate the state tightly at H=%d (got %.3f)" % (_h, _cl)
+      assert _ol > 2.5 * _cl, "open-loop must be much worse at H=%d (%.3f vs %.3f) - re-observing is what saves you" % (_h, _ol, _cl)
+hints:
+  - "fit_model: `M = np.column_stack([X, A, np.ones_like(X)])`; `coef, *_ = np.linalg.lstsq(M, Y, rcond=None)`; return a 3-tuple of floats."
+  - "rollout_error: for each trial draw `acts = rng.uniform(-0.3, 0.3, horizon)`, run BOTH systems from x0 with those same actions, and record `abs(x_true - x_pred)` at the end."
+  - "plan: `seqs = rng.uniform(-0.7, 0.7, (n_samples, horizon))`; for each, roll forward with learned_step accumulating `x*x`; return the sequence with the lowest total."
+  - "run_open_loop executes every action of one plan through true_step. run_replanning calls plan() each step and executes only `seq[0]`. That single difference is the whole lesson."
+solution: |
+  import numpy as np
+
+  def fit_model(X, A, Y):
+      M = np.column_stack([X, A, np.ones_like(X)])
+      coef, *_ = np.linalg.lstsq(M, Y, rcond=None)
+      return (float(coef[0]), float(coef[1]), float(coef[2]))
+
+  def learned_step(coef, x, a):
+      return float(np.clip(coef[0] * x + coef[1] * a + coef[2], -BOUND, BOUND))
+
+  def rollout_error(coef, horizon, n=40, x0=0.6, seed=5):
+      rng = np.random.default_rng(seed)
+      errs = []
+      for _ in range(n):
+          acts = rng.uniform(-0.3, 0.3, horizon)
+          xt = xl = x0
+          for a in acts:
+              xt = true_step(xt, a)
+              xl = learned_step(coef, xl, a)
+          errs.append(abs(xt - xl))
+      return float(np.mean(errs))
+
+  def plan(coef, x, horizon, rng, n_samples=400):
+      seqs = rng.uniform(-0.7, 0.7, (n_samples, horizon))
+      best, best_cost = seqs[0], np.inf
+      for q in seqs:
+          xx, cost = x, 0.0
+          for a in q:
+              xx = learned_step(coef, xx, a)
+              cost += xx * xx
+          if cost < best_cost:
+              best, best_cost = q, cost
+      return best
+
+  def run_open_loop(coef, horizon, seed, x0=0.6):
+      rng = np.random.default_rng(seed)
+      seq = plan(coef, x0, horizon, rng)
+      x = x0
+      for a in seq:
+          x = true_step(x, a)
+      return abs(x)
+
+  def run_replanning(coef, horizon, seed, x0=0.6):
+      rng = np.random.default_rng(seed)
+      x = x0
+      for _ in range(horizon):
+          x = true_step(x, plan(coef, x, horizon, rng)[0])
+      return abs(x)
+
+  coef = fit_model(LOG_X, LOG_A, LOG_Y)
+  print("learned: x' = %.3f x + %.3f a + %.3f" % coef)
+  print("imagined-vs-real drift:", " ".join(
+      "H=%d:%.2f" % (h, rollout_error(coef, h)) for h in (1, 2, 4)))
+  for h in (4, 8, 16):
+      ol = np.mean([run_open_loop(coef, h, s) for s in range(10)])
+      cl = np.mean([run_replanning(coef, h, s) for s in range(10)])
+      print("horizon %2d | open-loop %.3f | replanning %.3f" % (h, ol, cl))
