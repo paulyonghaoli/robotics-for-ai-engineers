@@ -21,7 +21,8 @@ Three courses, eleven modules. **Courses I and II's classical stack are complete
 | [**4 · Mapping & SLAM**](modules/04-mapping/index.md) | Occupancy grids, ICP/scan matching, EKF-SLAM, pose graphs & loop closure | ✅ 4 lessons (visual odometry lands with Module 7) |
 | [**5 · Planning & decision-making**](modules/05-planning/index.md) | A*, costmaps, RRT, dynamic-window local planning, planning under uncertainty | ✅ 5 lessons |
 | [**6 · ROS 2**](modules/06-ros2/index.md) *(parallel track)* | Nodes, topics, services, actions, TF2, URDF, launch, bags, QoS | ⬜ planned |
-| [**Capstone · autonomous 2D robot**](modules/capstone/index.md) | Scenario-evaluated navigation stack | 🔨 v0–v2 live, v3 planned |
+| [**Capstone · autonomous 2D robot**](modules/capstone/index.md) | Scenario-evaluated navigation stack | ✅ v0–v3 live, v4 planned |
+| [**Course II exam**](course-2-exam.md) | 16 cross-module questions, closed-book | ✅ form A |
 
 **Module 6 is a parallel track, not a prerequisite.** Everything through the capstone runs in pure Python — you never need a ROS installation to complete Courses I–II. Take ROS 2 whenever you want the industrial integration skills (and note from the [frontier research](frontier.md) that it's mandatory at Agility, Boston Dynamics, and Amazon, but conspicuously absent from frontier VLA-lab job postings).
 

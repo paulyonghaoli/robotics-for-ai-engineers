@@ -1,0 +1,186 @@
+id: course2-exam-a
+title: "Course II exam — form A"
+lesson: course-2-exam
+questions:
+  - id: e1
+    type: single
+    difficulty: core
+    prompt: "Your occupancy map shows walls smeared into gentle arcs, worsening with distance travelled. The mapper's code is correct. Where is the fault, and what does this failure motivate?"
+    options:
+      - text: "Pose drift — the mapper faithfully integrates a drifting localizer. Map quality is bounded by trajectory quality, which is the entire argument for SLAM"
+        correct: true
+        explanation: "Lesson 4.1's experiment made visible. Loop closure (4.4) is what removes it; the smear is the picture that motivates joint estimation."
+      - text: "Log-odds saturation"
+        explanation: "Saturation makes cells stubborn, not curved — and wouldn't grow with distance."
+      - text: "Lidar miscalibration"
+        explanation: "A calibration error distorts every scan identically, independent of how far you've driven."
+  - id: e2
+    type: numeric
+    difficulty: core
+    prompt: "A cell starts at log-odds 0 and receives 3 hits (l_occ = 0.85) and 1 free pass (l_free = −0.4). Its occupancy probability is 1 − 1/(1+e^l). Give the probability."
+    answer: 0.896
+    tolerance: 0.006
+    explanation: "l = 2.55 − 0.4 = 2.15 → p ≈ 0.896. Bayes as addition is the whole reason log-odds is the representation of choice."
+  - id: e3
+    type: single
+    difficulty: core
+    prompt: "Scan matching in a featureless corridor returns a SMALL residual, yet poses slide 20 cm along the corridor between matches. The honest response is…"
+    options:
+      - text: "Detect the degeneracy from the cost Hessian's conditioning and report inflated covariance along the flat direction, rather than handing the filter a confident point estimate"
+        correct: true
+        explanation: "Geometry, not the algorithm, is degenerate. Modules 3 and 4 meet here: honesty about what you don't know is a first-class output, and a confident wrong covariance poisons everything downstream."
+      - text: "Run more ICP iterations until the residual falls further"
+        explanation: "Iterations cannot manufacture information the geometry does not contain."
+      - text: "Discard corridor scans"
+        explanation: "The lateral direction is constrained perfectly well — throw away the unobservable component, not the measurement."
+  - id: e4
+    type: single
+    difficulty: core
+    prompt: "Adding place recognition makes your warehouse maps usually better but occasionally fold catastrophically. Both halves need explaining."
+    options:
+      - text: "Loop closures genuinely correct drift; but identical aisles cause perceptual aliasing, and one confident false edge forces the optimizer to deform everything else to satisfy it"
+        correct: true
+        explanation: "Defence in depth: geometric verification before accepting an edge, robust kernels (Huber) in the back-end. Least squares has no concept of a lying constraint unless you give it one."
+      - text: "The solver diverges numerically on large graphs"
+        explanation: "It converges beautifully — to a consistent solution of an inconsistent problem, which is what makes it dangerous."
+      - text: "Place recognition is simply unreliable and should be disabled"
+        explanation: "Without closures the map drifts unboundedly; the fix is filtering bad edges, not removing all of them."
+  - id: e5
+    type: numeric
+    difficulty: core
+    prompt: "1-D pose graph, x₀ pinned at 0: three odometry edges each measuring 1.0, plus one loop edge measuring x₃ = 2.4. All weights equal. Least-squares value of x₃?"
+    answer: 2.55
+    tolerance: 0.02
+    explanation: "The 0.6 disagreement splits across 4 equally-weighted edges (0.15 each): steps become 0.85, so x₃ = 2.55. The correction is distributed along the loop, not dumped at the closure."
+  - id: e6
+    type: single
+    difficulty: core
+    prompt: "Your A* paths are collision-free in cell space, yet the robot scrapes walls. The planner code is correct."
+    options:
+      - text: "Missing inflation — you planned for a point and drove a body. Plan on the C-space (inflated) grid"
+        correct: true
+        explanation: "Lesson 1.5's construction, skipped. The capstone rubric catches it as collisions accompanied by perfectly legal-looking plans."
+      - text: "The heuristic is inadmissible"
+        explanation: "That yields suboptimal path *lengths*, not clearance violations."
+      - text: "Grid resolution is too coarse"
+        explanation: "Resolution changes fidelity; it doesn't model the robot's radius."
+  - id: e7
+    type: single
+    difficulty: core
+    prompt: "Manhattan distance as the A* heuristic on an 8-connected grid produces…"
+    options:
+      - text: "Silently suboptimal paths — it overestimates whenever the optimum uses diagonals, breaking admissibility"
+        correct: true
+        explanation: "The classic port from 4-connected code. Paths come out a few percent long and nothing errors, which is how it survives to fleet scale."
+      - text: "Optimal paths, more slowly"
+        explanation: "An inadmissible heuristic misleads the search rather than slowing it."
+      - text: "Failure to find any path"
+        explanation: "It finds paths happily — just not the best ones."
+  - id: e8
+    type: single
+    difficulty: core
+    prompt: "Why do sampling-based planners (RRT) dominate for a 7-DOF arm while grid search dominates for a mobile base?"
+    options:
+      - text: "Dimension — a grid's cells scale exponentially with DOF, while sampling concentrates effort where free-space volume actually is"
+        correct: true
+        explanation: "The same argument as random over grid search for hyperparameters. A mobile base lives in 2–3 dimensions where grids are cheap and consistency is valuable."
+      - text: "Arms need smoother paths"
+        explanation: "RRT paths are famously jagged and require smoothing."
+      - text: "Grids can't represent joint limits"
+        explanation: "They can; the problem is how many cells that takes."
+  - id: e9
+    type: single
+    difficulty: core
+    prompt: "A robot reaches 7 m from its goal, retreats, re-advances, and times out with ZERO collisions. Diagnosis?"
+    options:
+      - text: "Replanning thrash — as the map grew, each replan found a shortcut through unexplored space concealing the wall just discovered. Fix with hysteresis"
+        correct: true
+        explanation: "Capstone field note 5, and lesson 5.1 predicted it in advance. Zero collisions plus no arrival is the signature: the robot is deciding badly, not driving badly."
+      - text: "Localization failure"
+        explanation: "A lost robot usually collides or wanders; coherent journeys in opposite directions implicate the decision layer."
+      - text: "Controller instability"
+        explanation: "That oscillates *around* a path rather than committing to opposite routes."
+  - id: e10
+    type: single
+    difficulty: core
+    prompt: "A robot stops 1.5 m short of a doorway it fits through comfortably, creeps, and sometimes never enters. Its clearance margin is 0.62 m; the gap's half-width is 0.7 m."
+    options:
+      - text: "Freezing — the required margin is nearly unachievable in that gap, so almost no arc is admissible. Make the margin achievable rather than disabling safety"
+        correct: true
+        explanation: "Check whether the margin is even geometrically possible before touching score weights. Lesson 5.4, and the reason the lab's tests refuse a fix that drops the margin below the robot radius."
+      - text: "Motor stiction at low speed"
+        explanation: "A hardware symptom; here the planner is *choosing* zero velocity, not failing to execute it."
+      - text: "The global path is blocked"
+        explanation: "Then it wouldn't approach the doorway at all."
+  - id: e11
+    type: single
+    difficulty: stretch
+    prompt: "The capstone's v1 stack drifted up to 16 m because lidar 'no-return' readings, plus noise, fell just under a 1σ rejection cutoff and were treated as hits at 6 m. What is the general lesson?"
+    options:
+      - text: "A sensor's failure to detect carries completely different semantics from a detection — conflate them at the noise boundary and you inject fiction that actively misleads rather than merely under-informs"
+        correct: true
+        explanation: "The filter wasn't under-informed, it was misled: more particles and more beams made it worse. This is lesson 4.1's phantom-ring bug in localization clothing."
+      - text: "Particle filters need more particles in large maps"
+        explanation: "More particles amplified the lying signal — that's what made the diagnosis interesting."
+      - text: "The lidar was faulty"
+        explanation: "The sensor behaved exactly as specified; the interpretation was wrong."
+  - id: e12
+    type: single
+    difficulty: stretch
+    prompt: "A robot spends an entire episode rotating in place at its start, unable to plan out. Its online-built map is correct. What happened?"
+    options:
+      - text: "Composed margins — lidar endpoints land just inside surfaces so mapped walls are ~1 cell fat, and full inflation on top sealed a passable pocket"
+        correct: true
+        explanation: "Capstone field note 6. Every layer that pads for uncertainty adds its own, and the total can exceed real clearance. Audit margins end to end, not per layer."
+      - text: "A* is incomplete on large grids"
+        explanation: "A* is complete on a finite grid — if it reports no path, none exists *in the grid you gave it*. The grid is the suspect."
+      - text: "The goal was genuinely unreachable"
+        explanation: "The robot physically fit through the gap; the representation didn't."
+  - id: e13
+    type: single
+    difficulty: stretch
+    prompt: "v3 avoids moving obstacles by scoring candidate arcs against the current scan. It still gets hit. Why, and what's the fix that does NOT freeze the robot?"
+    options:
+      - text: "The scan is a static snapshot, so a mover travels into the certified arc. Inflate the margin with rollout time — but only for map-inexplicable points, since walls don't move"
+        correct: true
+        explanation: "Capstone field note 8. Applying the growing margin to mapped walls too is what caused the self-inflicted freezing; the fix reused the classification already computed for beam rejection."
+      - text: "The local planner's horizon is too short"
+        explanation: "Lengthening it plans further into a future predicted with the same static assumption."
+      - text: "The obstacles move faster than the robot"
+        explanation: "They move at a fraction of its speed; prediction, not speed, is the gap."
+  - id: e14
+    type: single
+    difficulty: core
+    prompt: "Determinize-and-replan is the industry default for planning under uncertainty. When does it fail structurally?"
+    options:
+      - text: "When errors are irreversible — cliffs, one-way doors, collisions — because 'fix it next cycle' assumes there is a next cycle"
+        correct: true
+        explanation: "Replanning at rate IS feedback (lesson 2.6), and it carries the whole uncertainty burden cheaply. Its blind spot is recoverability, which is why the capstone has explicit recovery behaviours."
+      - text: "When the map is large"
+        explanation: "Scale costs compute, not correctness."
+      - text: "When sensors are noisy"
+        explanation: "Noise is precisely what it absorbs well."
+  - id: e15
+    type: single
+    difficulty: stretch
+    prompt: "Your capstone stack passes 8/8 episodes. What may you claim?"
+    options:
+      - text: "That the true success rate is plausibly somewhere from about 68% to 100% — 8/8 is encouraging and nearly uninformative about the difference between 75% and 99%"
+        correct: true
+        explanation: "Wilson's lower bound at 8/8. The v3 stack's published envelope exists because this arithmetic was applied to its own numbers before anyone asked."
+      - text: "That the stack is 100% reliable"
+        explanation: "The point estimate is 100%; the claim it supports is not."
+      - text: "Nothing — 8 episodes is worthless"
+        explanation: "Overcorrection: it rules out true rates below ~60% quite well."
+  - id: e16
+    type: single
+    difficulty: stretch
+    prompt: "Across Course II's failures — smeared maps, false closures, corridor degeneracy, replanning thrash, composed margins — what recurs?"
+    options:
+      - text: "The algorithms were textbook-correct; the bugs lived in the interface between an algorithm and a world that didn't match its assumptions"
+        correct: true
+        explanation: "Seven of the capstone's eight documented failures were of exactly this kind. It's why conventions, failure modes, and diagnostic labs get as much weight here as derivations."
+      - text: "Insufficient computational resources"
+        explanation: "Every one of these ran comfortably in real time while being wrong."
+      - text: "Numerical precision problems"
+        explanation: "All are structural and would occur in exact arithmetic."

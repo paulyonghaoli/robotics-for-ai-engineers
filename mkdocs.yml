@@ -100,6 +100,7 @@ nav:
       - "3.6 Lab: catching a lying filter": modules/03-estimation/06-consistency-lab.md
       - "Project: PF localization (autograded)": modules/03-estimation/project-localization.md
   - "Course I exam": course-1-exam.md
+  - "Course II exam": course-2-exam.md
   - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md
