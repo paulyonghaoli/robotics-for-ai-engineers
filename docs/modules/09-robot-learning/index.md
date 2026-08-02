@@ -1,6 +1,6 @@
 # Module 9 · Robot Learning & Embodied AI
 
-**Status:** In progress · **Course III**
+**Status:** Complete · **Course III**
 
 This is the module people arrive at robotics *for*, and it is deliberately placed last. Every learned component here plugs into scaffolding built in Courses I–II: policies emit setpoints that controllers track, their beliefs come from filters, their failures get caught by watchdogs, and their claims get checked by Module 10's evaluation machinery.
 
@@ -14,7 +14,7 @@ The [frontier research](../../frontier.md) is blunt about where the leverage is.
 4. [Sim-to-real and domain randomization](04-sim-to-real.md) — **available**
 5. [World models: learn the dynamics, plan through it](05-world-models.md) — **available**
 6. [Vision-language-action models: inference and honest evaluation](06-vla-evaluation.md) — **available**
-7. Lab: the policy that memorized *(planned)*
+7. [Lab: the policy that memorized](07-lab-policy-memorized.md) — **available**
 
 ## What you'll build
 

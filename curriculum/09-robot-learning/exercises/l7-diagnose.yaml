@@ -1,0 +1,154 @@
+id: rl-l7-diagnose
+title: "Four policies, four different diseases"
+lesson: modules/09-robot-learning/07-lab-policy-memorized
+description: >-
+  Four trained policies. All four have low held-out error. One is healthy
+  and three are broken in different ways — mode averaging, a coverage gap,
+  and overfitting to nominal conditions. Build the probes that tell them
+  apart, because held-out error tells you nothing.
+setup_code: |
+  import numpy as np
+
+  # Swerve around an obstacle sitting at lateral position c. BOTH c+0.8
+  # and c-0.8 are valid demonstrations; anything within 0.5 of c collides.
+  OFFSET, HALF_WIDTH = 0.8, 0.5
+  TRAIN_RANGE = 0.25        # obstacle positions the training data covered
+  NOMINAL_NOISE = 0.02      # observation noise during training/nominal use
+
+  def clears(a, c):
+      return abs(a - c) >= HALF_WIDTH
+
+  # --- the four policies. Each sees a noisy observation of c. -----------
+  def healthy(c_obs):
+      return c_obs + OFFSET
+
+  def averager(c_obs):
+      """Trained with MSE on demonstrations that went both ways."""
+      return c_obs
+
+  COVERED = 0.38            # how far this policy's training data reached
+
+  def coverage_gap(c_obs):
+      """Fine inside the region its data covered; adrift outside it."""
+      return c_obs + OFFSET if abs(c_obs) <= COVERED else c_obs
+
+  def sim_overfit(c_obs):
+      """Tuned until it just barely cleared under nominal noise."""
+      return c_obs + 0.55
+
+  POLICIES = {"A": healthy, "B": averager, "C": coverage_gap, "D": sim_overfit}
+
+  def sample(policy, n, c_range, noise, seed=0):
+      """Run n trials; return (obstacle positions, actions taken, cleared?)."""
+      rng = np.random.default_rng(seed)
+      cs = rng.uniform(-c_range, c_range, n)
+      acts = np.array([policy(c + rng.normal(0, noise)) for c in cs])
+      return cs, acts, np.array([clears(a, c) for a, c in zip(acts, cs)])
+starter_code: |
+  import numpy as np
+  # Provided: POLICIES (A-D), sample(policy, n, c_range, noise, seed),
+  #           OFFSET = 0.8, TRAIN_RANGE = 0.25, NOMINAL_NOISE = 0.02.
+  # A demonstration at obstacle c is either c+OFFSET or c-OFFSET.
+
+  def nominal_success(policy, n=400):
+      """Success on the conditions the policy was trained for:
+      obstacles within TRAIN_RANGE, noise = NOMINAL_NOISE."""
+      # TODO
+      return 0.0
+
+  def wide_success(policy, n=400):
+      """Same noise, but obstacles over a WIDER range (0.7) than training."""
+      # TODO
+      return 0.0
+
+  def noisy_success(policy, n=400):
+      """Training range, but 6x the observation noise."""
+      # TODO
+      return 0.0
+
+  def novel_action_rate(policy, n=400, tol=0.4):
+      """Fraction of NOMINAL trials where the action is far from BOTH
+      demonstrated modes (c+OFFSET and c-OFFSET) — i.e. the policy did
+      something no demonstrator ever did."""
+      # TODO
+      return 0.0
+
+  def diagnose(policy):
+      """Return 'healthy', 'mode-averaging', 'coverage-gap', or
+      'sim-overfit'.
+
+      Order matters:
+        novel actions          -> mode-averaging
+        nominal ok, wide bad   -> coverage-gap
+        nominal ok, noisy bad  -> sim-overfit
+        otherwise              -> healthy
+      """
+      # TODO
+      return "healthy"
+
+  for name, pol in POLICIES.items():
+      print("%s | nominal %.2f  wide %.2f  noisy %.2f  novel %.2f  -> %s" % (
+          name, nominal_success(pol), wide_success(pol), noisy_success(pol),
+          novel_action_rate(pol), diagnose(pol)))
+tests: |
+  import numpy as np
+  # Every policy looks fine on the metric people usually report.
+  for _n, _p in POLICIES.items():
+      _c, _a, _ok = sample(_p, 200, TRAIN_RANGE, NOMINAL_NOISE)
+      assert np.mean(np.abs(_a - _c)) < 1.2, "all four produce sane-looking actions on nominal data"
+  assert nominal_success(POLICIES["A"]) > 0.95, "the healthy policy works nominally"
+  assert wide_success(POLICIES["A"]) > 0.95 and noisy_success(POLICIES["A"]) > 0.9, "...and holds up under both stresses"
+  assert novel_action_rate(POLICIES["A"]) < 0.1, "...without inventing actions"
+  # B: averages two valid modes into an invalid one.
+  assert nominal_success(POLICIES["B"]) < 0.1, "the averager should collide (got %.2f)" % nominal_success(POLICIES["B"])
+  assert novel_action_rate(POLICIES["B"]) > 0.9, "...and its actions match NEITHER demonstrated mode (got %.2f)" % novel_action_rate(POLICIES["B"])
+  # C: fine where it has data, lost outside.
+  assert nominal_success(POLICIES["C"]) > 0.95, "the coverage-gap policy is fine inside its training range"
+  assert wide_success(POLICIES["C"]) < 0.8, "...and fails outside it (got %.2f)" % wide_success(POLICIES["C"])
+  assert noisy_success(POLICIES["C"]) > 0.85, "...but noise alone doesn't bother it - that's what separates it from D"
+  # D: no margin, so only the noise stress exposes it.
+  assert nominal_success(POLICIES["D"]) > 0.95, "the sim-overfit policy looks perfect nominally"
+  assert noisy_success(POLICIES["D"]) < 0.75, "...and degrades under noise (got %.2f)" % noisy_success(POLICIES["D"])
+  assert wide_success(POLICIES["D"]) > 0.9, "...while handling a wider range fine - that's what separates it from C"
+  _want = {"A": "healthy", "B": "mode-averaging", "C": "coverage-gap", "D": "sim-overfit"}
+  for _n, _lab in _want.items():
+      assert diagnose(POLICIES[_n]) == _lab, "policy %s should be %r, got %r" % (_n, _lab, diagnose(POLICIES[_n]))
+hints:
+  - "The three success probes are the same call with different arguments: `sample(policy, n, c_range, noise, seed)` then `float(np.mean(cleared))`. Use c_range=TRAIN_RANGE/0.7/TRAIN_RANGE and noise=NOMINAL_NOISE/NOMINAL_NOISE/6*NOMINAL_NOISE."
+  - "novel_action_rate: sample nominally, then for each (c, a) compute `min(abs(a - (c+OFFSET)), abs(a - (c-OFFSET)))` and count how often that exceeds `tol`."
+  - "diagnose: check novel actions FIRST — a mode-averager also fails the other probes, but the novel-action signature is what identifies it. Then use wide vs noisy to separate a coverage gap from a missing safety margin."
+  - "The point of the whole exercise: all four have low held-out error, and no single probe separates all four. Diagnosis needs a *panel*."
+solution: |
+  import numpy as np
+
+  def nominal_success(policy, n=400):
+      _, _, ok = sample(policy, n, TRAIN_RANGE, NOMINAL_NOISE, seed=1)
+      return float(np.mean(ok))
+
+  def wide_success(policy, n=400):
+      _, _, ok = sample(policy, n, 0.7, NOMINAL_NOISE, seed=2)
+      return float(np.mean(ok))
+
+  def noisy_success(policy, n=400):
+      _, _, ok = sample(policy, n, TRAIN_RANGE, 6 * NOMINAL_NOISE, seed=3)
+      return float(np.mean(ok))
+
+  def novel_action_rate(policy, n=400, tol=0.4):
+      cs, acts, _ = sample(policy, n, TRAIN_RANGE, NOMINAL_NOISE, seed=4)
+      d = np.minimum(np.abs(acts - (cs + OFFSET)), np.abs(acts - (cs - OFFSET)))
+      return float(np.mean(d > tol))
+
+  def diagnose(policy):
+      if novel_action_rate(policy) > 0.5:
+          return "mode-averaging"
+      nom = nominal_success(policy)
+      if nom > 0.9 and wide_success(policy) < 0.8:
+          return "coverage-gap"
+      if nom > 0.9 and noisy_success(policy) < 0.8:
+          return "sim-overfit"
+      return "healthy"
+
+  for name, pol in POLICIES.items():
+      print("%s | nominal %.2f  wide %.2f  noisy %.2f  novel %.2f  -> %s" % (
+          name, nominal_success(pol), wide_success(pol), noisy_success(pol),
+          novel_action_rate(pol), diagnose(pol)))

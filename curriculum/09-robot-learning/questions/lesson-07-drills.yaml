@@ -1,0 +1,76 @@
+id: rl-l7-drills
+title: "Diagnosis drills — learned policies"
+lesson: modules/09-robot-learning/07-lab-policy-memorized
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Policy:** 1.5% validation error. Succeeds on 20-step episodes, fails 80% of 200-step ones. Diagnosis?"
+    options:
+      - text: "Compounding error — the policy's own mistakes move it off the expert's distribution, and the effect grows super-linearly with horizon"
+        correct: true
+        explanation: "Validation error is measured where the expert went; deployment happens where the policy goes. The horizon dependence is the fingerprint. Fix with DAgger-style relabelling or action chunking."
+      - text: "The model is too small"
+        explanation: "Capacity wouldn't produce a failure rate that depends on episode length."
+      - text: "The 200-step task is simply harder"
+        explanation: "It's the same task run longer — which is exactly the point."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Policy:** in an ordinary, well-covered state it confidently does something that appears in **none** of the demonstrations. Diagnosis?"
+    options:
+      - text: "Mode averaging — MSE on multimodal demonstrations produces the conditional mean, which can be a valid-looking action nobody ever took"
+        correct: true
+        explanation: "The 'absent from the data' signature is what distinguishes this from ordinary error, which resembles the demonstrations. Cheap to check, rarely checked."
+      - text: "A coverage gap"
+        explanation: "The state is well covered — that's what makes averaging the answer rather than extrapolation."
+      - text: "Sensor noise"
+        explanation: "Noise produces scatter around the demonstrated actions, not a confident third option between them."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Policy:** 100% within its training range, 53% over a wider range, but unbothered by 6× sensor noise. Diagnosis?"
+    options:
+      - text: "Coverage gap — collection never reached those states, so it extrapolates there; noise doesn't hurt because inside the covered region it's genuinely fine"
+        correct: true
+        explanation: "The wide-versus-noisy split is what separates a coverage problem from a margin problem. Two probes that can disagree are worth more than two that agree."
+      - text: "No margin"
+        explanation: "A margin problem shows up under noise; this one shrugs noise off."
+      - text: "Mode averaging"
+        explanation: "Its actions match the demonstrated modes inside the covered region."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Policy:** 99% nominal, 99% over a wider range, 70% under 6× noise. Diagnosis?"
+    options:
+      - text: "No margin — it was tuned until it *just* cleared under nominal conditions, so any perturbation eats the remaining slack"
+        correct: true
+        explanation: "The classic sim-overfit signature, and the reason domain randomization exists. Range doesn't bother it; slack does."
+      - text: "Coverage gap"
+        explanation: "It handles the wider range fine, which is precisely what rules coverage out."
+      - text: "Compounding error"
+        explanation: "That would show as horizon dependence, not noise sensitivity."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "A policy reports 97% success and holds its precision tolerance only 24% of the time. What's the real finding?"
+    options:
+      - text: "The metric failed, not just the policy — a binary success rate cannot express precision, so it hid a fourfold degradation"
+        correct: true
+        explanation: "From the tokenization exercise. Whenever success is near-saturated, ask what it is unable to see."
+      - text: "97% is good enough to ship"
+        explanation: "For a task that needs precision, holding tolerance a quarter of the time is not shippable, and the headline number never says so."
+      - text: "The tolerance threshold is miscalibrated"
+        explanation: "Possible, but the structural point stands: one number cannot report two different things."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "Across all of Module 9, what single shape do compounding policy error, model drift, and the reality gap share?"
+    options:
+      - text: "Composing an imperfect function with itself makes error grow, and something must periodically re-ground it in reality"
+        correct: true
+        explanation: "Intervention data regrounds a policy, replanning regrounds a world model, randomization spans the gap, real hardware regrounds a benchmark. Remove the regrounding and the failure is identical; only the victim changes."
+      - text: "They're all caused by insufficient training data"
+        explanation: "More data of the same kind fixes none of them — that's what makes them structural."
+      - text: "They're all optimization failures"
+        explanation: "In each case the optimizer succeeded at the objective it was given."
