@@ -1,0 +1,71 @@
+id: rl-l3-engine
+title: "Quiz — the data engine"
+lesson: modules/09-robot-learning/03-data-engine
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is an intervention worth more per sample than a fresh expert demonstration, given both cost the same hour of human time?"
+    options:
+      - text: "It labels a state drawn from the policy's own distribution — specifically one it couldn't handle — while a demonstration re-labels a region already densely covered"
+        correct: true
+        explanation: "Deployment performance depends on error under the policy's distribution, so that's where budget belongs. The exercise's numbers are brutal: 600 demonstrations bought nothing, 600 intervention states solved the task."
+      - text: "Interventions are recorded at higher frequency"
+        explanation: "Sampling rate is identical; the difference is *which states* get labelled."
+      - text: "Human corrections are more accurate than demonstrations"
+        explanation: "Same human, same expertise. Location in state space is the whole story."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A fleet runs 400 episodes/day at a 6% intervention rate. Each intervention takes 90 seconds of operator time at $118/hour. Daily labelling cost in dollars?"
+    answer: 71
+    tolerance: 4
+    explanation: "400 × 0.06 = 24 interventions; 24 × 90 s = 0.6 h; × $118 ≈ $71/day — and at 10 Hz that's ~21,600 labelled states. The flywheel is cheap because you were already paying for the deployment."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "A pipeline that keeps only successful episodes is discarding…"
+    options:
+      - text: "Every example of the error states and recoveries the policy most needs — the highest-value data, thrown away because it looks like tidiness"
+        correct: true
+        explanation: "Recording a failure costs nothing extra; you already paid for the episode. Then the field writes workshop papers about robots that can't recover."
+      - text: "Nothing important — failures are noise"
+        explanation: "A failed rollout contains the approach, the error, and often the correction. That's dense supervision."
+      - text: "Only storage capacity"
+        explanation: "Storage is the cheapest part of a trajectory by orders of magnitude."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Which intervention field do teams most often omit, and why does it hurt?"
+    options:
+      - text: "`policy_version` — without it you can't tell whether an old correction still describes a failure your current policy has, so stale data accumulates and distorts training"
+        correct: true
+        explanation: "Cheap to write, expensive to reconstruct. `intervention_reason` is the close second, because it turns a pile of corrections into a prioritizable failure taxonomy."
+      - text: "`timestamp`"
+        explanation: "Almost always captured automatically."
+      - text: "`robot_id`"
+        explanation: "Usually present, and lesson 10.4 shows it's often too coarse anyway."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Six months of flywheel: benchmark success climbing steadily, but a new customer site performs terribly. Diagnosis?"
+    options:
+      - text: "Flywheel narrowing — the policy's deployments define the data, which defines the policy, and the benchmark narrowed along with them. Both numbers are real; neither generalizes"
+        correct: true
+        explanation: "The tell is benchmark and field diverging. Guard with held-out randomized scenarios that never feed training, plus deliberate collection at unlike sites."
+      - text: "The new site is simply harder"
+        explanation: "Possible, but it doesn't explain why the benchmark kept improving — that's the diagnostic signal."
+      - text: "The model is too small"
+        explanation: "Capacity wouldn't produce a divergence between two evaluations of the same policy."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Over-weighting interventions during training produces…"
+    options:
+      - text: "A policy that behaves as though it is perpetually in trouble — cautious and strange in ordinary conditions, because you trained it mostly on emergencies"
+        correct: true
+        explanation: "The weight is a tuned hyperparameter with a held-out check, not a constant. Under-weight and interventions get drowned out; over-weight and normal operation degrades."
+      - text: "Faster convergence with no downside"
+        explanation: "There's a real trade in both directions, which is why it needs tuning."
+      - text: "Mode collapse"
+        explanation: "A different failure (lesson 9.2); this one is a distribution-mismatch introduced deliberately."

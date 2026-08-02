@@ -10,7 +10,7 @@ The [frontier research](../../frontier.md) is blunt about where the leverage is.
 
 1. [Behavior cloning and the compounding-error problem](01-behavior-cloning.md) — **available**
 2. [Multimodality: why regression averages your demonstrations](02-multimodality.md) — **available**
-3. The data engine: interventions and human-in-the-loop *(planned)*
+3. [The data engine: interventions and human-in-the-loop](03-data-engine.md) — **available**
 4. Sim-to-real and domain randomization *(planned)*
 5. World models: learn the dynamics, plan through it *(planned)*
 6. Vision-language-action models: inference and honest evaluation *(planned)*

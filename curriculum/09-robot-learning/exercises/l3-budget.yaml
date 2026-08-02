@@ -1,0 +1,172 @@
+id: rl-l3-budget
+title: "Spend the labelling budget"
+lesson: modules/09-robot-learning/03-data-engine
+description: >-
+  You have a fixed number of labelled states and three ways to spend them:
+  all on fresh expert demonstrations, all on interventions where the policy
+  actually fails, or a mix. Same cost, same labeller, very different
+  policies. Find out which — and by how much.
+setup_code: |
+  import numpy as np
+
+  LANE_LIMIT, NOISE, DEPLOY_X0 = 1.0, 0.02, 0.55
+  BINS = np.linspace(-1.0, 1.0, 21)
+
+  def _push(x):
+      return 0.9 * np.sign(x) * max(0.0, abs(x) - 0.35)
+
+  def expert_action(x):
+      """The labeller. Costs the same per state wherever you ask it."""
+      return -0.45 * x - _push(x)
+
+  def step(x, a, rng):
+      return 1.30 * x + _push(x) + a + rng.normal(0, NOISE)
+
+  def bin_of(x):
+      return int(np.clip(np.digitize(x, BINS) - 1, 0, len(BINS) - 2))
+
+  def fit(states):
+      n = len(BINS) - 1
+      sums, counts = np.zeros(n), np.zeros(n)
+      for x in states:
+          b = bin_of(x)
+          sums[b] += expert_action(x); counts[b] += 1
+      out = np.full(n, np.nan)
+      out[counts > 0] = sums[counts > 0] / counts[counts > 0]
+      return out
+
+  def act(policy, x):
+      b = bin_of(x)
+      if not np.isnan(policy[b]):
+          return float(policy[b])
+      for d in range(1, len(policy)):
+          for c in (b - d, b + d):
+              if 0 <= c < len(policy) and not np.isnan(policy[c]):
+                  return float(policy[c])
+      return 0.0
+
+  def rollout(policy, seed, horizon=60):
+      rng = np.random.default_rng(seed)
+      x, visited = DEPLOY_X0, []
+      for _ in range(horizon):
+          visited.append(x)
+          x = step(x, act(policy, x), rng)
+          if abs(x) > LANE_LIMIT:
+              return False, visited
+      return True, visited
+
+  def success_rate(policy, n=100):
+      return sum(rollout(policy, s)[0] for s in range(n)) / n
+
+  def expert_demo_states(n, seed=0):
+      """Fresh expert demonstrations. The expert starts near centre and
+      stays there, so these are always drawn from the same narrow band."""
+      rng = np.random.default_rng(seed)
+      out = []
+      while len(out) < n:
+          x = rng.uniform(-0.25, 0.25)
+          for _ in range(30):
+              out.append(x)
+              x = step(x, expert_action(x), rng)
+              if len(out) >= n:
+                  break
+      return np.array(out[:n])
+
+  SEED_STATES = expert_demo_states(300, seed=0)   # what you already have
+  BUDGET = 600                                     # states you can still label
+starter_code: |
+  import numpy as np
+  # Provided: expert_demo_states(n, seed), rollout(policy, seed) -> (ok, visited),
+  #           fit(states), act(policy, x), success_rate(policy),
+  #           SEED_STATES (300 states you already have), BUDGET = 600.
+
+  def intervention_states(policy, n, seed=100):
+      """Collect states the CURRENT policy actually visits, by rolling it
+      out and taking the states it went through. Stop at n states."""
+      # TODO: loop over seeds, call rollout(policy, seed), extend with the
+      #       visited states it returns, until you have n
+      return np.array([])
+
+  def spend_on_demos(budget):
+      """All budget on fresh expert demonstrations."""
+      # TODO: fit(SEED_STATES + expert_demo_states(budget, seed=1))
+      return fit(SEED_STATES)
+
+  def spend_on_interventions(budget, rounds=3):
+      """All budget on interventions, in `rounds` batches — refitting
+      between rounds so later batches target the improved policy."""
+      # TODO: states = SEED_STATES; each round add
+      #       intervention_states(current_policy, budget // rounds)
+      return fit(SEED_STATES)
+
+  def spend_mixed(budget, demo_fraction=0.3, rounds=3):
+      """A split: some fresh demos, the rest as interventions."""
+      # TODO
+      return fit(SEED_STATES)
+
+  base = fit(SEED_STATES)
+  print("before spending      : %.2f" % success_rate(base))
+  print("all demonstrations   : %.2f" % success_rate(spend_on_demos(BUDGET)))
+  print("all interventions    : %.2f" % success_rate(spend_on_interventions(BUDGET)))
+  print("30%% demos / 70%% inter: %.2f" % success_rate(spend_mixed(BUDGET)))
+tests: |
+  import numpy as np
+  _base = fit(SEED_STATES)
+  _b = success_rate(_base)
+  assert _b < 0.4, "the starting policy should be weak (got %.2f)" % _b
+  _iv = intervention_states(_base, 200)
+  assert len(_iv) >= 200, "must return the requested number of states"
+  assert np.max(np.abs(_iv)) > 0.5, "interventions must include states OUT where the policy struggles (max |x| = %.2f)" % np.max(np.abs(_iv))
+  _demo_only = success_rate(spend_on_demos(BUDGET))
+  _inter_only = success_rate(spend_on_interventions(BUDGET))
+  _mixed = success_rate(spend_mixed(BUDGET))
+  assert _demo_only < 0.45, "600 more expert demos barely help (got %.2f) - they re-label a region already covered" % _demo_only
+  assert _inter_only > 0.85, "600 states of intervention should nearly solve it (got %.2f)" % _inter_only
+  assert _inter_only > _demo_only + 0.4, "SAME budget, same labeller: interventions must massively outperform demos (%.2f vs %.2f)" % (_inter_only, _demo_only)
+  assert _mixed > _demo_only + 0.4, "the mixed policy should also land near the top (got %.2f)" % _mixed
+  # And more demos is not the answer: triple the demo budget, still stuck.
+  _demo_triple = success_rate(spend_on_demos(BUDGET * 3))
+  assert _demo_triple < 0.55, "even 3x the demonstration budget doesn't fix it (got %.2f) - this is a coverage problem, not a volume problem" % _demo_triple
+hints:
+  - "intervention_states: `out = []`; `for s in range(seed, seed+500): _, v = rollout(policy, s); out.extend(v);` break once `len(out) >= n`; return `np.array(out[:n])`."
+  - "spend_on_interventions: start from SEED_STATES, then repeat `rounds` times — fit the current states, collect `budget // rounds` intervention states from THAT policy, and append. Refitting between rounds is what lets later batches target the improved policy."
+  - "spend_mixed: add `int(budget * demo_fraction)` demo states first, then run the intervention loop with the remainder."
+  - "The result to internalize: the demonstration budget is spent re-labelling a region already densely covered, so it buys almost nothing. Tripling it changes little. Coverage, not volume."
+solution: |
+  import numpy as np
+
+  def intervention_states(policy, n, seed=100):
+      out = []
+      for s in range(seed, seed + 500):
+          _, v = rollout(policy, s)
+          out.extend(v)
+          if len(out) >= n:
+              break
+      return np.array(out[:n])
+
+  def spend_on_demos(budget):
+      extra = expert_demo_states(budget, seed=1)
+      return fit(np.concatenate([SEED_STATES, extra]))
+
+  def spend_on_interventions(budget, rounds=3):
+      states = SEED_STATES.copy()
+      per = budget // rounds
+      for r in range(rounds):
+          pol = fit(states)
+          states = np.concatenate([states, intervention_states(pol, per, seed=100 + 1000 * r)])
+      return fit(states)
+
+  def spend_mixed(budget, demo_fraction=0.3, rounds=3):
+      n_demo = int(budget * demo_fraction)
+      states = np.concatenate([SEED_STATES, expert_demo_states(n_demo, seed=2)])
+      per = (budget - n_demo) // rounds
+      for r in range(rounds):
+          pol = fit(states)
+          states = np.concatenate([states, intervention_states(pol, per, seed=200 + 1000 * r)])
+      return fit(states)
+
+  base = fit(SEED_STATES)
+  print("before spending      : %.2f" % success_rate(base))
+  print("all demonstrations   : %.2f" % success_rate(spend_on_demos(BUDGET)))
+  print("all interventions    : %.2f" % success_rate(spend_on_interventions(BUDGET)))
+  print("30%% demos / 70%% inter: %.2f" % success_rate(spend_mixed(BUDGET)))
