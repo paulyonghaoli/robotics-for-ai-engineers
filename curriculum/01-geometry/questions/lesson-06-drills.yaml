@@ -1,0 +1,76 @@
+id: geometry-l6-drills
+title: "Diagnosis drills — name the bug from the symptom"
+lesson: modules/01-geometry/06-lab-frame-debugging
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the point cloud looks perfect when the robot faces east, and degrades progressively as it turns — worst when facing west."
+    options:
+      - text: "A rotation-dependent bug: swapped composition order or inverted convention (correct only at the identity-ish pose)"
+        correct: true
+        explanation: "Bugs that vanish at θ ≈ 0 and grow with heading implicate the rotation part of a transform chain. Test at θ = 90° and 180° to bisect."
+      - text: "LiDAR intensity calibration"
+        explanation: "Intensity affects point *brightness*, not geometry, and has no heading dependence."
+      - text: "Wheel slip"
+        explanation: "Slip causes drift over distance traveled, not a clean dependence on absolute heading."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the robot's map of a straight corridor shows the walls duplicated as a ghost pair, offset ~10 cm along the direction of driving, only at high speed."
+    options:
+      - text: "Timestamp mismatch: scans are being paired with poses from the wrong moment"
+        correct: true
+        explanation: "Speed-dependent smear along the motion direction is the timing signature. At 1 m/s, 100 ms of mismatch = 10 cm of ghosting."
+      - text: "Inverted transform convention"
+        explanation: "Convention bugs don't care how fast you drive — they corrupt geometry at any speed."
+      - text: "The corridor is actually 10 cm wider than the map"
+        explanation: "A map error would be speed-independent, and wouldn't produce *paired* ghosts."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** door on the robot's left in reality appears on the right in the map; text on signs appears reversed in the camera-projected overlay."
+    options:
+      - text: "Handedness flip — some transform has det(R) = −1 (a sign error in a rotation matrix or axis)"
+        correct: true
+        explanation: "Mirroring is the unique signature of a reflection. Grep for a sin() with the wrong sign, or a y-axis flip in image coordinates."
+      - text: "The map was built driving in the opposite direction"
+        explanation: "Maps are direction-independent; driving the other way doesn't mirror the world."
+      - text: "Angle unwrapping bug"
+        explanation: "Unwrapped angles cause long-way turns and control glitches, never mirroring."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** localization is accurate, but the robot's position estimate visibly *jumps* a few cm every second, and a downstream velocity estimator shows spikes at 1 Hz."
+    options:
+      - text: "A consumer is reading `map → base` (correction jumps included) where it should read `odom → base`"
+        correct: true
+        explanation: "1 Hz spikes matching the localizer's update rate are corrections leaking into a smoothness-sensitive consumer — the REP 105 split exists precisely to prevent this."
+      - text: "The wheel encoders are failing intermittently"
+        explanation: "Encoder dropouts wouldn't synchronize with the localization update rate."
+      - text: "The velocity estimator's filter constant is too aggressive"
+        explanation: "Retuning would blur the spikes but the input truly jumps — fix the frame choice, not the filter."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "**Symptom:** after a firmware update, everything works except objects detected by one camera land ~2× too far away in the map."
+    options:
+      - text: "A units or scale mismatch in that camera's chain (mm vs cm, or an unnormalized quaternion baked into its extrinsics)"
+        correct: true
+        explanation: "A clean multiplicative range error isolated to one sensor points at scale in that sensor's transform or intrinsics — recall that ‖q‖ ≠ 1 smuggles scale into R(q)."
+      - text: "The map resolution changed"
+        explanation: "That would rescale *every* sensor's projections, not one camera's."
+      - text: "The camera is mounted backward"
+        explanation: "A backward mount flips direction (points behind), it doesn't double distances."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "**Symptom:** everything above checks out, yet pose error grows smoothly and unboundedly with distance driven, resetting whenever localization sees a landmark."
+    options:
+      - text: "Not a frame bug — this is odometry drift, the expected behavior state estimation (Module 3) exists to manage"
+        correct: true
+        explanation: "Smooth, unbounded, distance-proportional, correctable-by-observation error is integration of noise, not broken geometry. Know when to stop bug-hunting."
+      - text: "A subtle composition-order bug"
+        explanation: "Composition bugs produce systematic geometric distortions, not smooth noise-like accumulation that observations correct."
+      - text: "Timestamp mismatch"
+        explanation: "Timing errors scale with *speed*, appear as smear/ghosting, and don't reset on landmark sightings."

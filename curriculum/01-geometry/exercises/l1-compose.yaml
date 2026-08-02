@@ -1,0 +1,64 @@
+id: geo-l1-compose
+title: "Build and compose SE(2) transforms"
+lesson: modules/01-geometry/01-coordinate-frames
+description: >-
+  Build homogeneous transforms from poses and chain them. Scenario from the
+  lesson: the robot base is at pose (1, 0, π/2) in the map; a LiDAR is
+  mounted 0.5 m ahead of the base; the LiDAR reports a detection 2 m
+  straight ahead. Compute the detection's position **in the map frame**.
+setup_code: |
+  import numpy as np
+starter_code: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      """Return the 3x3 homogeneous transform for pose (x, y, theta)."""
+      # TODO
+      return np.eye(3)
+
+  def transform_point(T, p):
+      """Apply transform T to 2D point p (shape (2,)); return shape (2,)."""
+      # TODO
+      return p
+
+  T_map_base = se2(1.0, 0.0, np.pi / 2)
+  T_base_lidar = se2(0.5, 0.0, 0.0)
+
+  # TODO: compose to get T_map_lidar, then map the detection into the map frame
+  p_lidar = np.array([2.0, 0.0])
+  p_map = p_lidar  # replace
+
+  print(p_map)  # expect [1.0, 2.5]
+tests: |
+  import numpy as np
+  _T = se2(2.0, -1.0, np.pi / 2)
+  assert _T.shape == (3, 3), "se2 must return a 3x3 array"
+  assert np.allclose(_T[2], [0, 0, 1]), "bottom row of a homogeneous transform is [0, 0, 1]"
+  assert np.allclose(_T[:2, 2], [2.0, -1.0]), "translation goes in the last column"
+  assert np.allclose(_T[:2, :2], [[0, -1], [1, 0]], atol=1e-9), "rotation block for theta=pi/2 is [[0,-1],[1,0]]"
+  _p = transform_point(se2(1.0, 0.0, np.pi / 2), np.array([1.0, 0.0]))
+  assert np.allclose(_p, [1.0, 1.0], atol=1e-9), "transform_point: rotating (1,0) by 90deg then translating by (1,0) gives (1,1)"
+  assert np.allclose(p_map, [1.0, 2.5], atol=1e-9), "p_map should be [1.0, 2.5]: sensor sits at (1, 0.5) facing +y, detection 2 m ahead"
+hints:
+  - "The rotation block is [[cosθ, -sinθ], [sinθ, cosθ]]; the translation goes in the last column; bottom row stays [0, 0, 1]."
+  - "For the point: either append a 1 to make it homogeneous and use T @ p̃, or compute T[:2,:2] @ p + T[:2,2]."
+  - "Composition order: `T_map_lidar = T_map_base @ T_base_lidar` — inner `base` cancels."
+solution: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      c, s = np.cos(theta), np.sin(theta)
+      return np.array([[c, -s, x],
+                       [s,  c, y],
+                       [0,  0, 1.0]])
+
+  def transform_point(T, p):
+      return T[:2, :2] @ p + T[:2, 2]
+
+  T_map_base = se2(1.0, 0.0, np.pi / 2)
+  T_base_lidar = se2(0.5, 0.0, 0.0)
+  T_map_lidar = T_map_base @ T_base_lidar
+
+  p_lidar = np.array([2.0, 0.0])
+  p_map = transform_point(T_map_lidar, p_lidar)
+  print(p_map)

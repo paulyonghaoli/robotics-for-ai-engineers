@@ -1,0 +1,90 @@
+id: map-l2-icp
+title: "Full ICP: correspond, align, repeat"
+lesson: modules/04-mapping/02-scan-matching
+description: >-
+  Combine nearest-neighbor correspondence with the provided Kabsch solve
+  into the full ICP loop, aligning a 'room corner' scan taken from a
+  displaced pose. The tests verify convergence from a realistic
+  odometry-sized initial error — and confirm the honest failure from a
+  huge one (initialization is destiny).
+setup_code: |
+  import numpy as np
+
+  def rot2(t):
+      c, s = np.cos(t), np.sin(t)
+      return np.array([[c, -s], [s, c]])
+
+  def kabsch(A, B):
+      ca, cb = A.mean(0), B.mean(0)
+      H = (B - cb).T @ (A - ca)
+      U, S, Vt = np.linalg.svd(H)
+      R = Vt.T @ U.T
+      if np.linalg.det(R) < 0:
+          Vt = Vt.copy(); Vt[-1] *= -1; R = Vt.T @ U.T
+      return R, ca - R @ cb
+
+  # An L-shaped 'room corner' point cloud (two perpendicular walls):
+  _w1 = np.column_stack([np.linspace(0, 4, 60), np.zeros(60)])
+  _w2 = np.column_stack([np.zeros(40), np.linspace(0, 3, 40)])
+  SCAN_A = np.vstack([_w1, _w2]) + np.random.default_rng(0).normal(0, 0.01, (100, 2))
+
+  R_TRUE, T_TRUE = rot2(0.08), np.array([0.15, -0.10])   # one odometry step
+  SCAN_B = (R_TRUE.T @ (SCAN_A - T_TRUE).T).T
+starter_code: |
+  import numpy as np
+  # Provided: kabsch(A, B), SCAN_A, SCAN_B (same corner seen after one
+  # odometry step R_TRUE=rot2(0.08), T_TRUE=(0.15, -0.10)), rot2(t)
+
+  def nearest_neighbors(A, B_transformed):
+      """For each point in B_transformed, index of the nearest point in A."""
+      # TODO: brute-force is fine at this size — pairwise distances, argmin
+      return np.zeros(len(B_transformed), dtype=int)
+
+  def icp(A, B, iters=40):
+      """Return (R, t) aligning B to A, starting from identity."""
+      R, t = np.eye(2), np.zeros(2)
+      # TODO each iteration:
+      #   Bt = (R @ B.T).T + t
+      #   idx = nearest_neighbors(A, Bt)
+      #   R2, t2 = kabsch(A[idx], Bt)          # incremental correction
+      #   compose: R = R2 @ R; t = R2 @ t + t2
+      return R, t
+
+  R, t = icp(SCAN_A, SCAN_B)
+  print("R error:", np.abs(R - R_TRUE).max(), " t error:", np.abs(t - T_TRUE).max())
+tests: |
+  import numpy as np
+  _idx = nearest_neighbors(SCAN_A, SCAN_A + 0.001)
+  assert np.array_equal(_idx, np.arange(len(SCAN_A))), "a barely-perturbed copy must match itself point-for-point"
+  _R, _t = icp(SCAN_A, SCAN_B)
+  assert np.abs(_R - R_TRUE).max() < 0.05, "ICP must recover the rotation from an odometry-sized initial error (got %.4f)" % np.abs(_R - R_TRUE).max()
+  assert np.abs(_t - T_TRUE).max() < 0.10, "ICP must recover the translation (max err %.3f)" % np.abs(_t - T_TRUE).max()
+  _B_far = (rot2(np.pi/2).T @ SCAN_A.T).T   # a 90-degree initial error
+  _R2, _t2 = icp(SCAN_A, _B_far, iters=60)
+  _residual = np.mean(np.linalg.norm((( _R2 @ _B_far.T).T + _t2) - SCAN_A[nearest_neighbors(SCAN_A, (_R2 @ _B_far.T).T + _t2)], axis=1))
+  _rot_err = np.abs(_R2 - rot2(np.pi/2)).max()
+  assert _rot_err > 0.1, "from a 90-degree error ICP should converge to the WRONG basin (it's a local optimizer) — if you 'fixed' this, check you're not cheating with global search"
+hints:
+  - "nearest_neighbors: d = np.linalg.norm(A[None,:,:] - Bt[:,None,:], axis=2); return d.argmin(axis=1)."
+  - "The composition order matters: the new correction applies ON TOP of the current alignment — R = R2 @ R, t = R2 @ t + t2."
+  - "You will NOT converge to the exact answer, and that is not your bug: points near the scan boundaries have no true partner in the other scan (the clouds only partially overlap), so they drag the fit by a few centimetres no matter how many iterations you run. Trimming the worst-matched pairs — production ICP's standard refinement — is what removes this residual."
+  - "The last test asserts FAILURE from 90 degrees. That's the lesson: ICP refines, it does not discover. Odometry supplies the initial guess in real systems."
+solution: |
+  import numpy as np
+
+  def nearest_neighbors(A, B_transformed):
+      d = np.linalg.norm(A[None, :, :] - B_transformed[:, None, :], axis=2)
+      return d.argmin(axis=1)
+
+  def icp(A, B, iters=40):
+      R, t = np.eye(2), np.zeros(2)
+      for _ in range(iters):
+          Bt = (R @ B.T).T + t
+          idx = nearest_neighbors(A, Bt)
+          R2, t2 = kabsch(A[idx], Bt)
+          R = R2 @ R
+          t = R2 @ t + t2
+      return R, t
+
+  R, t = icp(SCAN_A, SCAN_B)
+  print("R error:", np.abs(R - R_TRUE).max(), " t error:", np.abs(t - T_TRUE).max())

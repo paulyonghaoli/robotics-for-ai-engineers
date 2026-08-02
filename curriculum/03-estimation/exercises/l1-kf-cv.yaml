@@ -1,0 +1,89 @@
+id: est-l1-kf-cv
+title: "Track a moving robot: the constant-velocity filter"
+lesson: modules/03-estimation/01-kalman
+description: >-
+  The full matrix filter on a real task: track position AND velocity from
+  position-only measurements. You implement the matrix predict/update; the
+  tests demand you beat the raw sensor by a wide margin and recover the
+  (never directly measured) velocity.
+setup_code: |
+  import numpy as np
+
+  DT = 0.1
+  RNG = np.random.default_rng(7)
+  TRUE_VEL = 1.0
+  true_pos = np.cumsum(np.full(120, TRUE_VEL * DT))
+  measurements = true_pos + RNG.normal(0, 0.5, size=120)
+starter_code: |
+  import numpy as np
+  # Provided: DT, true_pos (120 steps of a 1 m/s walk), measurements (noise sigma 0.5)
+
+  F = np.array([[1.0, DT], [0.0, 1.0]])    # state: [position, velocity]
+  H = np.array([[1.0, 0.0]])               # we measure position only
+  Q = np.array([[1e-4, 0.0], [0.0, 1e-3]])
+  R = np.array([[0.25]])                   # sigma^2 = 0.5^2
+
+  def kf_predict(x, P):
+      # TODO: x <- F x ;  P <- F P F^T + Q
+      return x, P
+
+  def kf_update(x, P, z):
+      # TODO: innovation y, S = H P H^T + R, K = P H^T S^-1,
+      #       x <- x + K y ; P <- (I - K H) P
+      return x, P
+
+  x, P = np.array([0.0, 0.0]), np.eye(2) * 10.0
+  estimates = []
+  for z in measurements:
+      x, P = kf_predict(x, P)
+      x, P = kf_update(x, P, np.array([z]))
+      estimates.append(x.copy())
+  estimates = np.array(estimates)
+
+  print("final velocity estimate:", estimates[-1, 1])
+  print("raw sensor RMSE:", np.sqrt(np.mean((measurements - true_pos) ** 2)))
+  print("filter RMSE:    ", np.sqrt(np.mean((estimates[:, 0] - true_pos) ** 2)))
+tests: |
+  import numpy as np
+  assert abs(estimates[-1, 1] - 1.0) < 0.25, "velocity (never measured!) should be inferred near 1.0 m/s, got %.3f" % estimates[-1, 1]
+  _raw = np.sqrt(np.mean((measurements - true_pos) ** 2))
+  _flt = np.sqrt(np.mean((estimates[20:, 0] - true_pos[20:]) ** 2))
+  assert _flt < 0.5 * _raw, "after burn-in the filter should at least halve the raw sensor RMSE (raw %.3f, filter %.3f)" % (_raw, _flt)
+  _x, _P = kf_predict(np.array([0.0, 1.0]), np.eye(2))
+  assert abs(_x[0] - 0.1) < 1e-9, "predict must advance position by velocity*DT"
+  assert _P[0, 0] > 1.0, "predict must grow position variance"
+  _x2, _P2 = kf_update(np.array([0.0, 0.0]), np.eye(2) * 10.0, np.array([2.0]))
+  assert 0 < _x2[0] < 2.0 and _P2[0, 0] < 10.0, "update must move the state toward z and shrink variance"
+  np.testing.assert_allclose(_P2, _P2.T, atol=1e-9, err_msg="covariance must stay symmetric")
+hints:
+  - "kf_predict: `return F @ x, F @ P @ F.T + Q`."
+  - "kf_update: y = z − H@x; S = H@P@H.T + R; K = P@H.T@np.linalg.inv(S); x += K@y; P = (np.eye(2) − K@H) @ P."
+  - "Velocity emerges through the F-coupling: position measurements + the model 'position integrates velocity' is enough — that's the magic worth staring at."
+solution: |
+  import numpy as np
+
+  F = np.array([[1.0, DT], [0.0, 1.0]])
+  H = np.array([[1.0, 0.0]])
+  Q = np.array([[1e-4, 0.0], [0.0, 1e-3]])
+  R = np.array([[0.25]])
+
+  def kf_predict(x, P):
+      return F @ x, F @ P @ F.T + Q
+
+  def kf_update(x, P, z):
+      y = z - H @ x
+      S = H @ P @ H.T + R
+      K = P @ H.T @ np.linalg.inv(S)
+      return x + K @ y, (np.eye(2) - K @ H) @ P
+
+  x, P = np.array([0.0, 0.0]), np.eye(2) * 10.0
+  estimates = []
+  for z in measurements:
+      x, P = kf_predict(x, P)
+      x, P = kf_update(x, P, np.array([z]))
+      estimates.append(x.copy())
+  estimates = np.array(estimates)
+
+  print("final velocity estimate:", estimates[-1, 1])
+  print("raw sensor RMSE:", np.sqrt(np.mean((measurements - true_pos) ** 2)))
+  print("filter RMSE:    ", np.sqrt(np.mean((estimates[:, 0] - true_pos) ** 2)))

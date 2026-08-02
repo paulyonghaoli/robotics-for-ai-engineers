@@ -1,0 +1,71 @@
+id: geo-l2-slerp
+title: "Slerp with the shortest-arc fix"
+lesson: modules/01-geometry/02-quaternions
+description: >-
+  Implement spherical linear interpolation. The catch the tests probe: if
+  `dot(q0, q1) < 0`, flip one quaternion first (double cover!) or your
+  interpolation takes the long way around the sphere. Handle the
+  nearly-parallel case with a normalized-lerp fallback.
+setup_code: |
+  import numpy as np
+
+  def quat_from_axis_angle(axis, angle):
+      axis = np.asarray(axis, dtype=float)
+      axis = axis / np.linalg.norm(axis)
+      half = 0.5 * angle
+      return np.concatenate(([np.cos(half)], np.sin(half) * axis))
+starter_code: |
+  import numpy as np
+  # Provided (already defined): quat_from_axis_angle(axis, angle)
+
+  def slerp(q0, q1, t):
+      """Spherical linear interpolation between unit quaternions [w,x,y,z]."""
+      q0 = np.asarray(q0, dtype=float)
+      q1 = np.asarray(q1, dtype=float)
+      # TODO:
+      # 1. dot = q0 . q1; if negative, negate q1 (shortest arc)
+      # 2. if dot is ~1 (say > 1 - 1e-9), fall back to normalized lerp
+      # 3. otherwise apply the slerp formula with omega = arccos(dot)
+      return q0
+
+  z = np.array([0.0, 0.0, 1.0])
+  mid = slerp(quat_from_axis_angle(z, 0.0), quat_from_axis_angle(z, np.pi / 2), 0.5)
+  print(mid)  # expect the 45-degree quaternion [0.9239, 0, 0, 0.3827]
+tests: |
+  import numpy as np
+  _z = np.array([0.0, 0.0, 1.0])
+  _q0 = quat_from_axis_angle(_z, 0.0)
+  _q1 = quat_from_axis_angle(_z, np.pi / 2)
+  assert np.allclose(slerp(_q0, _q1, 0.0), _q0, atol=1e-9), "t=0 must return q0"
+  assert np.allclose(slerp(_q0, _q1, 1.0), _q1, atol=1e-9), "t=1 must return q1"
+  _mid = slerp(_q0, _q1, 0.5)
+  _want = quat_from_axis_angle(_z, np.pi / 4)
+  assert np.allclose(_mid, _want, atol=1e-9), "midpoint of 0->90 deg should be the 45 deg quaternion"
+  _mid2 = slerp(_q0, -_q1, 0.5)
+  assert abs(abs(np.dot(_mid2, _want)) - 1.0) < 1e-9, "shortest arc: slerp(q0, -q1) must give the same rotation as slerp(q0, q1) — flip on negative dot"
+  _near = quat_from_axis_angle(_z, 1e-12)
+  _out = slerp(_q0, _near, 0.5)
+  assert np.isfinite(_out).all() and abs(np.linalg.norm(_out) - 1.0) < 1e-6, "nearly-parallel case must not divide by sin(0) — use the nlerp fallback"
+hints:
+  - "Shortest arc: `if np.dot(q0, q1) < 0: q1 = -q1` — q and -q are the same rotation, so this is free."
+  - "Fallback: `out = q0 + t*(q1-q0); return out/np.linalg.norm(out)` when dot > 1 - 1e-9."
+  - "Main branch: `omega = np.arccos(np.clip(dot, -1, 1))`; weights `sin((1-t)ω)/sin(ω)` and `sin(tω)/sin(ω)`."
+solution: |
+  import numpy as np
+
+  def slerp(q0, q1, t):
+      q0 = np.asarray(q0, dtype=float)
+      q1 = np.asarray(q1, dtype=float)
+      dot = float(np.dot(q0, q1))
+      if dot < 0.0:
+          q1, dot = -q1, -dot
+      if dot > 1.0 - 1e-9:
+          out = q0 + t * (q1 - q0)
+          return out / np.linalg.norm(out)
+      omega = np.arccos(np.clip(dot, -1.0, 1.0))
+      s = np.sin(omega)
+      return (np.sin((1.0 - t) * omega) / s) * q0 + (np.sin(t * omega) / s) * q1
+
+  z = np.array([0.0, 0.0, 1.0])
+  mid = slerp(quat_from_axis_angle(z, 0.0), quat_from_axis_angle(z, np.pi / 2), 0.5)
+  print(mid)

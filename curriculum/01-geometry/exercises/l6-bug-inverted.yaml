@@ -1,0 +1,64 @@
+id: geo-l6-bug-inverted
+title: "Bug 1: the rotating map"
+lesson: modules/01-geometry/06-lab-frame-debugging
+description: >-
+  **Symptom:** as the simulated robot drives a quarter circle, the fixed
+  landmark appears to orbit around it in the map. The mapping code below
+  contains one classic frame bug. Reproduce with **Run** (watch the
+  landmark's supposedly-fixed map position move), then find and fix it.
+setup_code: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      c, s = np.cos(theta), np.sin(theta)
+      return np.array([[c, -s, x], [s, c, y], [0, 0, 1.0]])
+
+  def se2_inverse(T):
+      R, t = T[:2, :2], T[:2, 2]
+      Ti = np.eye(3)
+      Ti[:2, :2] = R.T
+      Ti[:2, 2] = -R.T @ t
+      return Ti
+
+  TRUE_LANDMARK = np.array([3.0, 1.0])
+
+  def simulate_observation(robot_pose):
+      """What the range sensor reports: the landmark in the ROBOT frame."""
+      T_map_base = se2(*robot_pose)
+      p = np.array([*TRUE_LANDMARK, 1.0])
+      return (se2_inverse(T_map_base) @ p)[:2]
+starter_code: |
+  import numpy as np
+  # Provided: se2, se2_inverse, simulate_observation(robot_pose)
+  # The sensor reports the landmark position in the ROBOT (base) frame.
+
+  def landmark_to_map(observation, robot_pose):
+      """Convert a base-frame observation to map coordinates."""
+      T_map_base = se2(*robot_pose)
+      p = np.array([*observation, 1.0])
+      return (se2_inverse(T_map_base) @ p)[:2]   # <-- something is off here
+
+  # A fixed landmark must map to the SAME map position from every robot pose:
+  for pose in [(0.0, 0.0, 0.0), (1.0, 0.0, np.pi / 4), (2.0, 1.0, np.pi / 2)]:
+      obs = simulate_observation(pose)
+      print(pose, "->", landmark_to_map(obs, pose))
+tests: |
+  import numpy as np
+  _poses = [(0.0, 0.0, 0.0), (1.0, 0.0, np.pi / 4), (2.0, 1.0, np.pi / 2), (-1.0, 2.0, 2.5)]
+  for _pose in _poses:
+      _est = landmark_to_map(simulate_observation(_pose), _pose)
+      assert np.allclose(_est, [3.0, 1.0], atol=1e-9), "landmark should map to (3.0, 1.0) from every pose; from pose %s you got %s — which direction does T_map_base go?" % (str(_pose), np.round(_est, 3))
+hints:
+  - "Write the subscript equation: you have p_base and want p_map. Which transform maps base-frame points INTO the map?"
+  - "The observation is already in the base frame. Applying inverse(T_map_base) converts map → base — the OPPOSITE of what's needed. Remove the inverse."
+solution: |
+  import numpy as np
+
+  def landmark_to_map(observation, robot_pose):
+      T_map_base = se2(*robot_pose)
+      p = np.array([*observation, 1.0])
+      return (T_map_base @ p)[:2]   # T_map_base maps base-frame points into map
+
+  for pose in [(0.0, 0.0, 0.0), (1.0, 0.0, np.pi / 4), (2.0, 1.0, np.pi / 2)]:
+      obs = simulate_observation(pose)
+      print(pose, "->", landmark_to_map(obs, pose))

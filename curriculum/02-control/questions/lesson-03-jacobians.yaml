@@ -1,0 +1,47 @@
+id: control-l3-jacobians
+title: "Quiz — Jacobians and singularities"
+lesson: modules/02-control/03-jacobians
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "For l1 = l2 = 1, det J = l1·l2·sin(θ2). Evaluate at θ2 = π/2."
+    answer: 1.0
+    tolerance: 0.001
+    explanation: "Right angle at the elbow: maximal manipulability, farthest from both singularities."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "The manipulability ellipsoid's axes are…"
+    options:
+      - text: "The Jacobian's singular values — the hand's velocity capability per direction"
+        correct: true
+        explanation: "SVD intuition transfers whole: singular value ≈ explained capability; rank collapse ≈ singularity."
+      - text: "The link lengths"
+        explanation: "Link lengths set the workspace, not the instantaneous velocity ellipse."
+      - text: "The joint velocity limits"
+        explanation: "Limits scale the ellipse; its *shape* comes from J alone."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "τ = Jᵀ F uses the transpose (not inverse) because…"
+    options:
+      - text: "It follows from virtual work / power balance: τ·θ̇ = F·ṗ for all θ̇ — no inversion involved"
+        correct: true
+        explanation: "The statics dual holds even AT singularities, where J⁻¹ doesn't exist — which is why a stretched arm resists radial loads for free."
+      - text: "The transpose is a cheaper approximation of the inverse"
+        explanation: "Jacobian-transpose IK uses it that way, but the statics relation is exact, not approximate."
+      - text: "Forces and velocities have the same units"
+        explanation: "They don't — and the transpose is precisely what makes the units work out."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "Near full extension, joint noise of fixed size produces hand-position noise that is…"
+    options:
+      - text: "Amplified along some directions by the ill-conditioned J — the condition number acts exactly as in badly-scaled regression"
+        correct: true
+        explanation: "σmax/σmin blows up; jitter in the near-null-space direction maps to large task-space error. Same disease, same diagnosis."
+      - text: "Unchanged — noise doesn't depend on configuration"
+        explanation: "The mapping from joints to hand DOES depend on configuration; that's the whole lesson."
+      - text: "Reduced, since the arm moves less when stretched"
+        explanation: "Velocity capability shrinks in one direction but noise sensitivity grows in the mapping's stretched directions."

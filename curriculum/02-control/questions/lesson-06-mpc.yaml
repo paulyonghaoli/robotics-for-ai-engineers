@@ -1,0 +1,59 @@
+id: control-l6-mpc
+title: "Quiz — model predictive control"
+lesson: modules/02-control/06-mpc
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "MPC applies only the FIRST input of each optimized sequence because…"
+    options:
+      - text: "The model is imperfect and the world is noisy — re-optimizing from the measured state each step is how feedback re-enters"
+        correct: true
+        explanation: "Execute all N inputs open-loop and you've thrown feedback away; the receding horizon IS the feedback mechanism."
+      - text: "Later inputs are always zero"
+        explanation: "They're generally not — they're just superseded by better information."
+      - text: "Computing the rest would be too slow"
+        explanation: "The rest is already computed — it's discarded on purpose."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Cart at v = 2 m/s with |u| ≤ 1 m/s²: minimum stopping distance v²/(2·u_max) in meters?"
+    answer: 2.0
+    tolerance: 0.01
+    explanation: "A horizon too short to span the ~2 s of braking cannot 'see' a wall in time — horizon myopia, quantified."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "MPC's fundamental capability that PID lacks is…"
+    options:
+      - text: "Constraints as first-class citizens: actuator limits and no-go regions are promises the optimizer keeps, not clamps discovered after"
+        correct: true
+        explanation: "A clamped PID output violates the *intent* silently; MPC plans within the limits from the start."
+      - text: "Faster reaction time"
+        explanation: "PID is typically faster per step; MPC buys foresight, not reflexes."
+      - text: "Not needing a model"
+        explanation: "Backwards — the M in MPC is the price of admission."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Your MPC chatters between +u_max and −u_max each step while tracking fine. The fix is…"
+    options:
+      - text: "Raise the control-effort weight R — the cost currently says effort is free"
+        correct: true
+        explanation: "With R ≈ 0, bang-bang IS optimal. Same loss-function-engineering instinct as regularizing any objective."
+      - text: "Shorten the horizon"
+        explanation: "Horizon affects foresight, not the effort/accuracy trade."
+      - text: "Add measurement filtering"
+        explanation: "The chatter is the optimizer's preference, not noise."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Sampling-based MPC (rollout candidates, pick the best) matters for Module 9 because…"
+    options:
+      - text: "Swap the physics model for a learned model and it becomes model-based RL's control loop (MPPI, world models)"
+        correct: true
+        explanation: "Same loop, different simulator — half the modern robot-learning stack is receding-horizon control over a learned model."
+      - text: "It proves neural networks are unnecessary"
+        explanation: "It's the bridge TO them, not the argument against."
+      - text: "Random sampling guarantees global optimality"
+        explanation: "It guarantees nothing — it's just derivative-free, parallel, and shockingly effective."

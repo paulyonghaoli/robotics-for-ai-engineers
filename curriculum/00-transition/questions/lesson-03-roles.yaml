@@ -1,0 +1,40 @@
+id: transition-l3-roles
+title: "Quiz — roles and transfer strategy"
+lesson: modules/00-transition/03-roles
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "For an MLE with strong CV/DL background, which role has the smallest skill delta?"
+    options:
+      - text: "Perception engineer — CV/DL transfers nearly whole; the delta is 3D geometry, sensors, and real-time constraints"
+        correct: true
+        explanation: "Which is why this curriculum front-loads geometry and treats perception as a flagship module."
+      - text: "Autonomy engineer"
+        explanation: "The most classical-heavy role — largest delta from a pure-ML background."
+      - text: "Platform engineer"
+        explanation: "Smallest delta for DE/infra people; for a CV-centric MLE, perception is closer."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why do robot-learning teams still expect fluency in the classical stack (filters, planners, controllers)?"
+    options:
+      - text: "Learned components are evaluated against classical baselines and deployed inside classical scaffolding — you can't replace what you can't operate"
+        correct: true
+        explanation: "The role's catch: the ML-est robotics job requires the most credibility about non-ML robotics."
+      - text: "Classical methods are being deprecated, but slowly"
+        explanation: "They're not — estimation and control remain classical in nearly all production systems."
+      - text: "Interviewers enjoy trick questions"
+        explanation: "The Kalman-filter question in a robot-learning interview is not a trick; it's the job."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The migration route this curriculum is designed to support is…"
+    options:
+      - text: "Enter via perception or platform on existing strengths, then migrate toward learning-heavy work with embodied credibility"
+        correct: true
+        explanation: "First robotics role beats best robotics role. The portfolio artifacts target that entry point."
+      - text: "Wait until robot-learning roles require no classical knowledge"
+        explanation: "See q2 — and the queue of MLE résumés targeting those roles is long."
+      - text: "Enter through autonomy, the least competitive path"
+        explanation: "Least ML-adjacent means largest delta — slowest entry for this profile, not fastest."

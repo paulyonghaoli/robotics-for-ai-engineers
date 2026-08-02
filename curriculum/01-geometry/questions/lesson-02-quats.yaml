@@ -1,0 +1,95 @@
+id: geometry-l2-quats
+title: "Quiz — 3D rotations and quaternions"
+lesson: modules/01-geometry/02-quaternions
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "Why does robotics prefer unit quaternions over Euler angles for internal orientation state?"
+    options:
+      - text: "Quaternions are singularity-free; every 3-parameter representation has a gimbal-lock-style singularity"
+        correct: true
+        explanation: "You cannot chart a curved 3-manifold like SO(3) with 3 parameters and no singular points — the 4th number buys global smoothness."
+      - text: "Quaternions use fewer numbers than Euler angles"
+        explanation: "They use more (4 vs 3). The extra dimension is the point, not a cost being avoided."
+      - text: "Euler angles cannot represent all orientations"
+        explanation: "They can represent every orientation — the problem is the singular *parameterization* near ±90° in the middle axis, where a DOF collapses."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "The quaternions `q` and `-q` represent…"
+    options:
+      - text: "The same rotation (double cover of SO(3))"
+        correct: true
+        explanation: "A 360° rotation returns the vector but negates the quaternion. Averaging or comparing without sign-alignment is a classic bug."
+      - text: "Opposite rotations (inverse of each other)"
+        explanation: "The inverse of a unit quaternion is its conjugate [w, -x, -y, -z], not its negation."
+      - text: "Different rotations about the same axis"
+        explanation: "They are the *same* rotation — check by computing R(q) and R(-q); the quadratic form kills the sign."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "A rotation of 180° about the z-axis has quaternion `[w, x, y, z]`. What is `w`?"
+    answer: 0.0
+    tolerance: 0.0001
+    hint: "w = cos(θ/2), and θ = π."
+    explanation: "cos(π/2) = 0; the quaternion is [0, 0, 0, 1]."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: "For a 90° rotation about z, `w = cos(45°)`. Give its decimal value."
+    answer: 0.7071068
+    tolerance: 0.001
+    explanation: "Half-angles: a 90° rotation stores cos/sin of 45° ≈ 0.7071."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "ROS 2 `geometry_msgs/Quaternion` orders its fields as…"
+    options:
+      - text: "`x, y, z, w` — scalar-last"
+        correct: true
+        explanation: "While Eigen (and this curriculum internally) are scalar-first. Convert at the boundary, in exactly one place."
+      - text: "`w, x, y, z` — scalar-first"
+        explanation: "That's Eigen's and our internal convention — not the ROS wire format. This mismatch is a canonical robotics interop bug."
+      - text: "Order is configurable per publisher"
+        explanation: "Message definitions are fixed; that's the entire value of a wire schema."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "A tracking filter averages the last two quaternion estimates and occasionally outputs garbage when the input is smooth. Most likely cause?"
+    options:
+      - text: "Consecutive quaternions straddled the double cover; averaging `q` and `≈ -q` cancels toward zero"
+        correct: true
+        explanation: "Sign-align first (flip if the dot product with the previous estimate is negative), then average and renormalize."
+      - text: "Averaging quaternions is always mathematically invalid"
+        explanation: "Sign-aligned normalized averaging is a fine small-angle approximation; proper chordal averaging exists for the general case."
+      - text: "The quaternions were normalized too often"
+        explanation: "Renormalization is cheap and harmless — it cannot produce garbage."
+  - id: q7
+    type: multi
+    difficulty: core
+    prompt: "Which statements about slerp are true? Select all that apply."
+    options:
+      - text: "It interpolates at constant angular velocity along the shortest arc (given sign alignment)"
+        correct: true
+        explanation: "That's its defining property — the geodesic on the unit sphere."
+      - text: "Naive linear interpolation of components then normalizing gives identical results"
+        explanation: "Nlerp follows the chord, not the arc: same endpoints, non-constant angular speed. Acceptable for tiny angles only."
+      - text: "Without a sign check, slerp may take the long way around"
+        correct: true
+        explanation: "If q0·q1 < 0, flip one of them first or you interpolate across the far side of the sphere."
+      - text: "Slerp's formula is numerically ill-conditioned when the quaternions are nearly identical"
+        correct: true
+        explanation: "sin(Ω) → 0 in the denominator; implementations fall back to normalized lerp there."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "After integrating gyro rates for hours without renormalization, point clouds transformed by the estimated orientation slowly **shrink**. Why?"
+    options:
+      - text: "The quaternion norm drifted below 1, so `quat_to_matrix` yields a matrix with scale < 1 baked in"
+        correct: true
+        explanation: "The rotation-matrix formula is quadratic in the components; ‖q‖ = 1 − ε produces R with determinant ≈ (1 − ε)² per application. Renormalize."
+      - text: "Floating-point rotation always contracts vectors"
+        explanation: "Error is unbiased in direction; systematic contraction points to a norm problem, not float rounding."
+      - text: "The IMU's gyro bias causes scale drift"
+        explanation: "Gyro bias causes orientation drift (wrong direction), never scale — rigid rotations can't rescale."

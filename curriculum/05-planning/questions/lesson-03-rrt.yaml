@@ -1,0 +1,52 @@
+id: planning-l3-rrt
+title: "Quiz — sampling-based planning"
+lesson: modules/05-planning/03-rrt
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Voronoi bias means an RRT explores because…"
+    options:
+      - text: "Nodes bordering large empty regions own large nearest-neighbor cells, so uniform samples select them disproportionately — the frontier extends itself"
+        correct: true
+        explanation: "Exploration emerges from geometry, with no explicit bonus. It's the property that makes 'sample uniformly, extend nearest' more than a random walk."
+      - text: "Samples are drawn preferentially from unexplored areas"
+        explanation: "Sampling stays uniform — the BIAS comes from who is nearest, not where samples fall."
+      - text: "The tree stores a map of visited space"
+        explanation: "No map exists — that's the entire point of sampling-based planning."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "RRT's guarantee is probabilistic completeness, meaning…"
+    options:
+      - text: "If a path with clearance exists, the probability of finding one → 1 with samples — but with NO claim about its quality"
+        correct: true
+        explanation: "Hence jagged paths, shortcut smoothing as standard post-processing, and RRT* for those who need optimality-in-the-limit."
+      - text: "It finds the shortest path with enough samples"
+        explanation: "That's RRT*'s asymptotic-optimality upgrade, bought with choose-parent and rewire steps."
+      - text: "It always terminates with an answer"
+        explanation: "It may exhaust its budget on infeasible or narrow problems — completeness is probabilistic, not temporal."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The narrow-passage problem: a gap occupying 0.1% of C-space volume…"
+    options:
+      - text: "Receives ~0.1% of uniform samples, so expect ~1000 samples per hit — success plummets with passage volume, motivating specialized samplers"
+        correct: true
+        explanation: "Sampling volume IS the currency. Bridge tests and Gaussian sampling exist to mint more of it near obstacles."
+      - text: "Is impossible for RRT"
+        explanation: "Just expensive — completeness still holds, eventually."
+      - text: "Only affects PRM, not RRT"
+        explanation: "Both pay; any uniform-sampling method does."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "MoveIt's default RRTConnect grows trees from BOTH start and goal because…"
+    options:
+      - text: "Two frontiers meeting in the middle cover the space far faster than one — and each greedy connect attempt doubles as a solution test"
+        correct: true
+        explanation: "Bidirectional search's classic win, in C-space. It's the pragmatic default for arm reaches everywhere."
+      - text: "Arms have two ends"
+        explanation: "Poetic, but the reason is search geometry, not anatomy."
+      - text: "It guarantees optimal paths"
+        explanation: "RRTConnect is even less optimality-minded than RRT — it trades everything for speed to first solution."

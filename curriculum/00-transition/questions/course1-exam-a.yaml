@@ -1,0 +1,171 @@
+id: course1-exam-a
+title: "Course I exam — form A"
+lesson: course-1-exam
+questions:
+  - id: e1
+    type: single
+    difficulty: core
+    prompt: "Your localization filter's innovations develop a persistent nonzero mean immediately after a technician remounts the lidar. The root cause and fix live in…"
+    options:
+      - text: "Module 1: the mount transform (extrinsics) changed — recalibrate T_base_lidar; no amount of Q/R tuning repairs a bias"
+        correct: true
+        explanation: "Biased innovations = modeling error (3.1H). A physically moved sensor is a frame problem wearing an estimation costume."
+      - text: "Module 3: raise R until the innovations look balanced"
+        explanation: "Inflating R hides the symptom while the map quietly shears — tuning is not exorcism (2.2H either!)."
+      - text: "Module 2: retune the controller gains"
+        explanation: "The controller consumes the estimate; it didn't cause the bias."
+  - id: e2
+    type: numeric
+    difficulty: core
+    prompt: "Robot base at pose (1, 2, 90°) in the map; a sensor mounted 0.5 m ahead of the base detects an object 1 m straight ahead of the SENSOR. The object's map **y** coordinate?"
+    answer: 3.5
+    tolerance: 0.01
+    explanation: "Base faces +y: sensor at (1, 2.5); one meter 'ahead' is +y again → (1, 3.5). Compose T_map_base · T_base_sensor · p — lesson 1.1's daily bread."
+  - id: e3
+    type: single
+    difficulty: core
+    prompt: "A heading PID that works everywhere except near ±π, where the robot occasionally spins the long way, needs…"
+    options:
+      - text: "wrap_angle on the error BEFORE the PID — the controller is innocent, the error computation is guilty"
+        correct: true
+        explanation: "Module 1's oldest bug (1.1, 1.6) feeding Module 2's controller. The PID processes whatever error you hand it."
+      - text: "Derivative filtering"
+        explanation: "Filtered-D fixes chatter, not topology."
+      - text: "Anti-windup"
+        explanation: "Windup is a saturation pathology; this is the circle pretending to be a line."
+  - id: e4
+    type: numeric
+    difficulty: core
+    prompt: "Scalar Kalman: prediction 10 with variance 9; measurement 14 with variance 3. Posterior mean?"
+    answer: 13.0
+    tolerance: 0.01
+    explanation: "K = 9/12 = 0.75; 10 + 0.75·4 = 13 — three-quarters of the way to the 3×-more-confident sensor (3.1)."
+  - id: e5
+    type: single
+    difficulty: core
+    prompt: "Your particle filter must recover from kidnapping, and your EKF must not be used for global localization. Both constraints trace to ONE shared concept:"
+    options:
+      - text: "Representational support: an estimator can only re-weight hypotheses it can represent — a tight Gaussian and a converged particle cloud both lack support elsewhere"
+        correct: true
+        explanation: "PF fixes it with injection (3.2); the EKF simply can't (3.3) — one basin, forever. The folk rule 'EKF tracks, PF globalizes' is this sentence."
+      - text: "Computational cost"
+        explanation: "Cost differs, but the failure is about what the belief CAN express, not what it costs."
+      - text: "Sensor noise levels"
+        explanation: "Even noiseless sensors can't upweight hypotheses that don't exist."
+  - id: e6
+    type: single
+    difficulty: core
+    prompt: "A 2-link arm holds a heavy box with arms fully stretched (θ₂ = 0). Torque needed to resist the RADIAL load, and hand mobility in that direction, respectively:"
+    options:
+      - text: "~zero torque (statics dual τ = JᵀF with F in the null direction), and ~zero mobility (singular J)"
+        correct: true
+        explanation: "The same rank collapse gives free load-bearing AND lost mobility — 2.3's two faces of one singularity. It's why you carry boxes straight-armed."
+      - text: "Maximum torque and maximum mobility"
+        explanation: "Both backwards — check det J = l1·l2·sin θ₂ at zero."
+      - text: "Zero torque and full mobility"
+        explanation: "Half right: the mobility is what the singularity takes away."
+  - id: e7
+    type: single
+    difficulty: core
+    prompt: "The odometry motion model in your localization project samples per-particle noise. If you set that noise to exactly zero (perfect trust in commands), the filter…"
+    options:
+      - text: "Collapses to clones, becomes overconfident, and cannot track genuine actuation noise — inflated process noise is honesty, not sloppiness"
+        correct: true
+        explanation: "Modules 1.4 (commands ≠ motion) + 3.2 (impoverishment) + 3.6 (overconfidence) in one failure. The capstone's PF ran ~1.5× the true sigma for exactly this reason."
+      - text: "Becomes optimally accurate"
+        explanation: "Only in a world where commands execute perfectly — lesson 0.1's assumption #3 says otherwise."
+      - text: "Runs faster with no other effect"
+        explanation: "The speed is the same; the belief just stops being one."
+  - id: e8
+    type: numeric
+    difficulty: core
+    prompt: "P-control (kp = 9) on the plant dy/dt = (u − y)/τ, setpoint 1.0: steady-state value of y?"
+    answer: 0.9
+    tolerance: 0.005
+    explanation: "kp/(1+kp) = 0.9 — the structural steady-state error that I (2.2) or feedforward (2.5) exists to remove."
+  - id: e9
+    type: single
+    difficulty: core
+    prompt: "Gravity feedforward vs integral action for holding an arm's setpoint — the deep difference:"
+    options:
+      - text: "Feedforward generalizes across setpoints (a model of g(θ)); the integral memorizes one operating point and relearns at each change"
+        correct: true
+        explanation: "2.5's model-vs-lookup-table distinction. Both cancel the sag; only one transfers."
+      - text: "The integral is more accurate"
+        explanation: "At equilibrium they cancel identical torques; the difference is transient and generalization."
+      - text: "Feedforward requires no model"
+        explanation: "Feedforward IS the model — that's its entire content."
+  - id: e10
+    type: single
+    difficulty: core
+    prompt: "Your fused estimate is smooth but the planner complains the robot 'jumps' a few cm at 1 Hz. Per REP 105 and lesson 3.5, the likely wiring error:"
+    options:
+      - text: "A smoothness-sensitive consumer is reading the map-frame (correction-bearing) estimate instead of the odom-frame one"
+        correct: true
+        explanation: "1.3's two-guarantee split exists so corrections land where planners look and NOT where controllers differentiate."
+      - text: "The localizer updates too often"
+        explanation: "Rate isn't the issue; routing is."
+      - text: "Sensor noise"
+        explanation: "1 Hz structure matching the localizer's update rate is architecture, not noise."
+  - id: e11
+    type: numeric
+    difficulty: core
+    prompt: "Gyro: bias 0.005 rad/s, white noise σ = 0.02 rad/√s-ish per sample at 100 Hz. After 100 s of integration, the BIAS contribution to heading error (rad)?"
+    answer: 0.5
+    tolerance: 0.01
+    explanation: "b·t = 0.5 rad ≈ 29°, dominating the noise walk — why bias is estimated as a state (3.4)."
+  - id: e12
+    type: single
+    difficulty: core
+    prompt: "A filter passes NIS bands in the lab but its NEES (simulation) reads 0.2 on a 3-state filter. Ship it?"
+    options:
+      - text: "It's pessimistic, not broken — covariance ~15× too wide masks real information and lags; tighten before consumers pay for phantom uncertainty"
+        correct: true
+        explanation: "3.6's asymmetry: pessimism costs performance (not trust). Below-band NEES means P overstates error."
+      - text: "Yes — wide covariance is always safe"
+        explanation: "Safe-ish, but gating widens, fusion downweights honest sensors, planners over-hedge. Waste is a cost too."
+      - text: "No — low NEES means divergence"
+        explanation: "Divergence drives NEES UP (errors exceed P), not down."
+  - id: e13
+    type: single
+    difficulty: core
+    prompt: "Sampling-based MPC brakes late and clips a constraint only when approaching at high speed. First knob to check:"
+    options:
+      - text: "Horizon length vs stopping distance v²/2u_max — myopia: the optimizer literally cannot see the stop in time"
+        correct: true
+        explanation: "2.6's calculation, weaponized. At higher speed the required preview grows quadratically; a fixed horizon silently falls behind."
+      - text: "The cost's effort weight R"
+        explanation: "R shapes smoothness; it can't create foresight the horizon lacks."
+      - text: "More candidate samples"
+        explanation: "More samples of sequences that all end before the wall still can't represent stopping."
+  - id: e14
+    type: single
+    difficulty: stretch
+    prompt: "Two 'independent' pose estimates — one from wheel odometry, one from a visual odometry module that ALSO consumes wheel speeds for scale — are fused as independent. The consequence:"
+    options:
+      - text: "Double-counted evidence → overconfident covariance → downstream gating starts rejecting honest absolute fixes"
+        correct: true
+        explanation: "3.5's correlation trap cascading into the gate death spiral. Correlated producers must be fused jointly or decorrelated."
+      - text: "No harm — more estimates are better"
+        explanation: "More INDEPENDENT estimates are better; correlation is the entire caveat."
+      - text: "The estimates cancel each other"
+        explanation: "They agree too MUCH — that's the problem."
+  - id: e15
+    type: numeric
+    difficulty: core
+    prompt: "Octile heuristic (Module 1.5's C-space feeds Module 5, but you met octile in the diagnostic of admissibility): from (0,0) to (4,4) on an 8-connected grid, h = ?"
+    answer: 5.657
+    tolerance: 0.01
+    explanation: "Pure diagonal: 4√2 ≈ 5.657 — and on open ground the heuristic is exact. (Bridging into Course II — consider this a trailhead.)"
+  - id: e16
+    type: single
+    difficulty: stretch
+    prompt: "The single sentence that best compresses Course I:"
+    options:
+      - text: "A robot acts on beliefs, not truths — so geometry must be conventions-clean, control must respect what's predictable vs not, and estimators must be honest about what they don't know"
+        correct: true
+        explanation: "Modules 1 (conventions), 2 (feedforward/feedback), 3 (belief + consistency) in one breath. If this reads as obvious now, Course I did its job."
+      - text: "With enough sensor accuracy, most of this machinery becomes unnecessary"
+        explanation: "Better sensors shrink the noise, never the structure: frames still compose, gravity still pulls, beliefs still need honesty."
+      - text: "Classical methods are placeholders until learning replaces them"
+        explanation: "Module 9 will put learning INSIDE this scaffolding, not instead of it — and interviews at robot-learning teams will check you know it."

@@ -1,0 +1,99 @@
+id: est-l6-nees
+title: "Audit four filters"
+lesson: modules/03-estimation/06-consistency-lab
+description: >-
+  Four filters ran on the same tracking problem. All have plausible RMSE.
+  You get their logs — errors, covariances, innovations — and must compute
+  NEES/NIS and name each condition. One of the four is the case that makes
+  this lab necessary: a filter whose **runtime** diagnostics look perfect
+  while its state is quietly wrong.
+setup_code: |
+  import numpy as np
+
+  def _run(r_assumed, sensor_bias=0.0, seed=5):
+      rng = np.random.default_rng(seed)
+      q_true, r_true = 0.04, 1.0
+      x_true, x, P = 0.0, 0.0, 10.0
+      errs, Ps, ys, Ss = [], [], [], []
+      for _ in range(500):
+          x_true += rng.normal(0, np.sqrt(q_true))
+          P = P + q_true
+          z = x_true + rng.normal(0, np.sqrt(r_true)) + sensor_bias
+          y = z - x
+          S = P + r_assumed
+          K = P / S
+          x, P = x + K * y, (1 - K) * P
+          errs.append(x - x_true); Ps.append(P); ys.append(y); Ss.append(S)
+      return dict(err=np.array(errs), P=np.array(Ps), y=np.array(ys), S=np.array(Ss))
+
+  RUNS = {
+      "A": _run(r_assumed=1.0),                  # honest
+      "B": _run(r_assumed=0.05),                 # trusts a noisy sensor blindly
+      "C": _run(r_assumed=25.0),                 # paranoid about a fine sensor
+      "D": _run(r_assumed=1.0, sensor_bias=0.8), # sensor offset the filter absorbs
+  }
+starter_code: |
+  import numpy as np
+  # Provided: RUNS - four filter logs, each with arrays err (x_est - x_true),
+  # P, y (innovations), S. For a scalar state, healthy NEES and NIS ~ 1.
+
+  def mean_nees(run):
+      # TODO: mean of err^2 / P  (skip the first 50 burn-in steps)
+      return 0.0
+
+  def mean_nis(run):
+      # TODO: mean of y^2 / S    (skip burn-in)
+      return 0.0
+
+  def diagnose(run):
+      """One of: 'healthy', 'overconfident', 'pessimistic', 'unobservable-bias'.
+
+      The discriminator is that NEES needs ground truth while NIS does not:
+        NEES ~ 1, NIS ~ 1            -> healthy
+        NEES high AND NIS high       -> overconfident (covariance too small)
+        NEES low                     -> pessimistic (covariance too large)
+        NEES high but NIS ~ 1        -> the state is wrong in a way the
+                                        measurements CANNOT reveal
+      Use 0.6-1.6 as the "~1" band and 2.0 as the "high" threshold.
+      """
+      # TODO
+      return "healthy"
+
+  for name, run in RUNS.items():
+      print(name, "nees=%6.2f nis=%6.2f ->" % (mean_nees(run), mean_nis(run)), diagnose(run))
+tests: |
+  import numpy as np
+  assert 0.5 < mean_nees(RUNS["A"]) < 1.6, "filter A is honest: NEES near 1 (got %.2f)" % mean_nees(RUNS["A"])
+  assert mean_nees(RUNS["B"]) > 3.0, "filter B trusts a noisy sensor: NEES should blow up"
+  assert mean_nis(RUNS["B"]) > 3.0, "...and so should its NIS - overconfidence is visible at RUNTIME"
+  assert mean_nees(RUNS["C"]) < 0.5, "filter C is paranoid: NEES far below 1"
+  assert mean_nees(RUNS["D"]) > 3.0, "filter D's STATE is wrong: NEES should be high (got %.2f)" % mean_nees(RUNS["D"])
+  assert 0.6 < mean_nis(RUNS["D"]) < 1.6, "...but filter D's NIS looks PERFECT (got %.2f) - the sensor offset was absorbed into the state, so the innovations are consistent. This is the case runtime monitoring cannot catch." % mean_nis(RUNS["D"])
+  _want = {"A": "healthy", "B": "overconfident", "C": "pessimistic", "D": "unobservable-bias"}
+  for _n, _lab in _want.items():
+      assert diagnose(RUNS[_n]) == _lab, "filter %s should be diagnosed %r, got %r" % (_n, _lab, diagnose(RUNS[_n]))
+hints:
+  - "mean_nees: np.mean(run['err'][50:]**2 / run['P'][50:]). NIS likewise with y and S."
+  - "Order the checks carefully: test the NEES-high-but-NIS-fine case BEFORE the plain overconfident case, since both have high NEES."
+  - "Why D is the important one: a constant sensor offset is unobservable to this filter, so it slides into the state estimate and the innovations go back to looking perfect. Only ground truth exposes it — which is precisely why simulation-time NEES auditing exists and why you cannot rely on NIS alone."
+solution: |
+  import numpy as np
+
+  def mean_nees(run):
+      return float(np.mean(run["err"][50:] ** 2 / run["P"][50:]))
+
+  def mean_nis(run):
+      return float(np.mean(run["y"][50:] ** 2 / run["S"][50:]))
+
+  def diagnose(run):
+      nees, nis = mean_nees(run), mean_nis(run)
+      if nees > 2.0 and 0.6 < nis < 1.6:
+          return "unobservable-bias"
+      if nees > 2.0:
+          return "overconfident"
+      if nees < 0.5:
+          return "pessimistic"
+      return "healthy"
+
+  for name, run in RUNS.items():
+      print(name, "nees=%6.2f nis=%6.2f ->" % (mean_nees(run), mean_nis(run)), diagnose(run))

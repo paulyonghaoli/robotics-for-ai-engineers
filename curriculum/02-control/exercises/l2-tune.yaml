@@ -1,0 +1,62 @@
+id: ctl-l2-tune
+title: "Tune to spec: the step-response gate"
+lesson: modules/02-control/02-pid
+description: >-
+  A cart (double integrator — force in, position out) must meet a spec you'd
+  see on a real controller ticket: **settle within ±2% of a 1 m step by
+  t = 8 s, overshoot ≤ 20%, and cancel a constant 0.5 N disturbance
+  (steady-state error < 1 cm at 15 s).** Choose the gains. There is no
+  unique answer — the tests grade the *response*, not your numbers.
+setup_code: |
+  import numpy as np
+
+  def run_cart(kp, ki, kd, steps=1500, dt=0.01, disturbance=0.5):
+      """Double integrator with force disturbance; PID with anti-windup."""
+      x, v, integral, prev_e = 0.0, 0.0, 0.0, None
+      xs = []
+      for _ in range(steps):
+          e = 1.0 - x
+          integral = np.clip(integral + e * dt, -2.0, 2.0)
+          d = 0.0 if prev_e is None else (e - prev_e) / dt
+          prev_e = e
+          u = np.clip(kp * e + ki * integral + kd * d, -20.0, 20.0)
+          v += (u + disturbance) * dt
+          x += v * dt
+          xs.append(x)
+      return np.array(xs)
+starter_code: |
+  import numpy as np
+  # Provided: run_cart(kp, ki, kd) -> position trace, dt = 0.01 s, 15 s total.
+  # Spec: overshoot <= 20%; settled within +/-2% from t = 8 s on;
+  #       constant 0.5 N disturbance leaves < 1 cm error at 15 s.
+
+  KP = 1.0   # TODO: tune me
+  KI = 0.0   # TODO
+  KD = 0.0   # TODO
+
+  xs = run_cart(KP, KI, KD)
+  print("overshoot: %.1f%%" % (100 * (xs.max() - 1.0)))
+  print("final err: %.4f" % abs(xs[-1] - 1.0))
+  print("settled from 8s on:", bool(np.all(np.abs(xs[800:] - 1.0) < 0.02)))
+tests: |
+  import numpy as np
+  _xs = run_cart(KP, KI, KD)
+  _over = _xs.max() - 1.0
+  assert _over <= 0.20 + 1e-9, "overshoot %.1f%% exceeds the 20%% spec — more kd or less kp" % (100 * _over)
+  assert np.all(np.abs(_xs[800:] - 1.0) < 0.02), "must be settled within +/-2%% from t = 8 s on (worst late error %.3f)" % np.abs(_xs[800:] - 1.0).max()
+  assert abs(_xs[-1] - 1.0) < 0.01, "steady-state error %.4f at 15 s — the 0.5 N disturbance requires integral action (ki > 0)" % abs(_xs[-1] - 1.0)
+  assert KI > 0, "spec requires disturbance rejection: ki must be positive"
+hints:
+  - "Start P-only and raise kp until it oscillates around the target, then add kd until the oscillation dies. Expect kp in the 12–25 range, kd in the 6–12 range for this plant."
+  - "The 0.5 N disturbance shifts the equilibrium — only ki removes that offset (values around 4–8 work here). The integral must UNWIND after the rise, which is what limits how fast you can settle: more ki cancels the disturbance faster but adds overshoot."
+solution: |
+  import numpy as np
+
+  KP = 16.0
+  KI = 4.0
+  KD = 6.0
+
+  xs = run_cart(KP, KI, KD)
+  print("overshoot: %.1f%%" % (100 * (xs.max() - 1.0)))
+  print("final err: %.4f" % abs(xs[-1] - 1.0))
+  print("settled from 8s on:", bool(np.all(np.abs(xs[800:] - 1.0) < 0.02)))

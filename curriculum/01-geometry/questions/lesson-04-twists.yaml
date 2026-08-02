@@ -1,0 +1,79 @@
+id: geometry-l4-twists
+title: "Quiz — twists and velocity integration"
+lesson: modules/01-geometry/04-twists
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "A 2D body twist (v_x, v_y, ω) held constant over a timestep moves the robot along…"
+    options:
+      - text: "A circular arc (radius v_x/ω for v_y = 0)"
+        correct: true
+        explanation: "Constant body velocity + rotating body = arc. Straight-line motion is the ω → 0 limit."
+      - text: "A straight line in the direction of (v_x, v_y)"
+        explanation: "Only if ω = 0. With rotation, the heading changes continuously during the step — that's the corner Euler integration cuts."
+      - text: "A parabola"
+        explanation: "Parabolas come from constant acceleration in world frame (projectiles), not constant body twists."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Differential drive: wheel speeds v_r = 1.2 m/s, v_l = 0.8 m/s, wheelbase b = 0.5 m. What is ω in rad/s?"
+    answer: 0.8
+    tolerance: 0.001
+    hint: "ω = (v_r − v_l) / b."
+    explanation: "(1.2 − 0.8) / 0.5 = 0.8 rad/s, with v_x = 1.0 m/s → turning radius 1.25 m."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "Same robot: what is the turning radius in meters?"
+    answer: 1.25
+    tolerance: 0.001
+    explanation: "radius = v_x / ω = 1.0 / 0.8."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why is Euler-integration error in dead-reckoning more damaging than zero-mean sensor noise of similar size?"
+    options:
+      - text: "It is biased — every step cuts the arc's corner the same way, so error accumulates systematically"
+        correct: true
+        explanation: "Filters average away unbiased noise; they cannot remove a bias the motion model itself injects."
+      - text: "It is larger in magnitude per step"
+        explanation: "Per step it's usually *smaller* than sensor noise — the problem is that it never cancels."
+      - text: "It only occurs at high speeds"
+        explanation: "It occurs whenever ω ≠ 0, at any speed; magnitude scales with ω·dt."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "The arc-integration formula divides by ω. What must every implementation do?"
+    options:
+      - text: "Fall back to straight-line (Euler) integration when |ω| is below a small epsilon"
+        correct: true
+        explanation: "The limit ω → 0 is exactly straight-line motion; the guard avoids NaNs on straight segments."
+      - text: "Clamp ω to a minimum turning rate"
+        explanation: "That would forbid driving straight — a curious feature for a robot."
+      - text: "Use double precision"
+        explanation: "Precision doesn't fix division by ~0; the formula genuinely degenerates and needs its limit case."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "A ROS 2 planar robot's velocity command uses which `geometry_msgs/Twist` fields?"
+    options:
+      - text: "`linear.x` and `angular.z`"
+        correct: true
+        explanation: "Forward speed and yaw rate. `linear.y` stays zero for non-holonomic bases (it can't slide sideways)."
+      - text: "`linear.x` and `angular.x`"
+        explanation: "`angular.x` is roll rate — a planar base can't roll (one hopes)."
+      - text: "`linear.z` and `angular.z`"
+        explanation: "`linear.z` is vertical velocity — that's for drones."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Odometry uses the *intended* control period dt = 20 ms instead of measured time between encoder reads. The robot's pose estimate…"
+    options:
+      - text: "Drifts in proportion to scheduler jitter, even with perfect encoders"
+        correct: true
+        explanation: "Each late read integrates the right speeds over the wrong duration. Always integrate over measured elapsed time."
+      - text: "Is unaffected as long as the encoders are accurate"
+        explanation: "Distance = speed × time; a wrong time corrupts the product no matter how good the speed is."
+      - text: "Gains high-frequency noise but no drift"
+        explanation: "Jitter is not zero-mean relative to the assumed period under load — the error accumulates."

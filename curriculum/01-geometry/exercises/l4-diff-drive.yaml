@@ -1,0 +1,53 @@
+id: geo-l4-diff-drive
+title: "Differential drive: wheels to twist"
+lesson: modules/01-geometry/04-twists
+description: >-
+  Implement the forward kinematics of a differential-drive base: wheel
+  speeds to body twist, and the inverse (twist to wheel speeds). This is
+  the exact math inside every `diff_drive_controller`.
+setup_code: |
+  import numpy as np
+starter_code: |
+  import numpy as np
+
+  def wheels_to_twist(v_r, v_l, b):
+      """Wheel rim speeds (m/s) + wheelbase b (m) -> (v_x, omega)."""
+      # TODO
+      return 0.0, 0.0
+
+  def twist_to_wheels(v_x, omega, b):
+      """Inverse mapping: body twist -> (v_r, v_l)."""
+      # TODO
+      return 0.0, 0.0
+
+  print(wheels_to_twist(1.2, 0.8, 0.5))   # expect (1.0, 0.8)
+  print(twist_to_wheels(1.0, 0.8, 0.5))   # expect (1.2, 0.8)
+tests: |
+  import numpy as np
+  _v, _w = wheels_to_twist(1.2, 0.8, 0.5)
+  assert abs(_v - 1.0) < 1e-9, "v_x = (v_r + v_l) / 2 should be 1.0"
+  assert abs(_w - 0.8) < 1e-9, "omega = (v_r - v_l) / b should be 0.8"
+  _v, _w = wheels_to_twist(1.0, 1.0, 0.5)
+  assert abs(_w) < 1e-12, "equal wheel speeds must give zero rotation"
+  _v, _w = wheels_to_twist(0.5, -0.5, 0.5)
+  assert abs(_v) < 1e-12 and _w > 0, "opposite wheels: spin in place, CCW for right wheel forward"
+  _rng = np.random.default_rng(0)
+  for _ in range(10):
+      vr, vl, b = _rng.uniform(-2, 2), _rng.uniform(-2, 2), _rng.uniform(0.2, 1.0)
+      v, w = wheels_to_twist(vr, vl, b)
+      vr2, vl2 = twist_to_wheels(v, w, b)
+      assert abs(vr2 - vr) < 1e-9 and abs(vl2 - vl) < 1e-9, "twist_to_wheels must invert wheels_to_twist exactly"
+hints:
+  - "Forward: v_x = (v_r + v_l)/2, omega = (v_r − v_l)/b."
+  - "Inverse: solve the two equations — v_r = v_x + omega·b/2, v_l = v_x − omega·b/2."
+solution: |
+  import numpy as np
+
+  def wheels_to_twist(v_r, v_l, b):
+      return (v_r + v_l) / 2.0, (v_r - v_l) / b
+
+  def twist_to_wheels(v_x, omega, b):
+      return v_x + omega * b / 2.0, v_x - omega * b / 2.0
+
+  print(wheels_to_twist(1.2, 0.8, 0.5))
+  print(twist_to_wheels(1.0, 0.8, 0.5))

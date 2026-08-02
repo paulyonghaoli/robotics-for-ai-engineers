@@ -1,0 +1,95 @@
+id: map-l1-logodds
+title: "The log-odds map update"
+lesson: modules/04-mapping/01-occupancy-grids
+description: >-
+  Implement the inverse sensor model: one beam carves free space along its
+  cells and deposits occupancy at a hit, in clamped log-odds. The tests
+  include the map-healing case — the behavior the clamp exists to buy.
+setup_code: |
+  import numpy as np
+
+  def bresenham(y0, x0, y1, x1):
+      cells = []
+      dy, dx = abs(y1 - y0), abs(x1 - x0)
+      sy, sx = (1 if y1 >= y0 else -1), (1 if x1 >= x0 else -1)
+      err = dx - dy
+      y, x = y0, x0
+      while True:
+          cells.append((y, x))
+          if (y, x) == (y1, x1):
+              return cells
+          e2 = 2 * err
+          if e2 > -dy:
+              err -= dy
+              x += sx
+          if e2 < dx:
+              err += dx
+              y += sy
+
+  L_FREE, L_OCC, L_CLAMP = -0.4, 0.85, 6.0
+starter_code: |
+  import numpy as np
+  # Provided: bresenham(y0,x0,y1,x1), L_FREE=-0.4, L_OCC=0.85, L_CLAMP=6.0
+
+  def update_ray(log_odds, c0, c1, hit):
+      """Integrate one beam into the log-odds grid (modify in place).
+
+      c0: sensor cell (y, x); c1: beam end cell. Cells BEFORE the end get
+      L_FREE; the end cell gets L_OCC if hit else L_FREE. Clamp everything
+      to [-L_CLAMP, +L_CLAMP]. Ignore cells outside the grid.
+      """
+      # TODO
+      pass
+
+  def probability(log_odds):
+      """Per-cell occupancy probability from log-odds."""
+      # TODO: p = 1 - 1 / (1 + exp(l))
+      return log_odds
+
+  m = np.zeros((20, 20))
+  update_ray(m, (10, 2), (10, 12), hit=True)
+  print(probability(m)[10, 12], probability(m)[10, 7])   # high, low
+tests: |
+  import numpy as np
+  _m = np.zeros((20, 20))
+  update_ray(_m, (10, 2), (10, 12), hit=True)
+  assert _m[10, 12] > 0, "hit endpoint must gain occupied evidence"
+  assert _m[10, 7] < 0, "cells along the beam must gain free evidence"
+  assert _m[10, 2] < 0, "the sensor's own cell is on the beam: free"
+  assert abs(probability(np.zeros((1,1)))[0,0] - 0.5) < 1e-9, "log-odds 0 must map to p = 0.5"
+  _m2 = np.zeros((20, 20))
+  update_ray(_m2, (10, 2), (10, 12), hit=False)
+  assert _m2[10, 12] < 0, "a max-range MISS makes the end cell free too — no phantom obstacle"
+  _m3 = np.zeros((20, 20))
+  for _ in range(200):
+      update_ray(_m3, (10, 2), (10, 12), hit=True)
+  assert _m3[10, 12] <= 6.0 + 1e-9, "log-odds must clamp at +/-L_CLAMP"
+  for _ in range(40):
+      update_ray(_m3, (10, 2), (10, 18), hit=True)   # sustained free evidence through (10,12)
+  assert _m3[10, 12] < 0, "the clamp exists so sustained contrary evidence can RECLAIM a cell (map healing) — got %.2f" % _m3[10, 12]
+  _m4 = np.zeros((5, 5))
+  update_ray(_m4, (2, 2), (2, 30), hit=True)   # beam exits the grid
+  assert np.isfinite(_m4).all(), "out-of-grid cells must be skipped, not crash"
+hints:
+  - "cells = bresenham(*c0, *c1); for each cell but the last add L_FREE (if in bounds); last cell gets L_OCC if hit else L_FREE; then np.clip the grid in place."
+  - "Healing math: a cell clamped at +6.0 needs 6.0/0.4 = 15 free passes to reach 0 — without the clamp, 200 hits would need 425 passes."
+solution: |
+  import numpy as np
+
+  def update_ray(log_odds, c0, c1, hit):
+      rows, cols = log_odds.shape
+      cells = bresenham(c0[0], c0[1], c1[0], c1[1])
+      for (y, x) in cells[:-1]:
+          if 0 <= y < rows and 0 <= x < cols:
+              log_odds[y, x] += L_FREE
+      y, x = cells[-1]
+      if 0 <= y < rows and 0 <= x < cols:
+          log_odds[y, x] += L_OCC if hit else L_FREE
+      np.clip(log_odds, -L_CLAMP, L_CLAMP, out=log_odds)
+
+  def probability(log_odds):
+      return 1.0 - 1.0 / (1.0 + np.exp(log_odds))
+
+  m = np.zeros((20, 20))
+  update_ray(m, (10, 2), (10, 12), hit=True)
+  print(probability(m)[10, 12], probability(m)[10, 7])

@@ -1,0 +1,59 @@
+id: estimation-l4-sensors
+title: "Quiz — sensor models"
+lesson: modules/03-estimation/04-sensor-models
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "A gyro bias of 0.01 rad/s is left uncorrected for 60 s. Heading error in radians?"
+    answer: 0.6
+    tolerance: 0.005
+    explanation: "b·t = 0.6 rad ≈ 34° — from a bias invisible in any short log. This is why serious filters estimate bias as a state."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "The organizing question about any sensor's error is…"
+    options:
+      - text: "How does the error behave over TIME — bounded vs accumulating, biased vs white"
+        correct: true
+        explanation: "Relative sensors drift without bound; absolute sensors are noisy but bounded. Complementary structures are why fusion works."
+      - text: "How many decimal places the datasheet quotes"
+        explanation: "A meter-accurate bounded sensor can beat a millimeter-accurate drifting one after a minute."
+      - text: "How expensive the sensor is"
+        explanation: "Price correlates loosely at best; error structure is what the filter actually consumes."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "An accelerometer on a robot tilted 1° from level, otherwise stationary, reports…"
+    options:
+      - text: "~0.17 m/s² of phantom horizontal acceleration — gravity leaking through the orientation error"
+        correct: true
+        explanation: "It measures specific force including gravity; g·sin(1°) ≈ 0.17 m/s². Double-integrate that and you're meters away within a minute — why attitude and position estimation are coupled."
+      - text: "Exactly zero, since it isn't moving"
+        explanation: "A stationary accelerometer reads +g upward; any tilt error redistributes it into 'horizontal' axes."
+      - text: "Noise only"
+        explanation: "The gravity leak is systematic, not noise — averaging won't remove it."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "GPS multipath in an urban canyon should be modeled/handled as…"
+    options:
+      - text: "A mode switch — confidently wrong by tens of meters — handled by innovation gating, not by inflating R"
+        correct: true
+        explanation: "Inflating R to cover multipath makes GPS useless everywhere; gating rejects the lies while keeping honest fixes sharp."
+      - text: "Slightly fatter Gaussian noise"
+        explanation: "A 30 m structured error is not a tail of the 2 m Gaussian — treating it as one poisons the filter."
+      - text: "A reason to discard GPS entirely"
+        explanation: "Bounded absolute information is precious; defend against its failure modes instead."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Wheel odometry during wheel slip is best detected by…"
+    options:
+      - text: "Disagreement with other sensors in the fusion layer — odometry itself cannot know its wheels are lying"
+        correct: true
+        explanation: "The encoder faithfully reports wheel rotation; only cross-sensor innovation (IMU says no acceleration, lidar says no motion) exposes the fiction."
+      - text: "A larger σ in the odometry model"
+        explanation: "Slip isn't larger noise — it's a different regime; σ∝distance assumes rolling contact."
+      - text: "Filtering the encoder signal harder"
+        explanation: "The signal is clean; the *interpretation* (rotation = motion) is what broke."

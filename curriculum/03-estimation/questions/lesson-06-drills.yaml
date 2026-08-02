@@ -1,0 +1,64 @@
+id: estimation-l6-drills
+title: "Diagnosis drills — read the statistics, name the lie"
+lesson: modules/03-estimation/06-consistency-lab
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Log:** RMSE excellent; NEES averages 9 on a 3-state filter. Diagnosis and danger?"
+    options:
+      - text: "Overconfident (P ~3× too small): accurate today, but gating, fusion, and planners consuming P are all being lied to"
+        correct: true
+        explanation: "NEES ≈ dim for honesty; 3× over means covariance understates error 3-fold. The failure is deferred, not absent."
+      - text: "Healthy — RMSE is what matters"
+        explanation: "Module 3's central lesson, one last time: accuracy and honesty are different properties."
+      - text: "Pessimistic tuning"
+        explanation: "Pessimism drives NEES BELOW the band."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Log:** NIS in band, zero-mean — but strongly autocorrelated (long runs of same-sign innovations). Diagnosis?"
+    options:
+      - text: "Unmodeled dynamics: the filter is systematically late to something the process model doesn't capture"
+        correct: true
+        explanation: "White innovations are the fingerprint of a complete model; correlation means predictable structure is leaking into the 'surprise' channel."
+      - text: "Sensor bias"
+        explanation: "Bias shifts the innovation MEAN; this log's mean is zero."
+      - text: "Perfect health"
+        explanation: "Magnitude is right but color is wrong — a subtler failure than the bands catch."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Log:** NIS healthy in the lab; on the robot it's healthy except 2-second bursts of NIS ≈ 30 whenever the elevator door opens. Diagnosis?"
+    options:
+      - text: "Environmental sensor failure mode (metal door disturbing a sensor) — a gating/health-monitoring problem, not a tuning problem"
+        correct: true
+        explanation: "Burst pathologies correlated with the environment are regime switches; the fix is detection and rejection, not fatter R everywhere."
+      - text: "Q too small"
+        explanation: "Q errors are persistent, not door-synchronized."
+      - text: "The χ² threshold is wrong"
+        explanation: "The threshold is doing its job — flagging a real disturbance."
+  - id: d4
+    type: single
+    difficulty: stretch
+    prompt: "**Log:** NEES drifts from ~3 at mission start to ~15 after an hour, RMSE still fine. Most likely cause?"
+    options:
+      - text: "An unmodeled slowly-growing error — e.g. uncompensated IMU bias drift — outrunning a covariance that never widens for it"
+        correct: true
+        explanation: "Growing inconsistency with stable RMSE points at a slow systematic term the model lacks: estimate the bias as a state (lesson 3.4) or add process noise for it."
+      - text: "Random chance — NEES is noisy"
+        explanation: "Noisy per-step, yes; a monotonic hour-long trend is structure."
+      - text: "The sensor got noisier"
+        explanation: "That would inflate NIS visibly too, and RMSE with it."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "You have logs from the ROBOT (no ground truth). Which instrument can you actually compute?"
+    options:
+      - text: "NIS — it needs only innovations and S; NEES requires ground truth and lives in simulation"
+        correct: true
+        explanation: "Which is why NIS is the production dashboard and why simulators earn their keep: they're where NEES-grade auditing is possible at all."
+      - text: "NEES — it's the more fundamental statistic"
+        explanation: "More direct, yes — and unavailable without truth. Hence the sim-first workflow."
+      - text: "Neither without special hardware"
+        explanation: "NIS comes free with every update the filter already performs."

@@ -1,0 +1,76 @@
+id: map-l2-kabsch
+title: "Kabsch: the closed-form alignment"
+lesson: modules/04-mapping/02-scan-matching
+description: >-
+  Given already-corresponded point pairs, find the rigid transform that
+  best overlays them — the SVD-based Procrustes solution that is ICP's
+  inner solve. Includes the det-fix that rejects reflections (lesson 1.6's
+  mirror bug, preempted at the source).
+setup_code: |
+  import numpy as np
+
+  def rot2(t):
+      c, s = np.cos(t), np.sin(t)
+      return np.array([[c, -s], [s, c]])
+starter_code: |
+  import numpy as np
+  # Provided: rot2(theta)
+
+  def kabsch(A, B):
+      """Best-fit R, t such that R @ B_i + t ~= A_i (both (N,2) arrays).
+
+      Steps: center both sets; H = B_centered.T @ A_centered;
+      U, S, Vt = svd(H); R = Vt.T @ U.T; if det(R) < 0, flip the sign of
+      Vt's last row and recompute (reflection guard); t = mean(A) - R @ mean(B).
+      """
+      # TODO
+      return np.eye(2), np.zeros(2)
+
+  rng = np.random.default_rng(3)
+  A = rng.uniform(0, 10, (40, 2))
+  R_true, t_true = rot2(0.7), np.array([2.0, -1.0])
+  B = (A - t_true) @ R_true          # i.e. A = R_true.T is not it -- see tests
+  B = (R_true.T @ (A - t_true).T).T  # B such that R_true @ B + t_true == A
+  R, t = kabsch(A, B)
+  print(np.round(R, 3), np.round(t, 3))
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(11)
+  for _trial in range(10):
+      _A = _rng.uniform(-5, 5, (30, 2))
+      _th = _rng.uniform(-np.pi, np.pi)
+      _t = _rng.uniform(-3, 3, 2)
+      _Rt = rot2(_th)
+      _B = (_Rt.T @ (_A - _t).T).T
+      _R, _tv = kabsch(_A, _B)
+      assert np.allclose(_R @ _B.T + _tv[:, None], _A.T, atol=1e-8), "recovered transform must map B onto A exactly (noise-free case)"
+      assert abs(np.linalg.det(_R) - 1.0) < 1e-9, "R must be a proper rotation (det +1), not a reflection"
+  _A = np.array([[1.0, 0.0], [-1.0, 0.0], [0.0, 2.0]])
+  _B = _A * [1, -1]   # a MIRRORED copy
+  _R, _tv = kabsch(_A, _B)
+  assert abs(np.linalg.det(_R) - 1.0) < 1e-9, "even for mirrored inputs the det-fix must return a rotation, never a reflection"
+hints:
+  - "Center: Ac = A - A.mean(0); Bc = B - B.mean(0). H = Bc.T @ Ac. U, S, Vt = np.linalg.svd(H)."
+  - "R = Vt.T @ U.T; if np.linalg.det(R) < 0: Vt[-1] *= -1; R = Vt.T @ U.T. Then t = A.mean(0) - R @ B.mean(0)."
+solution: |
+  import numpy as np
+
+  def kabsch(A, B):
+      A, B = np.asarray(A, float), np.asarray(B, float)
+      ca, cb = A.mean(0), B.mean(0)
+      H = (B - cb).T @ (A - ca)
+      U, S, Vt = np.linalg.svd(H)
+      R = Vt.T @ U.T
+      if np.linalg.det(R) < 0:
+          Vt = Vt.copy()
+          Vt[-1] *= -1
+          R = Vt.T @ U.T
+      t = ca - R @ cb
+      return R, t
+
+  rng = np.random.default_rng(3)
+  A = rng.uniform(0, 10, (40, 2))
+  R_true, t_true = rot2(0.7), np.array([2.0, -1.0])
+  B = (R_true.T @ (A - t_true).T).T
+  R, t = kabsch(A, B)
+  print(np.round(R, 3), np.round(t, 3))

@@ -1,0 +1,98 @@
+id: plan-l3-rrt
+title: "Grow an RRT"
+lesson: modules/05-planning/03-rrt
+description: >-
+  Implement the RRT loop — sample, nearest, steer, collision-check, connect
+  — in a 20×20 m world with circular obstacles, plus goal bias. The tests
+  check the path end-to-end, verify every segment is genuinely
+  collision-free at fine resolution, and run multiple seeds (RRT's output
+  is a random variable; one lucky run proves nothing).
+setup_code: |
+  import numpy as np
+
+  OBSTACLES = [(10.0, 4.0, 2.0), (10.0, 10.0, 2.2), (10.0, 16.5, 2.0), (5.0, 8.0, 1.5)]
+  START, GOAL = np.array([2.0, 2.0]), np.array([18.0, 18.0])
+
+  def in_collision(p):
+      return any(np.hypot(p[0]-cx, p[1]-cy) < r for cx, cy, r in OBSTACLES)
+
+  def segment_free(a, b, step=0.05):
+      a, b = np.asarray(a, float), np.asarray(b, float)
+      n = max(2, int(np.hypot(*(b - a)) / step) + 1)
+      for t in np.linspace(0.0, 1.0, n):
+          if in_collision(a + t * (b - a)):
+              return False
+      return True
+starter_code: |
+  import numpy as np
+  # Provided: OBSTACLES, START, GOAL, in_collision(p), segment_free(a, b)
+
+  STEP, GOAL_BIAS, MAX_ITERS, GOAL_TOL = 1.0, 0.08, 4000, 1.0
+
+  def rrt(rng):
+      """Grow a tree from START; return the path (list of points) to GOAL
+      or None. Nodes: list of points; parents: list of indices."""
+      nodes, parents = [START.copy()], [-1]
+      for _ in range(MAX_ITERS):
+          # TODO:
+          # 1. sample = GOAL with prob GOAL_BIAS else rng.uniform(0, 20, 2)
+          # 2. nearest node index i (euclidean)
+          # 3. steer: new = nodes[i] + STEP * unit(sample - nodes[i])
+          #    (or sample itself if closer than STEP)
+          # 4. if segment_free(nodes[i], new): append node with parent i
+          # 5. if new is within GOAL_TOL of GOAL and the final hop is free:
+          #    append GOAL, walk parents back, return the reversed path
+          pass
+      return None
+
+  path = rrt(np.random.default_rng(0))
+  print("path nodes:", None if path is None else len(path))
+tests: |
+  import numpy as np
+  _found = 0
+  for _seed in range(5):
+      _p = rrt(np.random.default_rng(_seed))
+      if _p is None:
+          continue
+      _found += 1
+      assert np.allclose(_p[0], START), "path must begin at START"
+      assert np.hypot(*(np.asarray(_p[-1]) - GOAL)) < 1e-6, "path must end exactly at GOAL"
+      for _a, _b in zip(_p, _p[1:]):
+          assert segment_free(_a, _b), "every path segment must be collision-free at fine resolution"
+          assert np.hypot(*(np.asarray(_b) - np.asarray(_a))) < STEP + GOAL_TOL + 1e-6, "segments must respect the steer step size"
+  assert _found >= 4, "RRT should solve this scene on at least 4 of 5 seeds (got %d) - check goal bias and the steer step" % _found
+hints:
+  - "Nearest: `i = int(np.argmin([np.hypot(*(sample - n)) for n in nodes]))`."
+  - "Steer: `d = sample - nodes[i]; L = np.hypot(*d); new = sample if L <= STEP else nodes[i] + STEP * d / L`."
+  - "Path recovery: from the last-added index, follow `parents[]` to -1, collecting nodes; reverse."
+solution: |
+  import numpy as np
+
+  STEP, GOAL_BIAS, MAX_ITERS, GOAL_TOL = 1.0, 0.08, 4000, 1.0
+
+  def rrt(rng):
+      nodes, parents = [START.copy()], [-1]
+      for _ in range(MAX_ITERS):
+          sample = GOAL.copy() if rng.random() < GOAL_BIAS else rng.uniform(0.0, 20.0, 2)
+          i = int(np.argmin([np.hypot(*(sample - n)) for n in nodes]))
+          d = sample - nodes[i]
+          L = float(np.hypot(*d))
+          if L < 1e-9:
+              continue
+          new = sample if L <= STEP else nodes[i] + STEP * d / L
+          if not segment_free(nodes[i], new):
+              continue
+          nodes.append(new)
+          parents.append(i)
+          if np.hypot(*(new - GOAL)) < GOAL_TOL and segment_free(new, GOAL):
+              nodes.append(GOAL.copy())
+              parents.append(len(nodes) - 2)
+              path, j = [], len(nodes) - 1
+              while j != -1:
+                  path.append(nodes[j])
+                  j = parents[j]
+              return path[::-1]
+      return None
+
+  path = rrt(np.random.default_rng(0))
+  print("path nodes:", None if path is None else len(path))

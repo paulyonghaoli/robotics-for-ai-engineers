@@ -1,0 +1,59 @@
+id: estimation-l3-ekf
+title: "Quiz — the extended Kalman filter"
+lesson: modules/03-estimation/03-ekf
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "The EKF handles nonlinear models by…"
+    options:
+      - text: "Using the true nonlinear f and h for the state, and their Jacobians (re-evaluated each step) for the covariance"
+        correct: true
+        explanation: "State propagation stays exact; only the uncertainty bookkeeping rides the tangent plane."
+      - text: "Fitting a neural network to the dynamics"
+        explanation: "That's a different decade's solution — the EKF is a first-order Taylor expansion."
+      - text: "Discretizing the state space into a grid"
+        explanation: "Grid filters exist (histogram filters) but scale terribly; the EKF stays parametric."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Robot at (0,0,0), landmark at (4,3): the range row of H is [−dx/r, −dy/r, 0]. What is its first entry?"
+    answer: -0.8
+    tolerance: 0.005
+    explanation: "r = 5, so −4/5 = −0.8: minus the unit vector toward the landmark — moving toward it shrinks the range."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why does the EKF diverge when initialized far from the truth, while the linear KF cannot diverge this way?"
+    options:
+      - text: "Its Jacobians are evaluated at the (wrong) estimate — a bad linearization point can steer corrections in the wrong direction, compounding"
+        correct: true
+        explanation: "The same pathology as Newton's method from a bad start. The linear KF's F and H don't depend on the estimate, so there's no wrong place to linearize."
+      - text: "The EKF's covariance grows without bound"
+        explanation: "Usually the opposite — it stays confidently small around a wrong state, which is what makes divergence sticky."
+      - text: "Floating-point error accumulates faster in nonlinear models"
+        explanation: "Numerics aren't the issue; geometry of the linearization is."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A bearing residual computed without wrapping, when the true residual is −0.02 rad near the ±π seam, produces…"
+    options:
+      - text: "A ~2π-sized 'correction' that yanks the state violently — the classic EKF killer"
+        correct: true
+        explanation: "z − h(x) = 6.26 instead of −0.02. One such update can un-converge a healthy filter; the residual_fn hook exists for exactly this."
+      - text: "No effect, since the Kalman gain rescales residuals"
+        explanation: "The gain scales but does not repair a residual that is wrong by 314 sigma."
+      - text: "A slightly slower convergence"
+        explanation: "It's not gentle degradation — it's a discrete wrong-way kick."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "For 15-state IMU fusion at 200 Hz on embedded hardware, the standard choice is the EKF (not UKF or PF) because…"
+    options:
+      - text: "Its cost per step is lowest and the belief stays unimodal and tight, which is exactly where linearization is safe"
+        correct: true
+        explanation: "PF needs particle counts exponential in dimension; UKF costs ~2n+1 model evaluations. The EKF's weakness (wide beliefs) doesn't apply to a continuously-corrected IMU stack."
+      - text: "The EKF is the most accurate estimator in all conditions"
+        explanation: "It's the *cheapest adequate* one here — with a wide multimodal belief the PF wins on correctness."
+      - text: "UKF and PF cannot handle IMU data"
+        explanation: "Both can — they're just paying more for robustness this problem doesn't need."

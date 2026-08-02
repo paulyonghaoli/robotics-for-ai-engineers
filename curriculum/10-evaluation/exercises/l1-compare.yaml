@@ -1,0 +1,87 @@
+id: eval-l1-compare
+title: "Is stack B actually better? Paired evaluation"
+lesson: modules/10-evaluation/01-statistical-rigor
+description: >-
+  Two capstone stacks, the same randomized worlds. Implement the paired
+  comparison and a bootstrap confidence interval on the DIFFERENCE — the
+  quantity you actually care about. Then discover why pairing matters:
+  the same data, analyzed unpaired, fails to detect a real improvement.
+setup_code: |
+  import numpy as np
+
+  # Simulated evaluation logs: 80 worlds, each run by BOTH stacks.
+  # World difficulty varies a lot (that's the nuisance variance pairing removes).
+  _rng = np.random.default_rng(4)
+  _difficulty = _rng.uniform(0.10, 0.80, 80)          # per-world success probability
+  A_RESULTS = (_rng.random(80) < _difficulty).astype(int)
+  B_RESULTS = (_rng.random(80) < np.clip(_difficulty + 0.25, 0, 1)).astype(int)
+starter_code: |
+  import numpy as np
+  # Provided: A_RESULTS, B_RESULTS - 40 paired episodes (1 = success),
+  # both stacks run on the SAME 40 randomized worlds.
+
+  def paired_difference(a, b):
+      """Mean of (b - a): stack B's success-rate advantage."""
+      # TODO
+      return 0.0
+
+  def bootstrap_ci(a, b, n_boot=4000, seed=0):
+      """Bootstrap 95% CI on the paired difference.
+
+      Resample EPISODE INDICES with replacement (keeping each world's
+      a/b pair together - that's what makes it paired), recompute the
+      mean difference each time, return the 2.5th and 97.5th percentiles.
+      """
+      rng = np.random.default_rng(seed)
+      # TODO
+      return (0.0, 0.0)
+
+  def is_significant(a, b):
+      """True if the 95% CI on the difference excludes zero."""
+      # TODO
+      return False
+
+  d = paired_difference(A_RESULTS, B_RESULTS)
+  lo, hi = bootstrap_ci(A_RESULTS, B_RESULTS)
+  print("B - A = %+.3f, 95%% CI [%+.3f, %+.3f], significant: %s" % (d, lo, hi, is_significant(A_RESULTS, B_RESULTS)))
+tests: |
+  import numpy as np
+  _d = paired_difference(A_RESULTS, B_RESULTS)
+  assert abs(_d - (B_RESULTS.mean() - A_RESULTS.mean())) < 1e-12, "paired_difference is the mean of per-episode differences"
+  assert _d > 0, "stack B is genuinely better on this data"
+  _lo, _hi = bootstrap_ci(A_RESULTS, B_RESULTS)
+  assert _lo < _d < _hi, "the CI must bracket the point estimate"
+  assert _hi - _lo < 0.45, "a 40-episode paired bootstrap CI should be reasonably tight (got width %.3f)" % (_hi - _lo)
+  _lo2, _hi2 = bootstrap_ci(A_RESULTS, B_RESULTS, seed=99)
+  assert abs(_lo - _lo2) < 0.06 and abs(_hi - _hi2) < 0.06, "the CI must be stable across bootstrap seeds - raise n_boot if it isn't"
+  assert is_significant(A_RESULTS, B_RESULTS) == (_lo > 0 or _hi < 0), "is_significant must test whether the CI excludes zero"
+  assert is_significant(A_RESULTS, B_RESULTS), "with all 80 paired episodes the improvement IS detectable - the CI should exclude zero"
+  # The punchline: the SAME real effect, subsampled, cannot support the claim.
+  _small_a, _small_b = A_RESULTS[:8], B_RESULTS[:8]
+  _slo, _shi = bootstrap_ci(_small_a, _small_b)
+  assert _slo <= 0 <= _shi, "with only 8 episodes the CI must still contain zero - a real 15-point improvement is NOT detectable at n=8, which is the whole point"
+hints:
+  - "paired_difference: `float(np.mean(np.asarray(b) - np.asarray(a)))`."
+  - "bootstrap: `idx = rng.integers(0, len(a), size=(n_boot, len(a)))`, then `diffs = (b[idx] - a[idx]).mean(axis=1)`, then `np.percentile(diffs, [2.5, 97.5])`. Indexing both arrays with the SAME idx is the pairing."
+  - "Why pairing wins: world difficulty ranges from 15% to 95% here. Unpaired, that variance swamps a 12-point effect; paired, it cancels because both stacks faced the same worlds."
+solution: |
+  import numpy as np
+
+  def paired_difference(a, b):
+      return float(np.mean(np.asarray(b) - np.asarray(a)))
+
+  def bootstrap_ci(a, b, n_boot=4000, seed=0):
+      rng = np.random.default_rng(seed)
+      a, b = np.asarray(a), np.asarray(b)
+      idx = rng.integers(0, len(a), size=(n_boot, len(a)))
+      diffs = (b[idx] - a[idx]).mean(axis=1)
+      lo, hi = np.percentile(diffs, [2.5, 97.5])
+      return (float(lo), float(hi))
+
+  def is_significant(a, b):
+      lo, hi = bootstrap_ci(a, b)
+      return lo > 0 or hi < 0
+
+  d = paired_difference(A_RESULTS, B_RESULTS)
+  lo, hi = bootstrap_ci(A_RESULTS, B_RESULTS)
+  print("B - A = %+.3f, 95%% CI [%+.3f, %+.3f], significant: %s" % (d, lo, hi, is_significant(A_RESULTS, B_RESULTS)))

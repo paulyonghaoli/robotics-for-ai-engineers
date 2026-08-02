@@ -1,0 +1,71 @@
+id: estimation-l2-pf
+title: "Quiz — particle filters"
+lesson: modules/03-estimation/02-particle-filter
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "The particle filter's key capability over the Kalman family is…"
+    options:
+      - text: "Representing arbitrary (including multimodal) beliefs — 'corridor A or corridor B' as two live clusters"
+        correct: true
+        explanation: "A Gaussian forced onto that belief reports its mean: the wall between the corridors, confidently."
+      - text: "Lower computational cost"
+        explanation: "Thousands of particles cost far more than one covariance update — you pay for the flexibility."
+      - text: "Provable optimality"
+        explanation: "The KF owns the optimality theorem (in linear-Gaussian worlds); the PF trades proofs for generality."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Weights (0.7, 0.1, 0.1, 0.1): compute N_eff = 1/Σw²."
+    answer: 1.923
+    tolerance: 0.01
+    explanation: "1/(0.49+0.01+0.01+0.01) = 1/0.52 ≈ 1.92 — below N/2 = 2, so the resampling rule fires."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why resample only when N_eff drops below ~N/2, instead of every step?"
+    options:
+      - text: "Resampling clones and kills particles — done too often it destroys diversity (sample impoverishment)"
+        correct: true
+        explanation: "Every resample is a bottleneck event: survivors' descendants dominate. Resample only when weights have genuinely concentrated."
+      - text: "Resampling is too slow to run every step"
+        explanation: "Systematic resampling is O(N) — speed isn't the concern, genetics is."
+      - text: "N_eff cannot be computed every step"
+        explanation: "It's one line per step; the rule is about filter health, not computability."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "After upgrading to a very high-precision sensor, the particle filter diverges MORE often. Why?"
+    options:
+      - text: "A sharp likelihood zeroes every particle not almost exactly right — weight degeneracy from an overconfident sensor model"
+        correct: true
+        explanation: "With finite particles, a needle-thin likelihood usually lands between them. Soften the model (inflate its sigma) or raise N — precision must be matched by particle density."
+      - text: "Better sensors always destabilize filters"
+        explanation: "Better sensors help — *if* the likelihood model and particle density account for the sharpness."
+      - text: "The motion model became invalid"
+        explanation: "Nothing about the motion model changed — the weighting step is where the new failure lives."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why can't vanilla SIR recover from kidnapping (converged in the wrong place, robot teleported), and what's the fix?"
+    options:
+      - text: "No particles exist at the true location, so no evidence can upweight them; inject a small fraction of random particles each step"
+        correct: true
+        explanation: "The swarm can only reshape probability where samples live — the exploration/exploitation lesson, embodied. AMCL's recovery_alpha machinery is exactly this."
+      - text: "The motion model can't represent teleportation"
+        explanation: "True but fixable only through the injection mechanism — the deeper issue is support, not motion."
+      - text: "Resampling too slowly"
+        explanation: "Resample as often as you like: you'll be cloning wrong particles faster."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Particle filters dominate 2D localization but not 15-state IMU fusion because…"
+    options:
+      - text: "Required particle count grows exponentially with state dimension; Kalman variants scale polynomially"
+        correct: true
+        explanation: "The curse of dimensionality, drawing the practical boundary: PF for low-dim multimodal problems, EKF/UKF for high-dim unimodal ones."
+      - text: "IMUs are incompatible with sampling"
+        explanation: "Nothing special about IMUs — dimension is the constraint."
+      - text: "Particle filters can't run at 200 Hz"
+        explanation: "Small swarms can; the real cost is the N needed to fill 15 dimensions."

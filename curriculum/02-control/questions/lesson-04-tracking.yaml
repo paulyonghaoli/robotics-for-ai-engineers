@@ -1,0 +1,60 @@
+id: control-l4-tracking
+title: "Quiz — trajectory tracking"
+lesson: modules/02-control/04-trajectory-tracking
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "Pure pursuit: goal point in the body frame at (1.8, 0.6), speed 1 m/s. Compute ω = v · 2·y_b / L² (rad/s)."
+    answer: 0.3333
+    tolerance: 0.005
+    hint: "L² = x_b² + y_b² = 3.6."
+    explanation: "κ = 1.2/3.6 = 1/3; ω = 1/3 rad/s — an arc of radius 3 m through robot and goal."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "The lookahead distance trades…"
+    options:
+      - text: "Tight tracking (short L, oscillation-prone) against smoothness (long L, corner-cutting)"
+        correct: true
+        explanation: "The controller's one real knob — same shape as a learning rate. Production followers scale L with speed."
+      - text: "Speed against battery life"
+        explanation: "Lookahead is a geometry parameter; it doesn't touch the power budget."
+      - text: "Accuracy against memory usage"
+        explanation: "Memory is unaffected — the trade is dynamic behavior, not resources."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why does the pure-pursuit law use only the goal's *lateral* body coordinate y_b?"
+    options:
+      - text: "The arc through robot and goal is determined by lateral offset; a dead-ahead goal (y_b = 0) needs zero curvature"
+        correct: true
+        explanation: "The longitudinal component only sets how far along the arc the goal sits — the steering geometry cancels it out of the curvature."
+      - text: "The longitudinal coordinate is too noisy to use"
+        explanation: "It's equally accurate — it simply drops out of the circle geometry."
+      - text: "It's an approximation valid only at low speed"
+        explanation: "The κ = 2y_b/L² law is exact circle geometry at any speed (dynamics, not the law, limit speed)."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A robot tracking a figure-eight briefly steers toward the wrong lobe right after the crossing. The likely bug is…"
+    options:
+      - text: "Nearest-vertex search jumped to the other branch at the self-intersection — path progress must be tracked monotonically"
+        correct: true
+        explanation: "At the crossing, both branches are equally near; a memoryless nearest-point search can alias. Production followers carry a path index forward."
+      - text: "The lookahead is too short"
+        explanation: "Short lookahead oscillates around the correct branch; it doesn't switch branches."
+      - text: "Integral windup"
+        explanation: "Pure pursuit has no integrator — nothing to wind up."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "With speed-scaled lookahead L = k·v, what stays constant as speed varies?"
+    options:
+      - text: "The time-to-lookahead (L/v = k seconds) — the controller always reacts the same 'preview time' ahead"
+        correct: true
+        explanation: "Constant preview time keeps the closed-loop dynamics similar across speeds — fixed L is twitchy when fast and sluggish when slow."
+      - text: "The commanded curvature"
+        explanation: "Curvature varies with the path; it's the preview horizon that normalizes."
+      - text: "The cross-track error"
+        explanation: "Error still depends on path curvature and disturbances — the scaling stabilizes dynamics, it doesn't fix error."

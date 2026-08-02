@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev,docs]"
+      - name: Library tests
+        run: pytest
+      - name: Lint
+        run: ruff check .
+      - name: Interactive content integrity
+        run: python tools/validate_content.py
+      - name: Grader self-check (frame transforms)
+        run: python -m grader --reference --seed 1
+        working-directory: projects/frame_transforms_mini
+      - name: Grader self-check (localization)
+        run: python -m grader --reference --seed 1
+        working-directory: projects/localization
+      - name: Capstone harness self-check (reference stack passes rubric)
+        run: python -m eval run --episodes 4 --seed 7
+        working-directory: projects/capstone_nav
+      - name: Capstone v3 self-check (dynamic obstacles)
+        run: python -m eval run --episodes 3 --seed 1000 --stack dynamic_stack --dynamic 6
+        working-directory: projects/capstone_nav
+      - name: Site build
+        run: mkdocs build --strict

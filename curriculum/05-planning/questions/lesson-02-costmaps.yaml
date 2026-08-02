@@ -1,0 +1,47 @@
+id: planning-l2-costmaps
+title: "Quiz — costmaps"
+lesson: modules/05-planning/02-costmaps
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "Costmap skirt: C_max = 100, α = 2/m, robot radius 0.3 m. Cost at 0.8 m from an obstacle?"
+    answer: 36.79
+    tolerance: 0.1
+    explanation: "100·e^(−2·0.5) = 100/e ≈ 36.8. The skirt is a preference with a dial, not a wall."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "The inscribed band must be encoded as lethal (∞), not merely expensive, because…"
+    options:
+      - text: "Any finite cost can be outbid by a long enough detour — making driving through the robot's own radius mathematically attractive"
+        correct: true
+        explanation: "Hard constraints stay hard; softening them converts a guarantee into a negotiation the optimizer will eventually win against you."
+      - text: "Infinity is faster to compute"
+        explanation: "It's about semantics, not speed."
+      - text: "Planners can't handle large finite numbers"
+        explanation: "They handle them fine — that's exactly the danger."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Costmap layers compose by MAX rather than sum because…"
+    options:
+      - text: "Two layers seeing the same wall shouldn't make it twice as costly — max deduplicates correlated evidence"
+        correct: true
+        explanation: "The correlated-evidence bug (lessons 3.5, 4.1) in planning clothes: sum double-counts, max takes the most cautious single opinion."
+      - text: "Max is numerically more stable"
+        explanation: "Stability isn't the issue; evidence semantics is."
+      - text: "Sum would overflow with many layers"
+        explanation: "Overflow is trivia; double-counting is the design point."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "Costmaps let *policy* (avoid the loading dock at shift change) enter planning by…"
+    options:
+      - text: "Adding a cost layer with no physical obstacle behind it — the planner treats preference and geometry in one currency"
+        correct: true
+        explanation: "Reward shaping for planners: powerful, and with the same caveat — shape too hard and paths reward-hack into strange detours."
+      - text: "Modifying the A* heuristic"
+        explanation: "Heuristics guide search efficiency; costs define what 'best' means. Policy belongs in the cost."
+      - text: "Post-processing paths to avoid the region"
+        explanation: "Post-hoc edits fight the optimizer instead of informing it — the path quality shows it."

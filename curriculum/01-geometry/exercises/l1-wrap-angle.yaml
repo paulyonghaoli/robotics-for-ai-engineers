@@ -1,0 +1,41 @@
+id: geo-l1-wrap-angle
+title: "Implement angle wrapping"
+lesson: modules/01-geometry/01-coordinate-frames
+description: >-
+  Implement `wrap_angle(theta)` returning the equivalent angle in the
+  half-open interval **(-π, π]**. Boundary behavior matters: `+π` must stay
+  `+π`, and `-π` must wrap to `+π`. This exact function guards every heading
+  computation in the rest of the curriculum.
+setup_code: |
+  import numpy as np
+starter_code: |
+  import numpy as np
+
+  def wrap_angle(theta):
+      """Wrap a scalar angle (radians) to the interval (-pi, pi]."""
+      # TODO: your implementation
+      return theta
+
+  # Try it out (Run executes this; Submit also runs the hidden checks):
+  print(wrap_angle(3 * np.pi))    # expect pi (3.14159...)
+  print(wrap_angle(-np.pi))       # expect +pi, NOT -pi
+tests: |
+  import numpy as np
+  assert abs(wrap_angle(0.5) - 0.5) < 1e-12, "wrap_angle(0.5) should be unchanged"
+  assert abs(wrap_angle(3 * np.pi) - np.pi) < 1e-9, "wrap_angle(3*pi) should be pi (remove full turns)"
+  assert abs(wrap_angle(2 * np.pi)) < 1e-9, "wrap_angle(2*pi) should be 0"
+  assert abs(wrap_angle(np.pi) - np.pi) < 1e-12, "boundary: wrap_angle(pi) must stay +pi (interval is half-open)"
+  assert abs(wrap_angle(-np.pi) - np.pi) < 1e-9, "boundary: wrap_angle(-pi) must wrap to +pi"
+  assert abs(wrap_angle(-5 * np.pi / 2) + np.pi / 2) < 1e-9, "wrap_angle(-5pi/2) should be -pi/2"
+  _err = wrap_angle((np.pi - 0.05) - (-np.pi + 0.05))
+  assert abs(_err + 0.1) < 1e-9, "heading error across the +/-pi seam should be -0.1, got %r" % _err
+hints:
+  - "`np.mod(x, 2*np.pi)` maps any angle into [0, 2π). From there, shift values above π down by 2π."
+  - "A clean trick for the (-π, π] half-open boundary: negate, wrap to [-π, π), negate back. Or: `np.where(a > np.pi, a - 2*np.pi, a)` after `a = np.mod(theta, 2*np.pi)` — then check the -π case."
+solution: |
+  import numpy as np
+
+  def wrap_angle(theta):
+      # Negate-wrap-negate makes the interval half-open on the correct side:
+      # np.mod puts -theta+pi in [0, 2pi), so the result lands in (-pi, pi].
+      return -(np.mod(-theta + np.pi, 2 * np.pi) - np.pi)

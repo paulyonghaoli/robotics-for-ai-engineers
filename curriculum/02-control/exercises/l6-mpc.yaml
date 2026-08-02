@@ -1,0 +1,89 @@
+id: ctl-l6-mpc
+title: "Sampling MPC on a constrained cart"
+lesson: modules/02-control/06-mpc
+description: >-
+  Implement receding-horizon control by sampling: roll out candidate input
+  sequences through the model, score them, apply the best sequence's FIRST
+  input, repeat. The cart must reach x = 2.0 fast — and a hard wall at
+  x = 2.5 makes late braking fatal. PID slams the wall here; MPC sees it
+  coming.
+setup_code: |
+  import numpy as np
+
+  DT, U_MAX, WALL = 0.1, 1.0, 2.5
+
+  def rollout(x, v, u_seq):
+      """Simulate the double integrator; returns arrays of x and v."""
+      xs, vs = [], []
+      for u in u_seq:
+          v = v + np.clip(u, -U_MAX, U_MAX) * DT
+          x = x + v * DT
+          xs.append(x); vs.append(v)
+      return np.array(xs), np.array(vs)
+
+  def run_closed_loop(controller, steps=120):
+      x, v, hist = 0.0, 0.0, []
+      for _ in range(steps):
+          u = float(np.clip(controller(x, v), -U_MAX, U_MAX))
+          v = v + u * DT
+          x = x + v * DT
+          hist.append((x, v))
+      return np.array(hist)
+starter_code: |
+  import numpy as np
+  # Provided: rollout(x, v, u_seq), run_closed_loop(controller),
+  #           DT = 0.1, U_MAX = 1.0, WALL at x = 2.5. Target: x = 2.0.
+
+  TARGET, HORIZON, N_CANDIDATES = 2.0, 25, 300
+  rng = np.random.default_rng(0)
+
+  def cost(xs, vs):
+      """Score one rollout: tracking error + effort-free comfort + wall."""
+      # TODO:
+      #   tracking: sum of (xs - TARGET)^2
+      #   terminal velocity penalty: 10 * vs[-1]^2  (arrive, don't fly by)
+      #   wall: +1e6 for every sample with xs >= WALL (hard constraint)
+      return 0.0
+
+  def mpc(x, v):
+      """Sample N_CANDIDATES random input sequences, return best first input."""
+      # TODO: u_seqs = rng.uniform(-U_MAX, U_MAX, (N_CANDIDATES, HORIZON));
+      #       evaluate cost of each rollout; return the best sequence's u[0]
+      return 0.0
+
+  hist = run_closed_loop(mpc)
+  print("final x: %.3f  max x: %.3f (wall at %.1f)" % (hist[-1, 0], hist[:, 0].max(), WALL))
+tests: |
+  import numpy as np
+  _h = run_closed_loop(mpc)
+  assert _h[:, 0].max() < WALL, "the wall at x=2.5 is a HARD constraint - max x was %.3f" % _h[:, 0].max()
+  assert abs(_h[-1, 0] - TARGET) < 0.15, "must settle near the target x=2.0 (got %.3f)" % _h[-1, 0]
+  assert abs(_h[-1, 1]) < 0.3, "must arrive nearly stopped (final v %.3f)" % _h[-1, 1]
+  assert _h[30, 0] > 0.5, "should make brisk progress early - MPC is not a parking brake (x at t=3s was %.2f)" % _h[30, 0]
+  _xs, _vs = rollout(2.4, 1.0, np.zeros(5))
+  assert cost(_xs, _vs) >= 1e6, "rollouts that cross the wall must be catastrophically costed"
+hints:
+  - "cost: `np.sum((xs-TARGET)**2) + 10*vs[-1]**2 + 1e6*np.sum(xs >= WALL)`."
+  - "mpc: generate the (N_CANDIDATES, HORIZON) array, loop rollout+cost per candidate, `best = np.argmin(costs)`, return `u_seqs[best, 0]`."
+  - "300 random candidates x 25 steps is plenty here - crude sampling MPC works shockingly well on small problems (and scaled up, it's Nav2's MPPI)."
+solution: |
+  import numpy as np
+
+  TARGET, HORIZON, N_CANDIDATES = 2.0, 25, 300
+  rng = np.random.default_rng(0)
+
+  def cost(xs, vs):
+      c = float(np.sum((xs - TARGET) ** 2) + 10.0 * vs[-1] ** 2)
+      c += 1e6 * float(np.sum(xs >= WALL))
+      return c
+
+  def mpc(x, v):
+      u_seqs = rng.uniform(-U_MAX, U_MAX, (N_CANDIDATES, HORIZON))
+      costs = np.empty(N_CANDIDATES)
+      for i in range(N_CANDIDATES):
+          xs, vs = rollout(x, v, u_seqs[i])
+          costs[i] = cost(xs, vs)
+      return float(u_seqs[np.argmin(costs), 0])
+
+  hist = run_closed_loop(mpc)
+  print("final x: %.3f  max x: %.3f (wall at %.1f)" % (hist[-1, 0], hist[:, 0].max(), WALL))

@@ -1,0 +1,116 @@
+id: est-l3-ekf-localize
+title: "EKF localization with landmarks"
+lesson: modules/03-estimation/03-ekf
+description: >-
+  Assemble the full EKF update for a robot observing landmarks with
+  range-bearing sensors. Predict is provided; you write the update —
+  including the wrapped bearing residual, without which the tests will
+  have words with you.
+setup_code: |
+  import numpy as np
+
+  def wrap(a):
+      return -(np.mod(-a + np.pi, 2 * np.pi) - np.pi)
+
+  DT = 0.1
+  LANDMARKS = np.array([[0.0, 10.0], [10.0, 0.0], [10.0, 10.0]])
+  Q = np.diag([1e-3, 1e-3, 1e-3])
+  R = np.diag([0.1**2, 0.05**2])
+
+  def motion(x, v=1.0, w=0.3):
+      px, py, th = x
+      return np.array([px + v*np.cos(th)*DT, py + v*np.sin(th)*DT, wrap(th + w*DT)])
+
+  def motion_jac(x, v=1.0):
+      th = x[2]
+      return np.array([[1, 0, -v*np.sin(th)*DT], [0, 1, v*np.cos(th)*DT], [0, 0, 1.0]])
+
+  def obs(x, lm):
+      d = lm - x[:2]
+      return np.array([np.hypot(d[0], d[1]), wrap(np.arctan2(d[1], d[0]) - x[2])])
+
+  def obs_jac(x, lm):
+      d = lm - x[:2]
+      q = float(d @ d); r = np.sqrt(q)
+      return np.array([[-d[0]/r, -d[1]/r, 0.0], [d[1]/q, -d[0]/q, -1.0]])
+
+  def simulate(steps=200, seed=3):
+      rng = np.random.default_rng(seed)
+      x = np.array([2.0, 2.0, 0.0])
+      traj, zs = [], []
+      for _ in range(steps):
+          x = motion(x) + rng.normal(0, [0.01, 0.01, 0.005])
+          x[2] = wrap(x[2])
+          traj.append(x.copy())
+          step_z = []
+          for i, lm in enumerate(LANDMARKS):
+              z = obs(x, lm) + rng.normal(0, [0.1, 0.05])
+              z[1] = wrap(z[1])
+              step_z.append((i, z))
+          zs.append(step_z)
+      return np.array(traj), zs
+starter_code: |
+  import numpy as np
+  # Provided: motion, motion_jac, obs, obs_jac, wrap, LANDMARKS, Q, R,
+  #           simulate() -> (true_traj, per-step [(landmark_id, z), ...])
+
+  def ekf_predict(x, P):
+      x2 = motion(x)
+      F = motion_jac(x)
+      return x2, F @ P @ F.T + Q
+
+  def ekf_update(x, P, z, lm):
+      """One landmark update. Remember: wrap the bearing residual."""
+      # TODO: y = z - obs(x, lm)  (wrap y[1]!); H = obs_jac(x, lm);
+      #       S, K, then x + K@y and (I - K@H) @ P
+      return x, P
+
+  traj, zs = simulate()
+  x, P = np.array([2.5, 1.5, 0.1]), np.eye(3)
+  errs = []
+  for k in range(len(traj)):
+      x, P = ekf_predict(x, P)
+      for lm_id, z in zs[k]:
+          x, P = ekf_update(x, P, z, LANDMARKS[lm_id])
+      x[2] = wrap(x[2])
+      errs.append(np.hypot(*(x[:2] - traj[k, :2])))
+  print("mean error after burn-in:", np.mean(errs[50:]))
+tests: |
+  import numpy as np
+  assert np.mean(errs[50:]) < 0.08, "EKF should track within ~5-8 cm here (got %.3f) — is the bearing residual wrapped?" % np.mean(errs[50:])
+  assert np.allclose(P, P.T, atol=1e-9), "covariance must stay symmetric"
+  assert np.all(np.linalg.eigvalsh(P) > 0), "covariance must stay positive-definite"
+  _x, _P = ekf_update(np.array([5.0, 5.0, np.pi - 0.01]), np.eye(3) * 0.1,
+                      np.array([5.0, wrap(np.pi - (np.pi - 0.01))]), np.array([0.0, 5.0]))
+  assert np.hypot(*( _x[:2] - [5.0, 5.0])) < 1.0, "an observation consistent with the state must not yank it — near +/-pi this fails if the residual isn't wrapped (moved %.2f m)" % np.hypot(*(_x[:2] - [5.0, 5.0]))
+hints:
+  - "y = z − obs(x, lm); y[1] = wrap(y[1]) — that single line is worth 40% of real-world EKF debugging time."
+  - "S = H @ P @ H.T + R; K = P @ H.T @ np.linalg.inv(S); x = x + K @ y; P = (np.eye(3) − K @ H) @ P."
+solution: |
+  import numpy as np
+
+  def ekf_predict(x, P):
+      x2 = motion(x)
+      F = motion_jac(x)
+      return x2, F @ P @ F.T + Q
+
+  def ekf_update(x, P, z, lm):
+      y = z - obs(x, lm)
+      y[1] = wrap(y[1])
+      H = obs_jac(x, lm)
+      S = H @ P @ H.T + R
+      K = P @ H.T @ np.linalg.inv(S)
+      x = x + K @ y
+      P = (np.eye(3) - K @ H) @ P
+      return x, P
+
+  traj, zs = simulate()
+  x, P = np.array([2.5, 1.5, 0.1]), np.eye(3)
+  errs = []
+  for k in range(len(traj)):
+      x, P = ekf_predict(x, P)
+      for lm_id, z in zs[k]:
+          x, P = ekf_update(x, P, z, LANDMARKS[lm_id])
+      x[2] = wrap(x[2])
+      errs.append(np.hypot(*(x[:2] - traj[k, :2])))
+  print("mean error after burn-in:", np.mean(errs[50:]))

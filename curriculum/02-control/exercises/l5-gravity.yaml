@@ -1,0 +1,73 @@
+id: ctl-l5-gravity
+title: "Gravity compensation beats the integral"
+lesson: modules/02-control/05-dynamics
+description: >-
+  A 1-link arm must hold horizontal — gravity's worst case. Implement the
+  gravity feedforward and compose it with PD. The tests demonstrate the
+  lesson's claim: PD alone sags; PD + feedforward holds exactly, with no
+  integral to wind up or relearn.
+setup_code: |
+  import numpy as np
+
+  M, L, G, I = 2.0, 0.5, 9.81, 2.0 * 0.5**2 / 3   # rod: I = m l^2 / 3
+
+  def simulate(controller, theta0=-0.5, target=0.0, steps=2000, dt=0.005):
+      th, w = theta0, 0.0
+      hist = []
+      for _ in range(steps):
+          tau = np.clip(controller(th, w, target), -30.0, 30.0)
+          alpha = (tau - M * G * (L / 2) * np.cos(th)) / I
+          w += alpha * dt
+          th += w * dt
+          hist.append(th)
+      return np.array(hist)
+starter_code: |
+  import numpy as np
+  # Provided: simulate(controller) — 1-link rod arm under gravity.
+  # Rod parameters: M = 2.0 kg, L = 0.5 m, G = 9.81.
+
+  KP, KD = 40.0, 8.0
+
+  def gravity_torque(theta):
+      """Feedforward: torque needed to cancel gravity at this angle."""
+      # TODO: m g (l/2) cos(theta) for a uniform rod
+      return 0.0
+
+  def pd_only(th, w, target):
+      return KP * (target - th) - KD * w
+
+  def pd_plus_ff(th, w, target):
+      # TODO: pd_only + gravity_torque
+      return pd_only(th, w, target)
+
+  print("PD sag:  %.4f rad" % simulate(pd_only)[-1])
+  print("PD+ff:   %.4f rad" % abs(simulate(pd_plus_ff)[-1]))
+tests: |
+  import numpy as np
+  assert abs(gravity_torque(0.0) - 2.0*9.81*0.25) < 1e-9, "horizontal: tau_g = m g (l/2) = 4.905 N*m"
+  assert abs(gravity_torque(np.pi/2)) < 1e-9, "vertical arm needs zero gravity torque"
+  _sag = simulate(pd_only)[-1]
+  assert _sag < -0.05, "PD alone must sag BELOW the horizontal target (equilibrium where spring balances gravity), got %.3f" % _sag
+  _ff = simulate(pd_plus_ff)
+  assert abs(_ff[-1]) < 5e-3, "PD + gravity feedforward must hold the target with ~zero error (got %.4f)" % _ff[-1]
+  _ff2 = simulate(pd_plus_ff, target=0.7)
+  assert abs(_ff2[-1] - 0.7) < 5e-3, "feedforward generalizes to a new setpoint instantly — no integral relearning"
+hints:
+  - "gravity_torque: `M * G * (L/2) * np.cos(theta)` — maximal horizontal, zero vertical."
+  - "pd_plus_ff: `pd_only(th, w, target) + gravity_torque(th)` — feedforward uses the CURRENT angle, not the target."
+solution: |
+  import numpy as np
+
+  KP, KD = 40.0, 8.0
+
+  def gravity_torque(theta):
+      return M * G * (L / 2) * np.cos(theta)
+
+  def pd_only(th, w, target):
+      return KP * (target - th) - KD * w
+
+  def pd_plus_ff(th, w, target):
+      return pd_only(th, w, target) + gravity_torque(th)
+
+  print("PD sag:  %.4f rad" % simulate(pd_only)[-1])
+  print("PD+ff:   %.4f rad" % abs(simulate(pd_plus_ff)[-1]))

@@ -1,0 +1,52 @@
+id: transition-l2-anatomy
+title: "Quiz — the autonomy stack"
+lesson: modules/00-transition/02-anatomy
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "In the canonical autonomy loop, which ordering is correct?"
+    options:
+      - text: "sensors → perception → estimation → planning → control → actuators"
+        correct: true
+        explanation: "Understand, locate, decide, act — with actuation feeding back into the next sensor reading through physics."
+      - text: "sensors → planning → perception → control → estimation → actuators"
+        explanation: "Planning before perception would mean deciding before understanding."
+      - text: "sensors → control → planning → perception → actuators"
+        explanation: "Control is the innermost, fastest layer — it executes decisions, it doesn't precede them."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why do control loops run at 50–1000 Hz while global planners run at ~0.1–1 Hz?"
+    options:
+      - text: "Layers closer to the motors must react fast with simple computations; layers closer to the goal can think slowly — the rate hierarchy keeps the robot safe while it thinks"
+        correct: true
+        explanation: "A design principle, not an accident: fast-and-dumb stabilizes, slow-and-smart optimizes. Breaking it (slow control, fast replanning) produces instability or thrash."
+      - text: "Planners are poorly optimized legacy code"
+        explanation: "A global planner searching a large map is intrinsically expensive — and doesn't need to re-run often."
+      - text: "Motor hardware requires kilohertz signals for electrical reasons only"
+        explanation: "Partly true at the lowest layer, but it doesn't explain why the hierarchy exists all the way up."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "In today's production robots, which block is most dominated by learned (deep) components?"
+    options:
+      - text: "Perception"
+        correct: true
+        explanation: "Detection/segmentation/tracking are thoroughly learned. Estimation, planning, and control remain mostly classical, with learned components expanding outward (Module 9)."
+      - text: "Control"
+        explanation: "Control is the most classical layer — PID and MPC rule; learned control is the research frontier, not the production norm."
+      - text: "State estimation"
+        explanation: "Filters (Kalman, particle) remain overwhelmingly classical — they're cheap, provable, and debuggable."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "First step when dropped into an unfamiliar robot codebase?"
+    options:
+      - text: "Find the launch files — they enumerate the running processes, which map onto the architecture diagram"
+        correct: true
+        explanation: "Architecture before algorithms — the same instinct as reading a data platform through its DAGs before its SQL."
+      - text: "Read the perception model's training code"
+        explanation: "Depth-first into one block before knowing the blocks — the classic way to get lost."
+      - text: "Run the robot and see what happens"
+        explanation: "Bold. Possibly expensive. See lesson 0.1, assumption 4."

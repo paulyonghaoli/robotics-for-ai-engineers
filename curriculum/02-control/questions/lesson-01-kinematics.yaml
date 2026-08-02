@@ -1,0 +1,59 @@
+id: control-l1-kinematics
+title: "Quiz — forward and inverse kinematics"
+lesson: modules/02-control/01-kinematics
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "Forward kinematics is easy and inverse kinematics is hard because…"
+    options:
+      - text: "FK is composition of known transforms; IK is root-finding with multiple solutions, unreachable targets, and singularities"
+        correct: true
+        explanation: "FK: plug in angles, multiply matrices. IK: solve a nonlinear system that may have 0, 2, or infinitely many answers."
+      - text: "FK uses smaller matrices"
+        explanation: "Same matrices — the difference is which side of the equation is unknown."
+      - text: "IK requires knowledge of the robot's mass"
+        explanation: "Mass is dynamics; both FK and IK are pure geometry."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "l1 = l2 = 1, target (1.2, 0). Compute D = (‖p‖² − l1² − l2²)/(2·l1·l2)."
+    answer: -0.28
+    tolerance: 0.005
+    explanation: "(1.44 − 2)/2 = −0.28; θ₂ = ±acos(−0.28) ≈ ±106.3° — the two elbow branches."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "In damped-least-squares IK, the damping term λ²I plays the same role as which ML technique?"
+    options:
+      - text: "Ridge (Tikhonov) regularization — bounding the step where the system is ill-conditioned"
+        correct: true
+        explanation: "Near singularities J J^T is nearly singular; λ² keeps the solve bounded, trading a little accuracy for stability — exactly ridge's trade."
+      - text: "Dropout"
+        explanation: "Dropout randomizes structure; damping is a deterministic penalty on step magnitude."
+      - text: "Early stopping"
+        explanation: "Related in spirit (both regularize) but the mechanism here is literally the ridge penalty in the normal equations."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A fully-stretched 2-link arm cannot instantaneously move its hand radially outward. In Jacobian language this is because…"
+    options:
+      - text: "J is rank-deficient at the singularity: the radial direction leaves its column space"
+        correct: true
+        explanation: "Both joints' instantaneous hand motions are tangential when stretched — no combination produces radial motion. Undamped IK responds by requesting infinite joint speed."
+      - text: "The Jacobian becomes the zero matrix"
+        explanation: "It loses *rank*, not everything — tangential motion is still available."
+      - text: "The arm's motors saturate"
+        explanation: "This is geometry, not actuation — true even with infinitely strong motors."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Per-waypoint IK along a smooth hand path makes the elbow alternate between up/down configurations. The professional fix is…"
+    options:
+      - text: "Warm-start each solve from the previous waypoint's solution, staying on one branch"
+        correct: true
+        explanation: "Continuity in the seed gives continuity in the branch — same reason you warm-start any iterative solver along a homotopy."
+      - text: "Use smaller waypoints"
+        explanation: "Density doesn't fix branch selection if each solve starts from the same fixed seed."
+      - text: "Average the two solutions"
+        explanation: "The average of elbow-up and elbow-down is not a valid configuration for the target — this is the multimodality trap (see Module 9 on behavior cloning)."

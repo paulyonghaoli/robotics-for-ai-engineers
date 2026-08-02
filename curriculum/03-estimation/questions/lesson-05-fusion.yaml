@@ -1,0 +1,52 @@
+id: estimation-l5-fusion
+title: "Quiz — fusion architecture"
+lesson: modules/03-estimation/05-fusion
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A 2-D GPS innovation has NIS = 14; the χ²(0.99, dof=2) gate is 9.21. The filter should…"
+    options:
+      - text: "Reject the fix — 14 is far outside what an honest sensor would produce given the current belief"
+        correct: true
+        explanation: "Rejection means 'this measurement never happened.' Three lines of code; the highest-value robustness mechanism in estimation."
+      - text: "Accept it with reduced weight"
+        explanation: "Soft-weighting outliers is a valid alternative family (robust losses), but the χ² gate's answer here is reject."
+      - text: "Accept it — more data is always better"
+        explanation: "Multipath is not data about position; it's data about buildings."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Sequential per-sensor updates equal the joint batched update when…"
+    options:
+      - text: "The sensors' measurement noises are independent of each other"
+        correct: true
+        explanation: "Correlated errors (two estimates derived from the same encoders) break it — fusing them as independent double-counts evidence into overconfidence."
+      - text: "The sensors run at the same rate"
+        explanation: "Rates don't matter — each update is valid whenever it arrives."
+      - text: "All sensors measure the same states"
+        explanation: "Partial observers are the normal case and sequential updating handles them fine."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "After losing its absolute sensor, a healthy fusion stack's covariance should…"
+    options:
+      - text: "Grow along the now-unobserved directions — honest widening"
+        correct: true
+        explanation: "A stack still reporting tight covariance after losing GPS is the overconfident filter at system scale; every consumer of P inherits the lie."
+      - text: "Stay constant, since the filter is well-tuned"
+        explanation: "Tuning can't conjure observability that left the building."
+      - text: "Shrink, since fewer sensors mean less noise"
+        explanation: "Fewer sensors mean less *information* — noise was never the enemy, ignorance is."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "The 'gate death spiral' is…"
+    options:
+      - text: "Divergence → all honest measurements gated as outliers → deeper divergence; broken by rejection caps or reinitialization"
+        correct: true
+        explanation: "The gate's blind spot: it judges measurements against a belief that may itself be wrong. Production filters cap consecutive rejections and force-accept or reset."
+      - text: "A gate threshold set exactly at the noise floor"
+        explanation: "That's just a badly tight gate — annoying, not a spiral."
+      - text: "Two filters gating each other's outputs"
+        explanation: "Creative, but the spiral needs only one filter and one wrong belief."

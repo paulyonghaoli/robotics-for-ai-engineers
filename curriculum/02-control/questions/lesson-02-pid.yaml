@@ -1,0 +1,60 @@
+id: control-l2-pid
+title: "Quiz — PID in production"
+lesson: modules/02-control/02-pid
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "P-only control (kp = 4) of the first-order plant dy/dt = (u − y)/τ, setpoint 1.0. What value does y settle at?"
+    answer: 0.8
+    tolerance: 0.005
+    hint: "equilibrium: u = y and u = kp(1 − y)."
+    explanation: "y* = kp/(1 + kp) = 4/5. The gap is steady-state error; the integral term exists to close it."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "Which term removes steady-state error under a constant disturbance?"
+    options:
+      - text: "Integral — it accumulates the persistent error and learns the disturbance's offset"
+        correct: true
+        explanation: "The I-term is an online bias corrector; at equilibrium it supplies exactly the command the disturbance demands."
+      - text: "Proportional, with high enough gain"
+        explanation: "Higher kp shrinks the error but never zeroes it — and eventually oscillates."
+      - text: "Derivative"
+        explanation: "D responds to *change*; a constant error has none."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Integral windup happens when…"
+    options:
+      - text: "The actuator saturates while error persists, so the integral grows far beyond what the plant can use — causing massive overshoot on recovery"
+        correct: true
+        explanation: "Guards: clamp the integral, freeze integration while saturated, or back-calculate. The library PID clamps."
+      - text: "The integral gain is set too low"
+        explanation: "Low ki is sluggish, not windup — windup is state corruption, not mistuning."
+      - text: "dt varies between updates"
+        explanation: "Variable dt is handled by multiplying by dt; it doesn't cause windup by itself."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "The derivative term with noisy measurements produces…"
+    options:
+      - text: "High-frequency actuator chatter — differentiation amplifies noise; fix with a low-pass filter on D"
+        correct: true
+        explanation: "The filtered-D trade: less chatter, slightly less damping. Many production loops simply run PI for this reason."
+      - text: "Steady-state offset"
+        explanation: "Zero-mean noise through D adds jitter, not bias."
+      - text: "Slower response"
+        explanation: "D doesn't slow the loop — it damps overshoot; the noise cost is chatter, not sluggishness."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why do learned policies (Module 9) typically output *setpoints for PIDs* rather than motor currents?"
+    options:
+      - text: "The inner PID layer provides fast, provable stabilization, letting the policy act slowly and abstractly — the rate hierarchy from lesson 0.2"
+        correct: true
+        explanation: "Networks at 10–30 Hz command targets; PIDs at kHz keep physics under control between policy ticks. Safety cases also prefer the provable layer innermost."
+      - text: "Networks cannot output continuous values"
+        explanation: "They can and do — that's not the constraint."
+      - text: "Motor currents are proprietary interfaces"
+        explanation: "Sometimes true, never the engineering reason."

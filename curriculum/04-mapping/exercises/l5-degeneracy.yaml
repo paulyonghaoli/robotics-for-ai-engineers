@@ -1,0 +1,101 @@
+id: map-l5-degeneracy
+title: "Case 2: detect the corridor before it slides"
+lesson: modules/04-mapping/05-lab-slam-failures
+description: >-
+  Scan matching in a featureless corridor returns a confident, wrong
+  answer along the corridor axis — and a perfectly small residual, because
+  the cost surface really is flat there. Detect the degeneracy from the
+  cost Hessian's eigenvalues BEFORE trusting the match, and report which
+  direction is unobservable.
+setup_code: |
+  import numpy as np
+
+  # A corridor: two long parallel walls, nothing else to key on.
+  _x = np.linspace(0, 12, 240)
+  CORRIDOR = np.vstack([
+      np.column_stack([_x, np.zeros_like(_x)]),
+      np.column_stack([_x, np.full_like(_x, 2.5)]),
+  ])
+  # A room: same walls plus two perpendicular end walls (fully constrained).
+  _y = np.linspace(0, 2.5, 50)
+  ROOM = np.vstack([
+      CORRIDOR,
+      np.column_stack([np.zeros_like(_y), _y]),
+      np.column_stack([np.full_like(_y, 12.0), _y]),
+  ])
+
+  def match_cost(scan, offset):
+      """Sum of squared nearest-neighbour distances after shifting `scan`
+      by `offset` — the objective ICP is minimizing."""
+      shifted = scan + np.asarray(offset)
+      d = np.linalg.norm(scan[None, :, :] - shifted[:, None, :], axis=2)
+      return float(np.sum(d.min(axis=1) ** 2))
+starter_code: |
+  import numpy as np
+  # Provided: CORRIDOR, ROOM (point clouds), match_cost(scan, offset)
+
+  def cost_hessian(scan, eps=0.05):
+      """2x2 Hessian of match_cost at zero offset, by central differences.
+
+      H[0,0] = (c(+eps,0) - 2c(0,0) + c(-eps,0)) / eps^2      (same for H[1,1])
+      H[0,1] = H[1,0] = (c(+e,+e) - c(+e,-e) - c(-e,+e) + c(-e,-e)) / (4 eps^2)
+      """
+      # TODO
+      return np.eye(2)
+
+  def degeneracy(scan):
+      """Return (condition_number, unobservable_direction).
+
+      Eigendecompose the Hessian; the condition number is
+      lambda_max/lambda_min, and the unobservable direction is the
+      eigenvector of the SMALLEST eigenvalue (the flat one).
+      """
+      # TODO: use np.linalg.eigh (Hessian is symmetric)
+      return 1.0, np.array([1.0, 0.0])
+
+  c_corr, dir_corr = degeneracy(CORRIDOR)
+  c_room, dir_room = degeneracy(ROOM)
+  print("corridor: cond %.1f, flat direction %s" % (c_corr, np.round(np.abs(dir_corr), 2)))
+  print("room:     cond %.1f" % c_room)
+tests: |
+  import numpy as np
+  _H = cost_hessian(ROOM)
+  assert _H.shape == (2, 2), "Hessian must be 2x2"
+  assert abs(_H[0, 1] - _H[1, 0]) < 1e-6, "Hessian must be symmetric"
+  assert _H[0, 0] > 0 and _H[1, 1] > 0, "at a cost minimum both curvatures are positive"
+  _c_corr, _d_corr = degeneracy(CORRIDOR)
+  _c_room, _d_room = degeneracy(ROOM)
+  assert _c_corr > 20.0, "the corridor must look badly conditioned (got cond %.1f) - that IS the degeneracy" % _c_corr
+  assert _c_room < _c_corr / 4.0, "the closed room must be far better conditioned than the corridor (%.1f vs %.1f)" % (_c_room, _c_corr)
+  assert abs(_d_corr[0]) > 0.9, "the corridor's unobservable direction must be ALONG the corridor (x), got %s" % np.round(_d_corr, 2)
+  assert abs(np.linalg.norm(_d_corr) - 1.0) < 1e-6, "return a unit direction vector"
+hints:
+  - "cost_hessian: evaluate match_cost at (0,0), (±eps,0), (0,±eps) and the four diagonal corners, then apply the finite-difference formulas in the docstring."
+  - "degeneracy: `vals, vecs = np.linalg.eigh(H)`; eigh returns ascending eigenvalues, so vecs[:, 0] is the flat direction and cond = vals[-1]/max(vals[0], 1e-12)."
+  - "The point: sliding along the corridor barely changes the cost, so that eigenvalue is tiny. A production matcher reports this and inflates the covariance it hands the filter instead of pretending the estimate is a point."
+solution: |
+  import numpy as np
+
+  def cost_hessian(scan, eps=0.05):
+      c0 = match_cost(scan, (0.0, 0.0))
+      cxp, cxm = match_cost(scan, (eps, 0.0)), match_cost(scan, (-eps, 0.0))
+      cyp, cym = match_cost(scan, (0.0, eps)), match_cost(scan, (0.0, -eps))
+      cpp = match_cost(scan, (eps, eps))
+      cpm = match_cost(scan, (eps, -eps))
+      cmp_ = match_cost(scan, (-eps, eps))
+      cmm = match_cost(scan, (-eps, -eps))
+      hxx = (cxp - 2 * c0 + cxm) / eps**2
+      hyy = (cyp - 2 * c0 + cym) / eps**2
+      hxy = (cpp - cpm - cmp_ + cmm) / (4 * eps**2)
+      return np.array([[hxx, hxy], [hxy, hyy]])
+
+  def degeneracy(scan):
+      H = cost_hessian(scan)
+      vals, vecs = np.linalg.eigh(H)
+      cond = float(vals[-1] / max(vals[0], 1e-12))
+      return cond, vecs[:, 0]
+
+  c_corr, dir_corr = degeneracy(CORRIDOR)
+  c_room, dir_room = degeneracy(ROOM)
+  print("corridor: cond %.1f, flat direction %s" % (c_corr, np.round(np.abs(dir_corr), 2)))
+  print("room:     cond %.1f" % c_room)

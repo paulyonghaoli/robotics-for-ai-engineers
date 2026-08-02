@@ -1,0 +1,82 @@
+id: est-l5-gating
+title: "The chi-squared innovation gate"
+lesson: modules/03-estimation/05-fusion
+description: >-
+  A 1-D position filter receives GPS fixes that are usually honest — but
+  5% are multipath jumps 10 m off. Implement NIS gating: compute the
+  innovation statistic, reject measurements beyond the χ² threshold, and
+  watch RMSE collapse versus the ungated filter.
+setup_code: |
+  import numpy as np
+
+  RNG = np.random.default_rng(9)
+  STEPS, Q, R = 400, 0.04, 1.0
+  true_pos = np.cumsum(RNG.normal(0.0, 0.2, STEPS))
+  gps = true_pos + RNG.normal(0, 1.0, STEPS)
+  corrupt = RNG.random(STEPS) < 0.05
+  gps[corrupt] += RNG.choice([-10.0, 10.0], corrupt.sum())
+
+  def run_filter(update_fn):
+      x, P, errs = 0.0, 25.0, []
+      for k in range(STEPS):
+          P = P + Q                      # predict (random-walk model)
+          x, P = update_fn(x, P, gps[k])
+          errs.append(x - true_pos[k])
+      return float(np.sqrt(np.mean(np.square(errs))))
+starter_code: |
+  import numpy as np
+  # Provided: run_filter(update_fn), gps stream with 5% multipath (+/-10 m),
+  #           Q = 0.04, R = 1.0. chi2(0.99, dof=1) = 6.63.
+
+  GATE = 6.63
+
+  def update_ungated(x, P, z):
+      K = P / (P + R)
+      return x + K * (z - x), (1 - K) * P
+
+  def nis(x, P, z):
+      """Normalized innovation squared for this scalar filter."""
+      # TODO: y^2 / S with S = P + R
+      return 0.0
+
+  def update_gated(x, P, z):
+      """Standard update, but REJECT (return x, P unchanged) if nis > GATE."""
+      # TODO
+      return update_ungated(x, P, z)
+
+  print("ungated RMSE: %.3f" % run_filter(update_ungated))
+  print("gated RMSE:   %.3f" % run_filter(update_gated))
+tests: |
+  import numpy as np
+  assert abs(nis(0.0, 3.0, 4.0) - 4.0) < 1e-9, "nis = y^2/S = 16/(3+1) = 4.0"
+  _x, _P = update_gated(0.0, 1.0, 12.0)
+  assert _x == 0.0 and _P == 1.0, "a 12-sigma-ish jump (nis=72) must be rejected: state unchanged"
+  _x, _P = update_gated(0.0, 1.0, 1.0)
+  assert _x != 0.0, "an ordinary measurement (nis=0.5) must be accepted"
+  _rmse_u = run_filter(update_ungated)
+  _rmse_g = run_filter(update_gated)
+  assert _rmse_g < 0.6 * _rmse_u, "gating should cut RMSE dramatically under 5%% corruption (ungated %.2f, gated %.2f)" % (_rmse_u, _rmse_g)
+  assert _rmse_g < 0.8, "gated filter should track well (RMSE %.2f)" % _rmse_g
+hints:
+  - "nis: y = z − x; S = P + R; return y*y/S."
+  - "update_gated: `if nis(x, P, z) > GATE: return x, P` — rejection means the measurement never happened. Then fall through to the normal update."
+solution: |
+  import numpy as np
+
+  GATE = 6.63
+
+  def update_ungated(x, P, z):
+      K = P / (P + R)
+      return x + K * (z - x), (1 - K) * P
+
+  def nis(x, P, z):
+      y = z - x
+      return y * y / (P + R)
+
+  def update_gated(x, P, z):
+      if nis(x, P, z) > GATE:
+          return x, P
+      return update_ungated(x, P, z)
+
+  print("ungated RMSE: %.3f" % run_filter(update_ungated))
+  print("gated RMSE:   %.3f" % run_filter(update_gated))

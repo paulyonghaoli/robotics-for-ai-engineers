@@ -1,0 +1,61 @@
+id: geo-l6-bug-unwrapped
+title: "Bug 2: the long way around"
+lesson: modules/01-geometry/06-lab-frame-debugging
+description: >-
+  **Symptom:** a robot turning toward nearby headings usually behaves, but
+  when its heading and the target straddle ±π it spins nearly a full turn
+  the wrong way. The proportional heading controller below reproduces it.
+  Fix the controller so it always takes the short way.
+setup_code: |
+  import numpy as np
+
+  def simulate_turn(controller, start, target, steps=200, dt=0.05, k=2.0):
+      """Integrate heading under the controller; return (final_heading, total_rotation)."""
+      theta = start
+      total = 0.0
+      for _ in range(steps):
+          w = np.clip(controller(theta, target, k), -2.0, 2.0)
+          theta = theta + w * dt
+          total += abs(w) * dt
+      # report final heading wrapped for comparison
+      wrapped = -(np.mod(-theta + np.pi, 2 * np.pi) - np.pi)
+      return wrapped, total
+starter_code: |
+  import numpy as np
+  # Provided: simulate_turn(controller, start, target) -> (final_heading, total_rotation)
+
+  def heading_controller(current, target, k=2.0):
+      """P-controller on heading: returns angular velocity command."""
+      error = target - current          # <-- the bug lives on this line
+      return k * error
+
+  # Benign case: works fine
+  print(simulate_turn(heading_controller, 0.0, 0.5))
+  # The seam case: start just below +pi, target just above -pi.
+  # Physically this is a 0.1 rad nudge — watch total_rotation:
+  print(simulate_turn(heading_controller, np.pi - 0.05, -np.pi + 0.05))
+tests: |
+  import numpy as np
+  _wrap = lambda a: -(np.mod(-a + np.pi, 2 * np.pi) - np.pi)
+  _final, _total = simulate_turn(heading_controller, 0.0, 0.5)
+  assert abs(_wrap(_final - 0.5)) < 1e-3, "controller must still converge in the benign case"
+  _final, _total = simulate_turn(heading_controller, np.pi - 0.05, -np.pi + 0.05)
+  assert abs(_wrap(_final - (-np.pi + 0.05))) < 1e-3, "must converge to the target heading across the seam"
+  assert _total < 0.5, "crossing the seam is a 0.1 rad move; total rotation was %.2f rad — the robot went the long way. Wrap the error." % _total
+  _final, _total = simulate_turn(heading_controller, -np.pi + 0.02, np.pi - 0.02)
+  assert _total < 0.5, "same bug from the other side: %.2f rad of rotation for a 0.04 rad move" % _total
+hints:
+  - "Reproduce first: the second print shows ~6 rad of total rotation for a 0.1 rad task."
+  - "The error must be computed on the circle: wrap (target − current) to (-π, π] before multiplying by k."
+solution: |
+  import numpy as np
+
+  def wrap_angle(a):
+      return -(np.mod(-a + np.pi, 2 * np.pi) - np.pi)
+
+  def heading_controller(current, target, k=2.0):
+      error = wrap_angle(target - current)
+      return k * error
+
+  print(simulate_turn(heading_controller, 0.0, 0.5))
+  print(simulate_turn(heading_controller, np.pi - 0.05, -np.pi + 0.05))

@@ -1,0 +1,74 @@
+id: geo-l5-cspace
+title: "Build a C-space obstacle map"
+lesson: modules/01-geometry/05-configuration-space
+description: >-
+  Implement collision checking for a planar 2-link arm against circular
+  workspace obstacles, then rasterize the C-space obstacle map on a grid
+  over (θ₁, θ₂). The tests probe known colliding and free configurations
+  and the map's occupancy fraction.
+setup_code: |
+  import numpy as np
+
+  L1, L2 = 1.0, 0.8
+
+  def arm_points(theta1, theta2, n=25):
+      elbow = np.array([L1 * np.cos(theta1), L1 * np.sin(theta1)])
+      hand = elbow + np.array([L2 * np.cos(theta1 + theta2), L2 * np.sin(theta1 + theta2)])
+      t = np.linspace(0.0, 1.0, n)[:, None]
+      return np.vstack([t * elbow, elbow + t * (hand - elbow)])
+starter_code: |
+  import numpy as np
+  # Provided: arm_points(theta1, theta2) -> (2n, 2) points along both links
+  #           link lengths L1 = 1.0, L2 = 0.8
+
+  def in_collision(theta1, theta2, circles):
+      """True if any point of the arm lies inside any circle (cx, cy, r)."""
+      # TODO
+      return False
+
+  def cspace_map(circles, n=60):
+      """Boolean (n, n) grid over theta1, theta2 in [-pi, pi): True = collision."""
+      # TODO: thetas = np.linspace(-np.pi, np.pi, n, endpoint=False)
+      return np.zeros((n, n), dtype=bool)
+
+  obstacle = [(1.5, 0.0, 0.35)]  # circle sitting to the arm's right
+  grid = cspace_map(obstacle)
+  print("collision fraction:", grid.mean())
+tests: |
+  import numpy as np
+  _obs = [(1.5, 0.0, 0.35)]
+  assert in_collision(0.0, 0.0, _obs), "arm stretched along +x (theta=0,0) reaches x=1.8 and must hit the circle at (1.5, 0)"
+  assert not in_collision(np.pi / 2, 0.0, _obs), "arm pointing straight up must be free of an obstacle at (1.5, 0)"
+  assert not in_collision(np.pi, 0.0, _obs), "arm pointing along -x must be free"
+  _g = cspace_map(_obs, n=60)
+  assert _g.shape == (60, 60) and _g.dtype == bool, "map must be a boolean (n, n) grid"
+  assert _g.any() and not _g.all(), "the map must contain both colliding and free configurations"
+  _frac = _g.mean()
+  assert 0.01 < _frac < 0.35, "collision fraction for this single obstacle should be modest (got %.3f) — check your grid spans [-pi, pi)" % _frac
+  _t = np.linspace(-np.pi, np.pi, 60, endpoint=False)
+  _i = int(np.argmin(np.abs(_t - 0.0)))
+  assert _g[_i, _i], "the grid cell nearest (0, 0) must be marked colliding — check index order and ranges"
+hints:
+  - "in_collision: get pts = arm_points(...); for each circle test np.hypot(pts[:,0]-cx, pts[:,1]-cy).min() < r."
+  - "cspace_map: two nested loops over np.linspace(-np.pi, np.pi, n, endpoint=False); grid[i, j] indexed by (theta1_i, theta2_j)."
+solution: |
+  import numpy as np
+
+  def in_collision(theta1, theta2, circles):
+      pts = arm_points(theta1, theta2)
+      for cx, cy, r in circles:
+          if np.hypot(pts[:, 0] - cx, pts[:, 1] - cy).min() < r:
+              return True
+      return False
+
+  def cspace_map(circles, n=60):
+      thetas = np.linspace(-np.pi, np.pi, n, endpoint=False)
+      grid = np.zeros((n, n), dtype=bool)
+      for i, t1 in enumerate(thetas):
+          for j, t2 in enumerate(thetas):
+              grid[i, j] = in_collision(t1, t2, circles)
+      return grid
+
+  obstacle = [(1.5, 0.0, 0.35)]
+  grid = cspace_map(obstacle)
+  print("collision fraction:", grid.mean())

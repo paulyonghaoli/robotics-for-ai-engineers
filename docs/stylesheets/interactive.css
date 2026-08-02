@@ -1,0 +1,171 @@
+/* Interactive components: quiz-bank and code-exercise */
+
+quiz-bank, code-exercise {
+  display: block;
+  margin: 1.2em 0;
+}
+
+.rai-card {
+  border: 1px solid var(--md-default-fg-color--lightest, #ddd);
+  border-radius: 8px;
+  padding: 1em 1.2em;
+  margin: 1em 0;
+  background: var(--md-code-bg-color, #f8f8f8);
+}
+
+.rai-bank-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+}
+
+.rai-score {
+  font-size: 0.85em;
+  padding: 0.15em 0.7em;
+  border-radius: 1em;
+  background: var(--md-primary-fg-color, #5e35b1);
+  color: #fff;
+}
+
+.rai-q { margin: 1em 0; }
+.rai-q-prompt { margin-bottom: 0.5em; }
+.rai-q-num { font-weight: 700; margin-right: 0.4em; }
+.rai-q-tag {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-left: 0.6em;
+}
+
+.rai-opt {
+  display: block;
+  padding: 0.45em 0.7em;
+  margin: 0.3em 0;
+  border: 1px solid var(--md-default-fg-color--lightest, #ddd);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rai-opt:hover { background: var(--md-default-fg-color--lightest, #eee); }
+.rai-opt input { margin-right: 0.6em; }
+.rai-opt.rai-correct { border-color: #2e7d32; background: rgba(46, 125, 50, 0.12); }
+.rai-opt.rai-wrong { border-color: #c62828; background: rgba(198, 40, 40, 0.10); }
+
+.rai-explain {
+  font-size: 0.85em;
+  margin: 0.2em 0 0.2em 2em;
+  padding-left: 0.6em;
+  border-left: 3px solid var(--md-default-fg-color--lighter, #bbb);
+  opacity: 0.9;
+}
+
+.rai-numeric-input {
+  font-family: var(--md-code-font-family, monospace);
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--md-default-fg-color--lightest, #ccc);
+  border-radius: 6px;
+  width: 12em;
+  background: var(--md-default-bg-color, #fff);
+  color: var(--md-default-fg-color, #000);
+}
+
+.rai-btn {
+  font: inherit;
+  font-size: 0.8em;
+  font-weight: 700;
+  padding: 0.4em 1em;
+  margin: 0.5em 0.4em 0 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--md-primary-fg-color, #5e35b1);
+  color: #fff;
+}
+.rai-btn:hover { filter: brightness(1.15); }
+.rai-btn.rai-btn-ghost {
+  background: transparent;
+  color: var(--md-primary-fg-color, #5e35b1);
+  border: 1px solid currentColor;
+}
+.rai-btn:disabled { opacity: 0.5; cursor: default; }
+
+.rai-feedback { font-weight: 700; margin-top: 0.4em; }
+.rai-feedback.ok { color: #2e7d32; }
+.rai-feedback.bad { color: #c62828; }
+
+/* code exercise */
+.rai-ex-title { font-weight: 700; margin-bottom: 0.3em; }
+.rai-ex-desc { font-size: 0.92em; margin-bottom: 0.6em; }
+
+.rai-status {
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 0.15em 0.7em;
+  border-radius: 1em;
+  background: var(--md-default-fg-color--lightest, #ddd);
+  color: var(--md-default-fg-color, #333);
+}
+.rai-status.pass { background: #2e7d32; color: #fff; }
+.rai-status.fail { background: #c62828; color: #fff; }
+
+.rai-editor-wrap {
+  border: 1px solid var(--md-default-fg-color--lightest, #ccc);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0.5em 0;
+}
+.rai-editor-wrap .CodeMirror {
+  height: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.rai-editor-wrap textarea.rai-plain {
+  width: 100%;
+  min-height: 12em;
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.8rem;
+  border: none;
+  padding: 0.8em;
+  background: var(--md-code-bg-color, #f5f5f5);
+  color: var(--md-code-fg-color, #333);
+}
+
+.rai-output {
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  background: #1e1e2e;
+  color: #d8dee9;
+  border-radius: 6px;
+  padding: 0.7em 1em;
+  margin-top: 0.5em;
+  max-height: 16em;
+  overflow: auto;
+}
+.rai-output:empty { display: none; }
+.rai-output .err { color: #ff8a80; }
+.rai-output .okline { color: #a5d6a7; }
+
+.rai-hint {
+  font-size: 0.85em;
+  margin-top: 0.5em;
+  padding: 0.5em 0.8em;
+  border-left: 3px solid #f9a825;
+  background: rgba(249, 168, 37, 0.08);
+}
+
+.rai-solution { margin-top: 0.5em; }
+.rai-solution pre {
+  background: var(--md-code-bg-color, #f5f5f5);
+  padding: 0.7em 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.78rem;
+}
+
+/* dark scheme tweaks */
+[data-md-color-scheme="slate"] .rai-card { background: rgba(255, 255, 255, 0.03); }
+[data-md-color-scheme="slate"] .rai-opt:hover { background: rgba(255, 255, 255, 0.06); }

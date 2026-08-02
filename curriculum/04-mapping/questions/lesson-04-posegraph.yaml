@@ -1,0 +1,47 @@
+id: mapping-l4-posegraph
+title: "Quiz — pose graphs"
+lesson: modules/04-mapping/04-pose-graphs
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "1-D chain, x₀ pinned at 0: three odometry edges each measuring 1.0, one loop edge measuring x₃ = 2.4, equal weights. Least-squares x₃?"
+    answer: 2.55
+    tolerance: 0.01
+    explanation: "The 0.6 disagreement splits equally across 4 edges (0.15 each): steps become 0.85, x₃ = 2.55. Distributed, not dumped."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Pose graphs scale where EKF-SLAM couldn't because…"
+    options:
+      - text: "Each edge touches only two nodes — the least-squares system is SPARSE, and sparse solvers feast on it"
+        correct: true
+        explanation: "The EKF's dense joint covariance becomes a sparse graph of constraints; millions of edges are routine."
+      - text: "They discard uncertainty information"
+        explanation: "Ω per edge keeps it — stiffness IS confidence."
+      - text: "They avoid nonlinearity"
+        explanation: "Angles keep it nonlinear (Gauss–Newton handles it); sparsity, not linearity, is the win."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The front-end/back-end split assigns…"
+    options:
+      - text: "Edge PROPOSAL (scan matching, place recognition) to the front-end; global CONSISTENCY (sparse optimization) to the back-end"
+        correct: true
+        explanation: "Retrieval + reasoning. Front-end lies — false closures — are the catastrophic input; robust kernels are the back-end's immune system."
+      - text: "Mapping to the front, localization to the back"
+        explanation: "Both come out of the same optimized graph."
+      - text: "CPU work to the front, GPU to the back"
+        explanation: "An implementation detail at best; the split is about roles."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "A confident FALSE loop closure in a repetitive warehouse folds the map because…"
+    options:
+      - text: "The optimizer must satisfy a stiff constraint between places that aren't the same — and it dutifully deforms everything else to comply"
+        correct: true
+        explanation: "Least squares has no concept of 'this edge is a lie' unless given one: geometric verification before, robust kernels (Huber, switchable constraints) during."
+      - text: "The solver diverges numerically"
+        explanation: "It converges beautifully — to a consistent solution of an inconsistent problem. That's what makes it dangerous."
+      - text: "Repetitive environments break sparse solvers"
+        explanation: "They break place RECOGNITION (the front-end); the solver just obeys."

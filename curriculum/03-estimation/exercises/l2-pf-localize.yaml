@@ -1,0 +1,80 @@
+id: est-l2-pf-localize
+title: "Global localization in the door corridor"
+lesson: modules/03-estimation/02-particle-filter
+description: >-
+  The classic: a robot in a 20 m corridor with doors at known positions,
+  starting **completely lost** (uniform belief). It drives right at 0.5 m/s
+  sensing only its distance to the nearest door. Implement the measurement
+  weighting and the filter loop; watch a uniform swarm collapse onto the
+  true position.
+setup_code: |
+  import numpy as np
+
+  DOORS = np.array([3.0, 7.5, 15.0])
+  DT, SPEED, SENSOR_SIGMA = 0.5, 0.5, 0.3
+  RNG = np.random.default_rng(11)
+
+  def nearest_door_dist(x):
+      return np.min(np.abs(np.atleast_1d(x)[:, None] - DOORS[None, :]), axis=1)
+
+  # Simulate the true robot and its sensor readings for 30 steps:
+  true_traj = 2.0 + SPEED * DT * np.arange(30)
+  readings = nearest_door_dist(true_traj) + RNG.normal(0, SENSOR_SIGMA, 30)
+starter_code: |
+  import numpy as np
+  # Provided: DOORS, DT, SPEED, SENSOR_SIGMA, nearest_door_dist(x),
+  #           true_traj (30 poses), readings (30 noisy door-distance readings)
+
+  rng = np.random.default_rng(0)
+  N = 3000
+  particles = rng.uniform(0.0, 20.0, N)   # totally lost
+  weights = np.full(N, 1.0 / N)
+
+  def likelihood(particles, z):
+      """p(z | particle): Gaussian around each particle's door distance."""
+      # TODO: expected = nearest_door_dist(particles); Gaussian pdf (un-normalized ok)
+      return np.ones(len(particles))
+
+  for z in readings:
+      # 1. predict: move every particle by SPEED*DT plus noise sigma=0.05
+      # 2. weight:  weights *= likelihood(particles, z); renormalize
+      # 3. resample when neff = 1/sum(w^2) < N/2 (systematic; then reset weights)
+      pass  # TODO
+
+  estimate = np.sum(weights * particles)
+  print("estimate:", estimate, " true:", true_traj[-1])
+tests: |
+  import numpy as np
+  _lik = likelihood(np.array([3.0, 10.0]), 0.0)
+  assert _lik[0] > _lik[1] * 5, "a particle AT a door must be far more likely than one 2.5 m from any door when z = 0"
+  assert abs(estimate - true_traj[-1]) < 0.7, "after 30 steps the swarm should have collapsed near the true position %.2f (estimate %.2f)" % (true_traj[-1], estimate)
+  assert np.std(particles) < 2.5, "the particle spread should be far tighter than the initial uniform 20 m (std %.2f)" % np.std(particles)
+hints:
+  - "likelihood: `d = nearest_door_dist(particles) - z; return np.exp(-0.5 * (d / SENSOR_SIGMA)**2) + 1e-300`."
+  - "Loop body: particles += SPEED*DT + rng.normal(0, 0.05, N); weights *= likelihood(...); weights /= weights.sum(); if 1/np.sum(weights**2) < N/2: systematic resample (searchsorted on cumsum) and weights[:] = 1/N."
+  - "The belief is multimodal after the first door (three doors could explain it) — motion between doors is what disambiguates. Don't panic mid-run."
+solution: |
+  import numpy as np
+
+  rng = np.random.default_rng(0)
+  N = 3000
+  particles = rng.uniform(0.0, 20.0, N)
+  weights = np.full(N, 1.0 / N)
+
+  def likelihood(particles, z):
+      d = nearest_door_dist(particles) - z
+      return np.exp(-0.5 * (d / SENSOR_SIGMA) ** 2) + 1e-300
+
+  for z in readings:
+      particles = particles + SPEED * DT + rng.normal(0, 0.05, N)
+      weights = weights * likelihood(particles, z)
+      weights = weights / weights.sum()
+      if 1.0 / np.sum(weights ** 2) < N / 2:
+          positions = (rng.random() + np.arange(N)) / N
+          cs = np.cumsum(weights)
+          cs[-1] = 1.0
+          particles = particles[np.searchsorted(cs, positions)]
+          weights = np.full(N, 1.0 / N)
+
+  estimate = np.sum(weights * particles)
+  print("estimate:", estimate, " true:", true_traj[-1])

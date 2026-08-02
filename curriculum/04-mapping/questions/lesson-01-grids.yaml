@@ -1,0 +1,71 @@
+id: mapping-l1-grids
+title: "Quiz — occupancy grids"
+lesson: modules/04-mapping/01-occupancy-grids
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "One lidar beam updates the map in two different ways because…"
+    options:
+      - text: "Cells along the beam are evidence of FREE space (light got through); the endpoint is evidence of OCCUPIED (light stopped)"
+        correct: true
+        explanation: "The inverse sensor model: one ray carves a free corridor and deposits one occupied cell."
+      - text: "The beam's intensity fades with distance"
+        explanation: "Intensity models exist but aren't what splits the update — geometry is."
+      - text: "Sensor noise requires updating twice"
+        explanation: "Noise widens the evidence, it doesn't create the free/occupied split."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A cell receives 3 hits (l_occ = 0.85) and 1 free pass (l_free = −0.4) from log-odds 0. Its occupancy probability is 1 − 1/(1+e^l). Compute it."
+    answer: 0.896
+    tolerance: 0.005
+    explanation: "l = 2.55 − 0.4 = 2.15 → p ≈ 0.896. Bayes as bookkeeping — that's the log-odds trick."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why clamp log-odds at ±l_max?"
+    options:
+      - text: "So no cell becomes so certain that contrary evidence can't flip it in reasonable time — maps must heal when the world changes"
+        correct: true
+        explanation: "The parked truck leaves; a clamped cell needs ~15 free passes to recover, an unclamped one could need thousands."
+      - text: "To prevent floating-point overflow"
+        explanation: "exp(50) overflows eventually, but the engineering reason is adaptability, not numerics."
+      - text: "To save memory"
+        explanation: "A float is a float regardless of its value."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A faint ring of phantom obstacles appears at exactly the sensor's max range around everywhere the robot has been. The bug is…"
+    options:
+      - text: "Max-range readings (no hit) are being treated as hits — a miss should mark the end cell FREE, not occupied"
+        correct: true
+        explanation: "The 'no return' beam saw free space all the way out. Depositing occupancy at its end draws the sensor's range limit onto the map."
+      - text: "Lidar noise at long range"
+        explanation: "Noise smears; it doesn't draw a crisp circle at exactly max range."
+      - text: "The map resolution is too coarse"
+        explanation: "Resolution artifacts don't correlate with sensor range."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "The robot spins in place for a minute, re-observing the same wall 600 times. The map's confidence in that wall becomes…"
+    options:
+      - text: "Massively overcounted — the observations are correlated, but the per-cell independence assumption treats them as fresh evidence (clamp to the rescue)"
+        correct: true
+        explanation: "Naive Bayes' classic failure: correlated evidence double-counts. Same pathology as duplicated training rows; the clamp bounds the damage."
+      - text: "Correctly reinforced — more data is always better"
+        explanation: "600 looks at the same wall from the same place carry little more information than 10; the model just can't tell."
+      - text: "Reduced, since spinning adds motion blur"
+        explanation: "Grid mapping has no blur model; the update just keeps adding."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Mapping with slowly drifting pose estimates produces walls smeared into arcs. This demonstrates…"
+    options:
+      - text: "That map quality is bounded by trajectory quality — the motivation for SLAM, where mapping and localization are solved jointly"
+        correct: true
+        explanation: "The mapper faithfully integrates the localizer's lie. Fixing it requires closing the loop between the two — this module's destination."
+      - text: "That the sensor needs recalibration"
+        explanation: "A perfect sensor with a drifting pose produces the same smear."
+      - text: "That log-odds updates are numerically unstable"
+        explanation: "The math is fine; the input pose is the problem."

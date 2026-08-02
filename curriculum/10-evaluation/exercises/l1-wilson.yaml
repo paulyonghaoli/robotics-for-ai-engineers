@@ -1,0 +1,87 @@
+id: eval-l1-wilson
+title: "Confidence intervals that survive small samples"
+lesson: modules/10-evaluation/01-statistical-rigor
+description: >-
+  Implement the Wilson score interval and see why the textbook normal
+  approximation fails exactly where robotics lives — small N, rates near
+  0 or 1. The tests include the case that motivates the whole lesson:
+  8 successes out of 8 episodes is NOT evidence of 100%.
+setup_code: |
+  import numpy as np
+
+  Z95 = 1.959963985
+starter_code: |
+  import numpy as np
+  # Provided: Z95 = 1.96 (the 95% normal quantile)
+
+  def normal_interval(successes, n, z=Z95):
+      """The textbook (Wald) interval: p_hat +/- z*sqrt(p(1-p)/n).
+
+      Included so you can watch it misbehave — implement it as written,
+      warts and all.
+      """
+      # TODO
+      return (0.0, 0.0)
+
+  def wilson_interval(successes, n, z=Z95):
+      """Wilson score interval — the right default for success rates.
+
+      center = (p_hat + z^2/(2n)) / (1 + z^2/n)
+      half   = z * sqrt( p_hat(1-p_hat)/n + z^2/(4n^2) ) / (1 + z^2/n)
+      Return (low, high), both clipped to [0, 1].
+      """
+      # TODO
+      return (0.0, 0.0)
+
+  def episodes_needed(margin, p=0.5, z=Z95):
+      """Smallest n whose normal margin at rate p is <= `margin`.
+
+      n >= p(1-p) * (z/margin)^2   -> round UP to an integer.
+      """
+      # TODO
+      return 0
+
+  print("8/8   wald:", np.round(normal_interval(8, 8), 3), " wilson:", np.round(wilson_interval(8, 8), 3))
+  print("18/25 wilson:", np.round(wilson_interval(18, 25), 3))
+  print("episodes for +/-5 points:", episodes_needed(0.05))
+tests: |
+  import numpy as np
+  _lo, _hi = normal_interval(8, 8)
+  assert abs(_lo - 1.0) < 1e-9 and abs(_hi - 1.0) < 1e-9, "the Wald interval at 8/8 collapses to a POINT [1.0, 1.0] - claiming certainty from 8 episodes. That absurdity is why we use Wilson."
+  _lo, _hi = wilson_interval(8, 8)
+  assert _hi > 0.99, "Wilson's upper bound at 8/8 should be ~1.0"
+  assert 0.64 < _lo < 0.72, "Wilson's LOWER bound at 8/8 should be about 0.68 (got %.3f) - eight for eight is consistent with a true rate near 68%%" % _lo
+  _lo, _hi = wilson_interval(18, 25)
+  assert _lo < 0.60 < _hi, "18/25 = 72%% must have an interval containing 60%% - you cannot distinguish it from a 60%% baseline"
+  assert 0.50 < _lo < 0.56 and 0.85 < _hi < 0.89, "18/25 Wilson interval should be about [0.52, 0.86], got [%.3f, %.3f]" % (_lo, _hi)
+  _lo, _hi = wilson_interval(0, 10)
+  assert _lo >= 0.0 and 0.2 < _hi < 0.4, "0/10 must give a valid interval with a nonzero upper bound (~0.28) - zero successes is not proof of impossibility"
+  assert _lo <= _hi, "interval must be ordered"
+  assert episodes_needed(0.05) == 385, "for a +/-5 point margin at p=0.5 you need 385 episodes (got %d)" % episodes_needed(0.05)
+  assert episodes_needed(0.10) == 97, "for +/-10 points: 97 episodes"
+  assert episodes_needed(0.20) == 25, "for +/-20 points: 25 episodes - which is what the field typically runs"
+hints:
+  - "Wald: p = successes/n; half = z*np.sqrt(p*(1-p)/n); return (p-half, p+half). At 8/8, p(1-p) = 0, so the half-width is zero — that's the bug you're demonstrating."
+  - "Wilson: compute `denom = 1 + z**2/n`, `center = (p + z**2/(2*n)) / denom`, `half = z*np.sqrt(p*(1-p)/n + z**2/(4*n**2)) / denom`, then clip to [0,1]."
+  - "episodes_needed: `int(np.ceil(p*(1-p)*(z/margin)**2))`."
+solution: |
+  import numpy as np
+
+  def normal_interval(successes, n, z=Z95):
+      p = successes / n
+      half = z * np.sqrt(p * (1 - p) / n)
+      return (max(0.0, p - half), min(1.0, p + half))
+
+  def wilson_interval(successes, n, z=Z95):
+      p = successes / n
+      denom = 1.0 + z**2 / n
+      center = (p + z**2 / (2 * n)) / denom
+      half = z * np.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / denom
+      return (max(0.0, center - half), min(1.0, center + half))
+
+  def episodes_needed(margin, p=0.5, z=Z95):
+      return int(np.ceil(p * (1 - p) * (z / margin) ** 2))
+
+  print("8/8   wald:", np.round(normal_interval(8, 8), 3), " wilson:", np.round(wilson_interval(8, 8), 3))
+  print("18/25 wilson:", np.round(wilson_interval(18, 25), 3))
+  print("episodes for +/-5 points:", episodes_needed(0.05))

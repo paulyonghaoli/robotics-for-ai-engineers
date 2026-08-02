@@ -1,0 +1,78 @@
+id: eval-l1-rigor
+title: "Quiz — statistical rigor in robot evaluation"
+lesson: modules/10-evaluation/01-statistical-rigor
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "A stack succeeds in 18 of 25 episodes. Using the normal approximation, what is the 95% margin in percentage POINTS (z·√(p(1−p)/n) × 100)?"
+    answer: 17.6
+    tolerance: 1.0
+    explanation: "≈ ±18 points, so roughly 54%–90%. That interval contains 60% — you cannot distinguish this stack from a 60% baseline. This arithmetic is why only ~20% of published SOTA claims are statistically significant."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Your stack succeeds in all 8 evaluation episodes. The honest claim is…"
+    options:
+      - text: "The true success rate is plausibly anywhere from about 68% to 100%"
+        correct: true
+        explanation: "Wilson's lower bound at 8/8 is ~0.68. Eight for eight is encouraging and nearly uninformative about the difference between 75% and 99%."
+      - text: "The success rate is 100%"
+        explanation: "The point estimate is 100%; the *claim* it supports is not. The Wald interval's absurd [1.0, 1.0] at 8/8 is exactly why Wilson exists."
+      - text: "Nothing, because 8 episodes is worthless"
+        explanation: "Overcorrection — it rules out true rates below ~60% quite well. Small samples are informative about large effects, useless about small ones."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "How many episodes do you need for a ±5-percentage-point margin at a 50% success rate? (n = p(1−p)(z/margin)², rounded up.)"
+    answer: 385
+    tolerance: 2
+    explanation: "385. Compare against the field's typical ≤25 rollouts, which buys ±20 points. Precision is expensive and most published work hasn't paid for it."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why does running both stacks on the SAME randomized worlds (paired evaluation) need fewer episodes?"
+    options:
+      - text: "World difficulty is a shared nuisance variance that cancels in the per-episode difference"
+        correct: true
+        explanation: "Unpaired, difficulty spread from easy to hard worlds swamps a modest effect. Paired, both stacks face identical worlds and only the stack difference remains."
+      - text: "Because reusing worlds means fewer worlds to generate"
+        explanation: "A compute saving, not a statistical one — the variance reduction is the real win."
+      - text: "It doesn't; pairing is a convention"
+        explanation: "It's often the difference between detecting a real effect and not, at fixed budget."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "A benchmark's reported scores fall from 95% to under 30% when the camera viewpoint is perturbed. This shows…"
+    options:
+      - text: "The models were evaluated on their training distribution and reported as if they generalized — some were memorizing trajectories rather than using vision"
+        correct: true
+        explanation: "The LIBERO-Plus result. It's distribution shift, measured — and the reason perturbation testing belongs in every robot evaluation protocol."
+      - text: "Camera calibration drift"
+        explanation: "The perturbation is deliberate and known; the collapse is the finding, not an artifact."
+      - text: "That the benchmark is too hard"
+        explanation: "The benchmark is too *easy* in its nominal form — that's how it saturated above 95% in the first place."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "California's AV disengagement reports are a poor safety metric primarily because…"
+    options:
+      - text: "They measure the safety-driver test fleet — under 2% of real driving — with a self-defined event, no severity weighting, and better numbers for easier testing"
+        correct: true
+        explanation: "Four independent design failures in one metric. The DMV is retiring it. Study it before writing your own rubric."
+      - text: "The companies falsify them"
+        explanation: "No falsification needed — the metric's own definition does the damage."
+      - text: "Disengagements are too rare to measure"
+        explanation: "Rarity is a sample-size problem; this metric's issues are structural."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "You run 8 episodes with five different random seeds and get success rates of 62%, 75%, 88%, 75%, and 50%. The correct action is…"
+    options:
+      - text: "Report the pooled result over all 40 episodes with its interval — choosing the best seed would be seed shopping"
+        correct: true
+        explanation: "The spread across seeds IS the uncertainty your 8-episode claim was hiding. Pooling uses all the evidence; picking 88% manufactures a result."
+      - text: "Report 88% and note the others as outliers"
+        explanation: "Nothing distinguishes that run except that it flattered you — the textbook definition of the practice this lesson exists to prevent."
+      - text: "Report the median, 75%"
+        explanation: "Better than seed shopping, but it discards information and still hides the interval. Pool and report the interval."

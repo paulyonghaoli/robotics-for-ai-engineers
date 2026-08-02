@@ -1,0 +1,58 @@
+id: geo-l3-map-odom
+title: "The REP 105 correction edge"
+lesson: modules/01-geometry/03-transform-trees
+description: >-
+  Your localizer just estimated the robot's true pose in the map,
+  `T_map_base_true`, while wheel odometry reports the drifted
+  `T_odom_base`. Compute the correction edge `T_map_odom` that TF should
+  publish so the composed `map → odom → base` equals the true pose —
+  exactly what every localization node (AMCL, your Module 3 filter) does.
+setup_code: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      c, s = np.cos(theta), np.sin(theta)
+      return np.array([[c, -s, x], [s, c, y], [0, 0, 1.0]])
+
+  def se2_inverse(T):
+      R, t = T[:2, :2], T[:2, 2]
+      Ti = np.eye(3)
+      Ti[:2, :2] = R.T
+      Ti[:2, 2] = -R.T @ t
+      return Ti
+starter_code: |
+  import numpy as np
+  # Provided: se2(x, y, theta), se2_inverse(T)
+
+  def compute_map_odom(T_map_base_true, T_odom_base):
+      """Return T_map_odom such that T_map_odom @ T_odom_base == T_map_base_true."""
+      # TODO — one line of subscript algebra
+      return np.eye(3)
+
+  T_map_base_true = se2(4.0, 3.0, np.pi / 4)   # localizer's estimate
+  T_odom_base     = se2(3.9, 3.2, np.pi / 4 + 0.05)  # drifted odometry
+
+  T_map_odom = compute_map_odom(T_map_base_true, T_odom_base)
+  print(T_map_odom @ T_odom_base - T_map_base_true)  # expect ~zeros
+tests: |
+  import numpy as np
+  _T = compute_map_odom(T_map_base_true, T_odom_base)
+  assert np.allclose(_T @ T_odom_base, T_map_base_true, atol=1e-9), "composed map->odom->base must equal the true pose"
+  _rng = np.random.default_rng(3)
+  for _ in range(5):
+      _true = se2(*_rng.uniform(-5, 5, 3))
+      _odo = se2(*_rng.uniform(-5, 5, 3))
+      assert np.allclose(compute_map_odom(_true, _odo) @ _odo, _true, atol=1e-8), "must hold for arbitrary poses, not just the example"
+hints:
+  - "Solve T_map_odom @ T_odom_base = T_map_base for T_map_odom: right-multiply both sides by the inverse of T_odom_base."
+  - "`return T_map_base_true @ se2_inverse(T_odom_base)` — check the subscripts cancel: map←base · base←odom = map←odom."
+solution: |
+  import numpy as np
+
+  def compute_map_odom(T_map_base_true, T_odom_base):
+      return T_map_base_true @ se2_inverse(T_odom_base)
+
+  T_map_base_true = se2(4.0, 3.0, np.pi / 4)
+  T_odom_base     = se2(3.9, 3.2, np.pi / 4 + 0.05)
+  T_map_odom = compute_map_odom(T_map_base_true, T_odom_base)
+  print(T_map_odom @ T_odom_base - T_map_base_true)

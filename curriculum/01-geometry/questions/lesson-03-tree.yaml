@@ -1,0 +1,87 @@
+id: geometry-l3-tree
+title: "Quiz — transform trees"
+lesson: modules/01-geometry/03-transform-trees
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "Why do robot frames form a **tree** (one parent per frame) rather than a general graph?"
+    options:
+      - text: "A tree guarantees exactly one path — and therefore one answer — for every lookup"
+        correct: true
+        explanation: "Redundant edges would let two composition paths disagree; consistency would become a calibration problem instead of a structural guarantee."
+      - text: "Graphs are too slow to search at runtime"
+        explanation: "Graph search at this scale is microseconds; performance isn't the reason."
+      - text: "Sensors can only be attached to one physical link"
+        explanation: "True physically, but the design reason is lookup consistency — the map frame isn't 'attached' to anything and still obeys the tree rule."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "In REP 105, the robot pose is split into `map → odom` and `odom → base_link`. What does the `map → odom` edge represent?"
+    options:
+      - text: "The localization correction — it jumps when the localizer updates, keeping `odom → base` smooth"
+        correct: true
+        explanation: "Planners consume accurate-but-jumpy `map → base`; controllers consume smooth-but-drifting `odom → base`. Two guarantees, one tree."
+      - text: "The robot's smooth wheel-odometry motion"
+        explanation: "That's `odom → base_link`. The correction lives in the other edge."
+      - text: "A static calibration between two map versions"
+        explanation: "It's dynamic — it changes with every localization update."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "A trajectory-tracking controller subscribes to the robot pose. Per the REP 105 design, which transform should it consume?"
+    options:
+      - text: "`odom → base` — smooth and continuous, even though it drifts"
+        correct: true
+        explanation: "A controller differentiates pose; localization jumps in `map → base` become velocity spikes and actuator kicks."
+      - text: "`map → base` — always use the most accurate estimate"
+        explanation: "Accuracy isn't the controller's constraint — continuity is. Corrections belong upstream, in the planner's frame."
+      - text: "Either, they are numerically identical"
+        explanation: "They differ by exactly the accumulated drift correction — that difference is the whole point of the split."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: "`map→odom` = (5, 0, 0°), `odom→base` = (1, 2, 90°), `base→lidar` = (0.5, 0, 0°). What is the LiDAR's **y** coordinate in the map frame?"
+    answer: 2.5
+    tolerance: 0.001
+    hint: "the base faces map +y, so the 0.5 m mount offset adds to y."
+    explanation: "Base sits at (6, 2) facing +y; the mount lands at (6, 2.5)."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "`lookup(lidar, camera)` where both are children of `base`: which composition is correct?"
+    options:
+      - text: "`inverse(T_base_lidar) @ T_base_camera`"
+        correct: true
+        explanation: "Both paths meet at the common ancestor `base`; the edge walked upstream (into lidar) gets inverted."
+      - text: "`T_base_lidar @ T_base_camera`"
+        explanation: "Subscript check: lidar meets base — nothing cancels. One edge must be inverted."
+      - text: "`T_base_camera @ inverse(T_base_lidar)`"
+        explanation: "Order matters: this computes a camera-frame quantity, not T_lidar_camera. Cancel subscripts to verify."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "TF2 raises an 'extrapolation into the future' error for `lookup_transform('map', 'lidar', t_scan)`. Most likely cause?"
+    options:
+      - text: "The scan's timestamp is newer than the latest available transform — a clock offset or a dead/lagging publisher"
+        correct: true
+        explanation: "TF2 interpolates between buffered samples but refuses to extrapolate beyond them. Check clock sync (NTP/PTP) and publisher health first."
+      - text: "The tree contains a cycle"
+        explanation: "Cycles produce connectivity/consistency errors, not time-extrapolation errors."
+      - text: "The lookup rate is too high"
+        explanation: "Lookup rate doesn't affect the time window of buffered data."
+  - id: q7
+    type: multi
+    difficulty: core
+    prompt: "Which edges of a mobile manipulator's tree are **static**? Select all that apply."
+    options:
+      - text: "`base → lidar` (bolted sensor mount)"
+        correct: true
+        explanation: "Fixed at calibration time; published once."
+      - text: "`wrist → camera` (camera screwed to the wrist)"
+        correct: true
+        explanation: "Static relative to the wrist — even though the wrist itself moves through the world."
+      - text: "`odom → base`"
+        explanation: "That's the robot driving — updated at odometry rate."
+      - text: "`shoulder → forearm` (an arm joint)"
+        explanation: "Changes with every joint command; published from joint states."

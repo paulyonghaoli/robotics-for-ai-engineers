@@ -1,0 +1,84 @@
+id: geometry-l5-cspace
+title: "Quiz — configuration space"
+lesson: modules/01-geometry/05-configuration-space
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "The central trick of configuration space is that…"
+    options:
+      - text: "The robot becomes a point; its body geometry is absorbed into the obstacle shapes"
+        correct: true
+        explanation: "Collision checking becomes point-membership in C_obs — which is why planners can be geometry-agnostic search algorithms."
+      - text: "Obstacles become points; the robot absorbs their geometry"
+        explanation: "Backwards — the robot shrinks, the obstacles grow."
+      - text: "Both robot and obstacles are simplified to bounding boxes"
+        explanation: "Bounding boxes are a collision-checking accelerator, not the C-space concept."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A mobile manipulator: differential-drive base (planar) + 6-joint arm + 1-DOF gripper. What is dim(C)?"
+    answer: 10
+    tolerance: 0.01
+    hint: "the planar base contributes (x, y, θ)."
+    explanation: "3 (base pose) + 6 (arm joints) + 1 (gripper) = 10."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The C-space of a 2-link revolute arm is a torus because…"
+    options:
+      - text: "Each joint angle lives on a circle, and the product of two circles is a torus"
+        correct: true
+        explanation: "Walk off one edge of the (θ₁, θ₂) square and you re-enter opposite — planners must respect this wrap or take long-way-around paths."
+      - text: "The arm's reachable workspace is annulus-shaped"
+        explanation: "That's workspace topology; C-space topology comes from the joints, not the reach."
+      - text: "Torus is just a visualization convention"
+        explanation: "It's a real metric fact: configurations near θ = ±π are *close*, and distance computations must honor that."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Nav2 inflates occupancy-grid obstacles by the robot radius so that…"
+    options:
+      - text: "The global planner can treat the robot as a point in (x, y)"
+        correct: true
+        explanation: "The inflation layer is a Minkowski sum in disguise — C-space construction shipped as product."
+      - text: "Sensor noise in the map is smoothed away"
+        explanation: "Noise handling happens in the occupancy update, not the inflation layer."
+      - text: "Paths become shorter"
+        explanation: "Paths get *longer* (wider berth) — the win is correctness, not length."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why don't arm planners construct C_obs explicitly and then search it?"
+    options:
+      - text: "Explicit construction is intractable in high dimensions — planners sample configurations and collision-check them instead"
+        correct: true
+        explanation: "Gridding 7 joints at 1° is 360⁷ cells. Sampling + an oracle (collision checker) is the escape — the entire premise of RRT/PRM."
+      - text: "C_obs cannot be defined for revolute joints"
+        explanation: "It's perfectly well-defined — just expensive to enumerate."
+      - text: "Collision checking is more accurate than geometry"
+        explanation: "The checker *is* geometry; the issue is enumeration cost, not accuracy."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "A rectangular robot (1.2 × 0.6 m) planned as a circle keeps failing to find paths through 0.9 m aisles it can physically traverse lengthwise. The fix is…"
+    options:
+      - text: "Plan in (x, y, θ) with the true footprint, accepting the extra dimension"
+        correct: true
+        explanation: "Safe circular inflation needs the circumscribed radius (~0.67 m → 1.34 m clearance), which blocks the aisle. Orientation-aware footprint checking recovers it."
+      - text: "Inflate by the inscribed radius (0.3 m) instead"
+        explanation: "Now sideways passes look legal that physically collide — you traded false negatives for crashes."
+      - text: "Widen the aisles in the map"
+        explanation: "Editing the map to match the plan rather than reality is how robots meet shelves."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Two arm configurations put the hand in nearly the same place, yet a straight-line joint-space interpolation between them sweeps the elbow across the workspace. Why?"
+    options:
+      - text: "They are different IK branches (elbow-up vs elbow-down) — near in workspace, far in C-space"
+        correct: true
+        explanation: "Workspace distance and C-space distance are different metrics; interpolation happens in C-space, so that's the distance that governs the swept motion."
+      - text: "The interpolation should have been done in workspace coordinates"
+        explanation: "Workspace interpolation of poses has its own problems (IK feasibility along the path) — the real lesson is that the two metrics disagree."
+      - text: "Numerical error in the joint encoders"
+        explanation: "This is a geometry property, present with perfect encoders."

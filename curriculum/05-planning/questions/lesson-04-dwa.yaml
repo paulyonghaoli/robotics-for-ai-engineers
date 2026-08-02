@@ -1,0 +1,47 @@
+id: planning-l4-dwa
+title: "Quiz — local planning and DWA"
+lesson: modules/05-planning/04-local-planning
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "Dynamic window: current v = 0.8 m/s, max accel 1.0 m/s², Δt = 0.2 s. The window's UPPER v bound (V_MAX = 1.2)?"
+    answer: 1.0
+    tolerance: 0.005
+    explanation: "0.8 + 1.0·0.2 = 1.0 — under V_MAX, so accel binds. The window is small; DWA's agility comes from re-choosing constantly."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "The admissibility check removes velocities that can't stop before their arc's obstacle because…"
+    options:
+      - text: "Clearance NOW is irrelevant if momentum carries you past the last stopping point — braking distance is the honest safety margin"
+        correct: true
+        explanation: "v ≤ √(2·a·dist): the same v²/2a physics as MPC's horizon question, applied per candidate."
+      - text: "Slow velocities always score better"
+        explanation: "The velocity term explicitly prefers brisk — admissibility is a hard filter, not a preference."
+      - text: "It reduces the number of rollouts"
+        explanation: "A side effect, not the reason."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The freezing-robot problem is…"
+    options:
+      - text: "All nearby actions score poorly, so a one-step planner stops — safe, stationary, and blocking the corridor it refused to enter"
+        correct: true
+        explanation: "A myopia failure: short-term discomfort that buys long-term progress is invisible at horizon one. Fixes: longer horizons (MPPI) or better value estimates."
+      - text: "Motor stiction at low speed"
+        explanation: "That's lesson 2.5's hardware issue; freezing is a decision pathology."
+      - text: "The planner crashing under load"
+        explanation: "The planner is running fine — that's what makes it maddening."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "DWA matters to Module 9 (robot learning) because…"
+    options:
+      - text: "It's a one-step policy with a hand-crafted value function — the baseline learned local planners must beat and the safety envelope they run inside"
+        correct: true
+        explanation: "G(v,ω) is a value estimate over an action window; replacing it with a network keeps the loop and the admissibility guard. Know the classical floor before claiming to raise it."
+      - text: "DWA generates training data automatically"
+        explanation: "It can (imitation source), but the structural point is the policy/value framing."
+      - text: "Learned planners have made DWA obsolete"
+        explanation: "Nav2 ships DWB today; the envelope logic survives even where the scorer is learned."

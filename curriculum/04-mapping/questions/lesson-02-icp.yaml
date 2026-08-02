@@ -1,0 +1,52 @@
+id: mapping-l2-icp
+title: "Quiz — scan matching and ICP"
+lesson: modules/04-mapping/02-scan-matching
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "ICP is structurally the same loop as…"
+    options:
+      - text: "k-means / hard-EM: alternate assignment (correspondence) with fitting (alignment), converging to a local optimum"
+        correct: true
+        explanation: "Which is why initialization is destiny: ICP refines odometry's guess; it does not discover alignment from nothing."
+      - text: "Gradient descent on a convex loss"
+        explanation: "The correspondence step makes the landscape non-convex — basins everywhere."
+      - text: "RANSAC"
+        explanation: "RANSAC hypothesizes-and-verifies globally; ICP refines locally. Complementary, not identical."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "The det(R) fix in Kabsch exists because…"
+    options:
+      - text: "Without it, the SVD solution can return a REFLECTION — the mirror-world bug of lesson 1.6, produced by your own optimizer"
+        correct: true
+        explanation: "Flipping the sign of Vt's last row selects the best proper rotation instead."
+      - text: "SVD is numerically unstable"
+        explanation: "SVD is famously stable; the issue is which of two algebraic solutions you pick."
+      - text: "Rotations must have det = 0"
+        explanation: "det(R) = +1 for rotations; −1 is the reflection being rejected."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "In a featureless corridor, ICP's cost surface over (dx, dy) is…"
+    options:
+      - text: "A valley: flat along the corridor axis — lateral motion constrained, longitudinal motion unobservable"
+        correct: true
+        explanation: "Degenerate geometry ⇒ a solution subspace. Detect via the Hessian's conditioning and inflate covariance along the flat direction — honesty over hallucination."
+      - text: "A sharp bowl like anywhere else"
+        explanation: "Nothing in the scan constrains sliding along the walls — the geometry, not the algorithm, is degenerate."
+      - text: "Completely flat"
+        explanation: "Lateral offset IS constrained (the walls); only the along-axis direction is free."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "A person walks through scan B. Untrimmed ICP will…"
+    options:
+      - text: "Drag the alignment toward the mover — their points find false partners and vote in the least squares"
+        correct: true
+        explanation: "Outlier trimming (drop the worst-matched fraction) is robust regression against non-static scene content."
+      - text: "Ignore them automatically"
+        explanation: "Least squares has no concept of 'not part of the room' unless you give it one."
+      - text: "Fail to converge"
+        explanation: "Worse: it converges confidently to a slightly wrong answer."

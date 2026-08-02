@@ -1,0 +1,60 @@
+id: geo-l6-bug-order
+title: "Bug 3: the misplaced sensor"
+lesson: modules/01-geometry/06-lab-frame-debugging
+description: >-
+  **Symptom:** every projected LiDAR point is offset from ground truth by a
+  constant-looking pose error that *changes with the robot's heading*. The
+  projection pipeline below has one wrong line. Diagnose using the probe
+  poses, then fix.
+setup_code: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      c, s = np.cos(theta), np.sin(theta)
+      return np.array([[c, -s, x], [s, c, y], [0, 0, 1.0]])
+
+  MOUNT = (0.4, 0.0, np.pi)  # lidar mounted 0.4 m ahead, facing BACKWARD
+
+  def ground_truth_scan(robot_pose, points_map):
+      """What the lidar actually measures for map-frame points (lidar frame)."""
+      T_map_lidar = se2(*robot_pose) @ se2(*MOUNT)
+      R, t = T_map_lidar[:2, :2], T_map_lidar[:2, 2]
+      return (np.asarray(points_map) - t) @ R
+starter_code: |
+  import numpy as np
+  # Provided: se2, MOUNT = (0.4, 0.0, pi)  (backward-facing lidar!),
+  #           ground_truth_scan(robot_pose, points_map) -> lidar-frame points
+
+  def project_scan(scan_points, robot_pose):
+      """Project lidar-frame points into the map frame."""
+      T_map_lidar = se2(*MOUNT) @ se2(*robot_pose)   # <-- suspicious
+      pts = np.asarray(scan_points)
+      return pts @ T_map_lidar[:2, :2].T + T_map_lidar[:2, 2]
+
+  # Probe: a wall of three known map points, robot at a known pose.
+  wall = np.array([[2.0, -1.0], [2.0, 0.0], [2.0, 1.0]])
+  pose = (0.5, 0.0, np.pi / 2)
+  scan = ground_truth_scan(pose, wall)
+  print(project_scan(scan, pose))   # should reproduce the wall exactly
+tests: |
+  import numpy as np
+  _wall = np.array([[2.0, -1.0], [2.0, 0.0], [2.0, 1.0]])
+  for _pose in [(0.5, 0.0, np.pi / 2), (0.0, 0.0, 0.0), (-1.0, 2.0, 1.1)]:
+      _scan = ground_truth_scan(_pose, _wall)
+      _back = project_scan(_scan, _pose)
+      assert np.allclose(_back, _wall, atol=1e-9), "projected scan must reproduce the wall; at pose %s the error is %s — check which transform composes first" % (str(_pose), np.round(np.abs(_back - _wall).max(), 3))
+hints:
+  - "Subscript-check the buggy line: se2(*MOUNT) is T_base_lidar; se2(*robot_pose) is T_map_base. Does `T_base_lidar @ T_map_base` cancel anything?"
+  - "The correct chain is T_map_lidar = T_map_base @ T_base_lidar — robot pose first, mount second."
+solution: |
+  import numpy as np
+
+  def project_scan(scan_points, robot_pose):
+      T_map_lidar = se2(*robot_pose) @ se2(*MOUNT)   # map<-base . base<-lidar
+      pts = np.asarray(scan_points)
+      return pts @ T_map_lidar[:2, :2].T + T_map_lidar[:2, 2]
+
+  wall = np.array([[2.0, -1.0], [2.0, 0.0], [2.0, 1.0]])
+  pose = (0.5, 0.0, np.pi / 2)
+  scan = ground_truth_scan(pose, wall)
+  print(project_scan(scan, pose))

@@ -1,0 +1,70 @@
+id: est-l4-gyro
+title: "Characterize a gyro: noise vs bias"
+lesson: modules/03-estimation/04-sensor-models
+description: >-
+  You get a stationary gyro log (the robot isn't moving — every reading is
+  pure error). Estimate the bias and noise density, then show the lesson's
+  claim: integrated heading error grows ∝ √t from white noise but ∝ t from
+  bias — and after a minute, the bias you almost can't see dominates.
+setup_code: |
+  import numpy as np
+
+  DT = 0.01
+  TRUE_BIAS, NOISE_SIGMA = 0.008, 0.02
+  RNG = np.random.default_rng(21)
+  stationary_log = TRUE_BIAS + RNG.normal(0, NOISE_SIGMA, 60_000)  # 10 min at 100 Hz
+starter_code: |
+  import numpy as np
+  # Provided: stationary_log (10 min of a NON-MOVING gyro at 100 Hz, rad/s), DT
+
+  def estimate_bias(log):
+      """The stationary mean IS the bias — that's the whole trick."""
+      # TODO
+      return 0.0
+
+  def estimate_noise_sigma(log):
+      """Std of the log after removing the bias."""
+      # TODO
+      return 0.0
+
+  def heading_drift(log, remove_bias=False):
+      """Integrate the stationary log into heading error over time."""
+      # TODO: rates = log - (estimated bias if remove_bias else 0);
+      #        return np.cumsum(rates) * DT
+      return np.zeros(len(log))
+
+  b, s = estimate_bias(stationary_log), estimate_noise_sigma(stationary_log)
+  print("bias %.4f rad/s (true 0.008), sigma %.4f (true 0.02)" % (b, s))
+  print("60 s drift, raw:            %.3f rad" % heading_drift(stationary_log)[6000])
+  print("60 s drift, bias-corrected: %.3f rad" % heading_drift(stationary_log, True)[6000])
+tests: |
+  import numpy as np
+  _b = estimate_bias(stationary_log)
+  assert abs(_b - 0.008) < 0.0005, "bias estimate should be ~0.008 rad/s (got %.4f) - it's just the mean" % _b
+  _s = estimate_noise_sigma(stationary_log)
+  assert abs(_s - 0.02) < 0.002, "noise sigma should be ~0.02 (got %.4f)" % _s
+  _raw = heading_drift(stationary_log)
+  assert abs(_raw[6000] - 0.48) < 0.05, "raw 60 s drift should be ~bias*t = 0.48 rad (got %.3f)" % _raw[6000]
+  _cor = heading_drift(stationary_log, remove_bias=True)
+  assert abs(_cor[6000]) < 0.05, "bias-corrected drift should be ~10x smaller - only the sqrt(t) noise walk remains"
+  assert abs(_raw[-1]) > 8 * abs(_cor[-1]), "at 10 min the linear bias term must dominate the noise walk by ~an order of magnitude"
+hints:
+  - "estimate_bias: np.mean(log). estimate_noise_sigma: np.std(log - bias) — or just np.std(log)."
+  - "heading_drift: np.cumsum(log - correction) * DT. The punchline is in the two printed numbers."
+solution: |
+  import numpy as np
+
+  def estimate_bias(log):
+      return float(np.mean(log))
+
+  def estimate_noise_sigma(log):
+      return float(np.std(log - np.mean(log)))
+
+  def heading_drift(log, remove_bias=False):
+      rates = log - (estimate_bias(log) if remove_bias else 0.0)
+      return np.cumsum(rates) * DT
+
+  b, s = estimate_bias(stationary_log), estimate_noise_sigma(stationary_log)
+  print("bias %.4f rad/s (true 0.008), sigma %.4f (true 0.02)" % (b, s))
+  print("60 s drift, raw:            %.3f rad" % heading_drift(stationary_log)[6000])
+  print("60 s drift, bias-corrected: %.3f rad" % heading_drift(stationary_log, True)[6000])

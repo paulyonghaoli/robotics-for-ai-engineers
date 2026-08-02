@@ -1,0 +1,58 @@
+id: est-l1-kf-1d
+title: "The scalar Kalman filter, from scratch"
+lesson: modules/03-estimation/01-kalman
+description: >-
+  Implement predict and update for a 1-dimensional Kalman filter — every
+  matrix becomes a number and the structure becomes transparent. The tests
+  check the precision-weighted-average behavior directly.
+setup_code: |
+  import numpy as np
+starter_code: |
+  import numpy as np
+
+  def predict(x, P, q):
+      """Constant-position model: state unchanged, variance grows by q."""
+      # TODO
+      return x, P
+
+  def update(x, P, z, r):
+      """Fold in measurement z with variance r. Return posterior (x, P)."""
+      # TODO: K = P / (P + r); x' = x + K (z - x); P' = (1 - K) P
+      return x, P
+
+  # Prediction says 5 (variance 4); sensor says 6 (variance 1):
+  x, P = update(5.0, 4.0, 6.0, 1.0)
+  print(x, P)   # expect 5.8, 0.8 — pulled 80% toward the confident sensor
+tests: |
+  import numpy as np
+  _x, _P = update(5.0, 4.0, 6.0, 1.0)
+  assert abs(_x - 5.8) < 1e-9, "posterior mean should be 5.8: K = 4/5, x = 5 + 0.8*(6-5)"
+  assert abs(_P - 0.8) < 1e-9, "posterior variance should be (1-K)*P = 0.8"
+  _x, _P = predict(5.8, 0.8, 0.3)
+  assert abs(_x - 5.8) < 1e-9 and abs(_P - 1.1) < 1e-9, "predict: mean unchanged, variance grows by q"
+  _x, _P = update(0.0, 1e6, 3.0, 1.0)
+  assert abs(_x - 3.0) < 1e-2, "with a vague prior (P huge) the posterior must follow the measurement"
+  _x, _P = update(0.0, 1e-6, 3.0, 1.0)
+  assert abs(_x) < 1e-2, "with a confident prior (P tiny) the measurement must barely move it"
+  _x, _P = 0.0, 100.0
+  _rng = np.random.default_rng(0)
+  for _ in range(100):
+      _x, _P = predict(_x, _P, 0.01)
+      _x, _P = update(_x, _P, 2.0 + _rng.normal(0, 0.5), 0.25)
+  assert abs(_x - 2.0) < 0.2, "filtering 100 noisy readings of a constant should converge near 2.0 (got %.3f)" % _x
+  assert _P < 0.1, "steady-state variance should be far below the sensor variance"
+hints:
+  - "predict: return x, P + q — the model adds uncertainty, never information."
+  - "update: K = P/(P+r) is the fraction of the innovation to accept — 0 when the prior is certain, 1 when the sensor is."
+solution: |
+  import numpy as np
+
+  def predict(x, P, q):
+      return x, P + q
+
+  def update(x, P, z, r):
+      K = P / (P + r)
+      return x + K * (z - x), (1.0 - K) * P
+
+  x, P = update(5.0, 4.0, 6.0, 1.0)
+  print(x, P)

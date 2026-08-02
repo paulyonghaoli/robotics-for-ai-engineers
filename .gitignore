@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Docs
+site/
+docs/assets/generated/
+
+# Evaluation outputs
+projects/capstone_nav/results.json
+
+# Notebooks
+.ipynb_checkpoints/
+
+# ROS 2
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local editor/agent config
+.claude/

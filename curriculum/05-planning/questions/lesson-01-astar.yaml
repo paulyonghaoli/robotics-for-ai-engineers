@@ -1,0 +1,59 @@
+id: planning-l1-astar
+title: "Quiz — graph search and A*"
+lesson: modules/05-planning/01-astar
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "A* remains optimal as long as the heuristic…"
+    options:
+      - text: "Never overestimates the true cost-to-go (admissibility)"
+        correct: true
+        explanation: "Optimism is safe: the goal can't be expanded early via an inflated estimate. Overestimate anywhere and the guarantee is gone."
+      - text: "Is always exactly correct"
+        explanation: "If you had the exact cost-to-go you wouldn't need to search — admissibility only requires a lower bound."
+      - text: "Runs in constant time"
+        explanation: "Heuristic cost matters for speed, not correctness."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Octile heuristic from (0,0) to (5,3): (dy+dx) + (√2−2)·min(dy,dx). Compute it."
+    answer: 6.243
+    tolerance: 0.01
+    explanation: "8 + (1.414−2)·3 ≈ 6.243 — and on open ground this equals the true optimal (3 diagonals + 2 straights)."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Using Manhattan distance as the heuristic on an 8-connected grid…"
+    options:
+      - text: "Silently breaks optimality — it overestimates whenever the optimal path uses diagonals"
+        correct: true
+        explanation: "dy+dx > octile for any diagonal motion. The classic bug when porting 4-connected code; paths come out a few percent long and nobody notices until fleet-scale."
+      - text: "Is fine — Manhattan is always admissible"
+        explanation: "Only on 4-connected grids. Admissibility is relative to the motion model."
+      - text: "Makes A* slower but still optimal"
+        explanation: "Inadmissible heuristics don't slow A* — they mislead it."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Weighted A* (multiply h by ε > 1) buys…"
+    options:
+      - text: "Fewer node expansions in exchange for paths at most ε times optimal"
+        correct: true
+        explanation: "A bounded-suboptimality dial — the compute/quality trade production planners actually expose."
+      - text: "Optimal paths, faster"
+        explanation: "The suboptimality bound is the price; there's no free speedup."
+      - text: "Better paths in mazes specifically"
+        explanation: "Mazes are where heuristics help *least* — geometry doesn't cooperate."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Your planner's paths hug walls and the capstone rubric reports collisions, yet every path is collision-free in cell space. The missing step is…"
+    options:
+      - text: "Obstacle inflation — the robot has a body; plan on the C-space (inflated) grid from lesson 1.5"
+        correct: true
+        explanation: "Legal for a point, fatal for a 0.3 m-radius robot. The inflate-then-plan pattern is why the reference stack passes."
+      - text: "A finer grid resolution"
+        explanation: "Resolution changes fidelity, not the fact that the plan ignores the robot's radius."
+      - text: "A better heuristic"
+        explanation: "Heuristics affect search efficiency; the paths themselves are legal in the (wrong) space being searched."

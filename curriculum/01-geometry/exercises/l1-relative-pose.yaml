@@ -1,0 +1,58 @@
+id: geo-l1-relative-pose
+title: "Relative pose: where is the other robot?"
+lesson: modules/01-geometry/01-coordinate-frames
+description: >-
+  Two robots are localized in the same map: A at (1, 1, 0) and B at (2, 1, π).
+  Compute B's pose **as seen from A's frame** — the quantity you'd feed a
+  follow-the-leader controller. Requires the closed-form SE(2) inverse.
+setup_code: |
+  import numpy as np
+
+  def se2(x, y, theta):
+      c, s = np.cos(theta), np.sin(theta)
+      return np.array([[c, -s, x], [s, c, y], [0, 0, 1.0]])
+
+  def se2_to_pose(T):
+      return float(T[0, 2]), float(T[1, 2]), float(np.arctan2(T[1, 0], T[0, 0]))
+starter_code: |
+  import numpy as np
+  # Provided helpers (already defined): se2(x, y, theta), se2_to_pose(T)
+
+  def se2_inverse(T):
+      """Closed-form rigid inverse: [R t]^-1 = [R.T  -R.T @ t]."""
+      # TODO (do not use np.linalg.inv)
+      return T
+
+  T_map_A = se2(1.0, 1.0, 0.0)
+  T_map_B = se2(2.0, 1.0, np.pi)
+
+  # TODO: compute T_A_B, then unpack it into a pose
+  x, y, theta = 0.0, 0.0, 0.0  # replace
+
+  print(x, y, theta)  # expect 1.0 0.0 pi (B is 1 m ahead of A, facing back at it)
+tests: |
+  import numpy as np
+  _T = se2(3.0, -2.0, 0.7)
+  _Ti = se2_inverse(_T)
+  assert np.allclose(_Ti @ _T, np.eye(3), atol=1e-9), "se2_inverse(T) @ T must be the identity"
+  assert np.allclose(_Ti[:2, :2], _T[:2, :2].T, atol=1e-12), "inverse rotation block should be R.T (closed form, not np.linalg.inv)"
+  assert abs(x - 1.0) < 1e-9 and abs(y - 0.0) < 1e-9, "B should be at (1, 0) in A's frame"
+  assert abs(abs(theta) - np.pi) < 1e-9, "B faces back toward A: heading pi (or -pi)"
+hints:
+  - "T_A_B = (T_map_A)^-1 @ T_map_B — invert to flip the subscript order, then the inner `map` cancels."
+  - "For the inverse: new rotation is R.T, new translation is -R.T @ t."
+solution: |
+  import numpy as np
+
+  def se2_inverse(T):
+      R, t = T[:2, :2], T[:2, 2]
+      Ti = np.eye(3)
+      Ti[:2, :2] = R.T
+      Ti[:2, 2] = -R.T @ t
+      return Ti
+
+  T_map_A = se2(1.0, 1.0, 0.0)
+  T_map_B = se2(2.0, 1.0, np.pi)
+  T_A_B = se2_inverse(T_map_A) @ T_map_B
+  x, y, theta = se2_to_pose(T_A_B)
+  print(x, y, theta)

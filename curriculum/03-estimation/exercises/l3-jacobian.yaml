@@ -1,0 +1,76 @@
+id: est-l3-jacobian
+title: "The range-bearing Jacobian, by hand"
+lesson: modules/03-estimation/03-ekf
+description: >-
+  Derive and implement the observation Jacobian H for a range-bearing
+  measurement of a landmark — the one worked example every estimation
+  engineer does once. Your analytic Jacobian is checked against finite
+  differences (the standard robotics unit-test idiom; steal it).
+setup_code: |
+  import numpy as np
+
+  def wrap(a):
+      return -(np.mod(-a + np.pi, 2 * np.pi) - np.pi)
+
+  def obs(x, lm):
+      d = np.asarray(lm) - x[:2]
+      return np.array([np.hypot(d[0], d[1]), wrap(np.arctan2(d[1], d[0]) - x[2])])
+
+  def finite_diff_jac(x, lm, eps=1e-6):
+      J = np.zeros((2, 3))
+      for k in range(3):
+          dx = np.zeros(3); dx[k] = eps
+          diff = obs(x + dx, lm) - obs(x - dx, lm)
+          diff[1] = wrap(diff[1])
+          J[:, k] = diff / (2 * eps)
+      return J
+starter_code: |
+  import numpy as np
+  # Provided: obs(x, lm) -> [range, bearing];  finite_diff_jac(x, lm)
+
+  def obs_jac(x, lm):
+      """Analytic 2x3 Jacobian of [range, bearing] wrt (px, py, theta).
+
+      With delta = lm - x[:2], q = ||delta||^2, r = sqrt(q):
+        row 0 (range):   [-dx/r,  -dy/r,   0]
+        row 1 (bearing): [ dy/q,  -dx/q,  -1]
+      """
+      # TODO
+      return np.zeros((2, 3))
+
+  x = np.array([0.0, 0.0, 0.0])
+  lm = np.array([4.0, 3.0])
+  print(obs_jac(x, lm))
+  print(finite_diff_jac(x, lm))   # should match
+tests: |
+  import numpy as np
+  _H = obs_jac(np.array([0.0, 0.0, 0.0]), np.array([4.0, 3.0]))
+  assert _H.shape == (2, 3), "Jacobian must be 2x3"
+  assert np.allclose(_H[0], [-0.8, -0.6, 0.0], atol=1e-9), "range row for the (4,3) landmark should be [-0.8, -0.6, 0]"
+  assert np.allclose(_H[1], [0.12, -0.16, -1.0], atol=1e-9), "bearing row should be [0.12, -0.16, -1]"
+  _rng = np.random.default_rng(5)
+  for _ in range(20):
+      _x = np.array([*_rng.uniform(-5, 5, 2), _rng.uniform(-np.pi, np.pi)])
+      _lm = _rng.uniform(-5, 5, 2)
+      if np.hypot(*(_lm - _x[:2])) < 0.5:
+          continue
+      assert np.allclose(obs_jac(_x, _lm), finite_diff_jac(_x, _lm), atol=1e-4), "analytic and finite-difference Jacobians must agree at pose %s" % np.round(_x, 2)
+hints:
+  - "delta = lm − x[:2]; q = delta @ delta; r = sqrt(q). Fill the two rows from the docstring — the -1 in the bearing/theta slot is the robot turning away from the landmark."
+  - "The range row is minus the unit vector toward the landmark: moving toward it shrinks the range."
+solution: |
+  import numpy as np
+
+  def obs_jac(x, lm):
+      d = np.asarray(lm) - x[:2]
+      q = float(d @ d)
+      r = np.sqrt(q)
+      return np.array([
+          [-d[0] / r, -d[1] / r, 0.0],
+          [ d[1] / q, -d[0] / q, -1.0],
+      ])
+
+  x = np.array([0.0, 0.0, 0.0])
+  lm = np.array([4.0, 3.0])
+  print(obs_jac(x, lm))
+  print(finite_diff_jac(x, lm))

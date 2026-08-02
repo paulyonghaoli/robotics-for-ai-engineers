@@ -1,0 +1,92 @@
+id: ctl-l4-pursuit
+title: "Implement pure pursuit"
+lesson: modules/02-control/04-trajectory-tracking
+description: >-
+  Implement the pure-pursuit steering law and drive a simulated
+  differential-drive robot back onto a path it starts 2 m away from. The
+  tests grade the closed-loop behavior: convergence, staying converged,
+  and steering the correct direction.
+setup_code: |
+  import numpy as np
+
+  PATH = np.column_stack([np.linspace(0, 30, 301), np.zeros(301)])
+
+  def body_frame(pose, point):
+      """Express a world point in the robot's body frame."""
+      x, y, th = pose
+      d = np.asarray(point) - [x, y]
+      c, s = np.cos(-th), np.sin(-th)
+      return np.array([c * d[0] - s * d[1], s * d[0] + c * d[1]])
+
+  def rollout(controller, pose, path, steps=300, v=1.0, dt=0.05):
+      poses = []
+      for _ in range(steps):
+          w = float(np.clip(controller(np.array(pose), path), -2.5, 2.5))
+          x, y, th = pose
+          if abs(w) < 1e-9:
+              pose = (x + v*np.cos(th)*dt, y + v*np.sin(th)*dt, th)
+          else:
+              r = v / w
+              pose = (x + r*(np.sin(th + w*dt) - np.sin(th)),
+                      y - r*(np.cos(th + w*dt) - np.cos(th)), th + w*dt)
+          poses.append(pose)
+      return np.array(poses)
+starter_code: |
+  import numpy as np
+  # Provided: PATH (straight line along +x), body_frame(pose, point),
+  #           rollout(controller, start_pose, path) -> pose history
+
+  V = 1.0
+  LOOKAHEAD = 1.2
+
+  def lookahead_point(pose, path):
+      """First path vertex at least LOOKAHEAD from the robot,
+      searching forward from the nearest vertex (fallback: last vertex)."""
+      # TODO
+      return path[-1]
+
+  def pure_pursuit(pose, path):
+      """Return omega: curvature law kappa = 2*y_body / L^2, omega = V*kappa."""
+      # TODO: goal = lookahead_point(...); g = body_frame(pose, goal); ...
+      return 0.0
+
+  poses = rollout(pure_pursuit, (0.0, 2.0, 0.0), PATH)
+  print("final lateral error:", poses[-1, 1])
+tests: |
+  import numpy as np
+  _w = pure_pursuit(np.array([5.0, 1.0, 0.0]), PATH)
+  assert _w < -1e-4, "robot left of the path must steer right (omega < 0), got %.4f" % _w
+  _w = pure_pursuit(np.array([5.0, -1.0, 0.0]), PATH)
+  assert _w > 1e-4, "robot right of the path must steer left (omega > 0)"
+  _g = lookahead_point(np.array([5.0, 0.0, 0.0]), PATH)
+  assert _g[0] >= 5.0 + LOOKAHEAD - 0.2, "lookahead point must be AHEAD by ~LOOKAHEAD, got x=%.2f" % _g[0]
+  _poses = rollout(pure_pursuit, (0.0, 2.0, 0.0), PATH)
+  assert np.abs(_poses[150:, 1]).max() < 0.15, "must converge to the path and stay (late error %.3f)" % np.abs(_poses[150:, 1]).max()
+  _poses2 = rollout(pure_pursuit, (0.0, -2.0, 0.5), PATH)
+  assert np.abs(_poses2[150:, 1]).max() < 0.15, "must also converge from below with a heading offset"
+hints:
+  - "Nearest vertex: `i = np.argmin(np.hypot(*(path - pose[:2]).T))`; then walk j from i forward until np.hypot(*(path[j] - pose[:2])) >= LOOKAHEAD."
+  - "Steering: g = body_frame(pose, goal); L2 = g @ g; return V * (2 * g[1] / L2). The sign comes free from the body-frame y."
+solution: |
+  import numpy as np
+
+  V = 1.0
+  LOOKAHEAD = 1.2
+
+  def lookahead_point(pose, path):
+      d = path - pose[:2]
+      i = int(np.argmin(np.hypot(d[:, 0], d[:, 1])))
+      for j in range(i, len(path)):
+          if np.hypot(*(path[j] - pose[:2])) >= LOOKAHEAD:
+              return path[j]
+      return path[-1]
+
+  def pure_pursuit(pose, path):
+      g = body_frame(pose, lookahead_point(pose, path))
+      L2 = float(g @ g)
+      if L2 < 1e-12:
+          return 0.0
+      return V * (2.0 * g[1] / L2)
+
+  poses = rollout(pure_pursuit, (0.0, 2.0, 0.0), PATH)
+  print("final lateral error:", poses[-1, 1])

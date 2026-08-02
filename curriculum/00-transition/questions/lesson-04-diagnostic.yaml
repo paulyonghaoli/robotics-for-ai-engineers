@@ -1,0 +1,123 @@
+id: transition-l4-diagnostic
+title: "Math prerequisites diagnostic — 12 questions, ~1 minute each"
+lesson: modules/00-transition/04-diagnostic
+questions:
+  - id: la1
+    type: numeric
+    difficulty: intro
+    prompt: "**[LinAlg]** For the rotation-ish matrix A = [[0, −1], [1, 0]], compute A·(3, 4) and give the resulting **x** component."
+    answer: -4.0
+    tolerance: 0.001
+    explanation: "(0·3 − 1·4, 1·3 + 0·4) = (−4, 3): a 90° rotation. If matrix-vector products aren't instant reflexes, Module 1 will be mud — refresh matrix-vector geometry first."
+  - id: la2
+    type: single
+    difficulty: intro
+    prompt: "**[LinAlg]** A matrix R satisfies RᵀR = I. What is R⁻¹?"
+    options:
+      - text: "Rᵀ — orthogonal matrices invert by transposition"
+        correct: true
+        explanation: "The single most-used fact in this curriculum (rotations!). If this wasn't instant, review orthogonality before lesson 1.1."
+      - text: "R itself"
+        explanation: "Only for symmetric orthogonal matrices (reflections). Review orthogonality."
+      - text: "It may not be invertible"
+        explanation: "RᵀR = I forces |det R| = 1 — always invertible. Review determinants + orthogonality."
+  - id: la3
+    type: numeric
+    difficulty: core
+    prompt: "**[LinAlg]** det([[2, 1], [1, 2]]) = ?"
+    answer: 3.0
+    tolerance: 0.001
+    explanation: "4 − 1 = 3. Determinants as volume-scaling shows up in Jacobians (lesson 2.3) and singularity detection."
+  - id: la4
+    type: single
+    difficulty: core
+    prompt: "**[LinAlg]** The SVD's smallest singular value being ≈ 0 tells you the matrix…"
+    options:
+      - text: "Nearly annihilates some input direction — it's close to rank-deficient"
+        correct: true
+        explanation: "The geometric heart of lesson 2.3's singularities and every ill-conditioning argument. If SVD is fuzzy, watch 3Blue1Brown's episode before Module 2."
+      - text: "Has small entries"
+        explanation: "Entry size and singular values are unrelated (try [[1e6, 1e6],[1e6, 1e6]]). Review SVD geometry."
+      - text: "Is not square"
+        explanation: "Shape doesn't determine spectrum. Review SVD."
+  - id: pr1
+    type: numeric
+    difficulty: intro
+    prompt: "**[Prob]** A test is 99% accurate both ways; 1% of robots have the fault. A robot tests positive. P(fault | positive) as a decimal?"
+    answer: 0.5
+    tolerance: 0.02
+    explanation: "Bayes: 0.99·0.01 / (0.99·0.01 + 0.01·0.99) = 0.5. If this surprised you, review Bayes before Module 3 — the entire module is this move at 50 Hz."
+  - id: pr2
+    type: single
+    difficulty: intro
+    prompt: "**[Prob]** X and Y independent with variances 4 and 9. Var(X + Y) = ?"
+    options:
+      - text: "13 — variances of independent variables add"
+        correct: true
+        explanation: "Why uncertainty GROWS in the Kalman predict step. If shaky, review variance rules."
+      - text: "√13"
+        explanation: "Standard deviations don't add; variances do (under independence). Review."
+      - text: "36"
+        explanation: "That's multiplying — variances add. Review variance algebra."
+  - id: pr3
+    type: single
+    difficulty: core
+    prompt: "**[Prob]** A covariance matrix's off-diagonal entry being large and positive means…"
+    options:
+      - text: "The two variables err together — knowing one's error tells you about the other's"
+        correct: true
+        explanation: "Correlated uncertainty is what makes the Kalman gain a matrix rather than per-state scalars. Review covariance if fuzzy."
+      - text: "Both variables have large variance"
+        explanation: "Variances live on the diagonal. Review covariance structure."
+      - text: "The matrix is invalid"
+        explanation: "Perfectly valid if the matrix stays positive semi-definite. Review."
+  - id: pr4
+    type: single
+    difficulty: core
+    prompt: "**[Prob]** Multiplying two Gaussian densities (same variable) yields, up to scale, another Gaussian whose mean is…"
+    options:
+      - text: "A precision-weighted average of the two means"
+        correct: true
+        explanation: "This IS the Kalman update (lesson 3.1). Being able to feel this result makes Module 3 nearly self-evident."
+      - text: "The midpoint of the two means"
+        explanation: "Only when variances are equal. The general weighting by 1/σ² is the punchline. Review Gaussian products."
+      - text: "The mean of the wider Gaussian"
+        explanation: "Backwards — the NARROWER (more confident) one dominates. Review."
+  - id: ca1
+    type: numeric
+    difficulty: intro
+    prompt: "**[Calc]** f(x, y) = x²y. Evaluate ∂f/∂x at (2, 3)."
+    answer: 12.0
+    tolerance: 0.001
+    explanation: "2xy = 12. Partial derivatives as 'sensitivity holding the rest fixed' is all Jacobians are (lessons 2.3, 3.3)."
+  - id: ca2
+    type: single
+    difficulty: intro
+    prompt: "**[Calc]** The chain rule's role in this curriculum is…"
+    options:
+      - text: "Composing sensitivities: how error in θ propagates through FK to the hand, through h to the innovation"
+        correct: true
+        explanation: "Same rule that runs backprop. If chain-rule-as-composition is unfamiliar, refresh before lesson 2.3."
+      - text: "Integrating trajectories"
+        explanation: "That's the fundamental theorem's other half; the chain rule composes derivatives."
+      - text: "A numerical trick for speed"
+        explanation: "It's the exact algebra of composed change, not an approximation."
+  - id: ca3
+    type: numeric
+    difficulty: core
+    prompt: "**[Calc]** First-order (Taylor) estimate: sin(0.1) ≈ ? (3 decimals)"
+    answer: 0.1
+    tolerance: 0.002
+    explanation: "sin(x) ≈ x near 0 — linearization, the move the EKF makes at every step (lesson 3.3). True value 0.0998."
+  - id: ca4
+    type: single
+    difficulty: core
+    prompt: "**[Calc]** Gradient descent on f follows −∇f because…"
+    options:
+      - text: "The gradient is the direction of steepest local increase; its negation decreases f fastest locally"
+        correct: true
+        explanation: "Numerical IK (lesson 2.1) is literally this on ‖FK(θ) − target‖². You know this from ML; the diagnostic just confirms the connection is live."
+      - text: "The gradient points at the global minimum"
+        explanation: "Only locally, only greedily — the local/global gap is why IK has branches and planners exist."
+      - text: "Convention from the ML literature"
+        explanation: "It's a theorem about directional derivatives, not a style choice."

@@ -1,0 +1,71 @@
+id: geo-l4-euler-vs-arc
+title: "Twist integration: exact arc model"
+lesson: modules/01-geometry/04-twists
+description: >-
+  Implement the exact (arc) integration of a constant body twist — with the
+  ω ≈ 0 guard — and see it beat Euler integration on a closed circle. The
+  tests drive one full revolution and check the trajectory closes.
+setup_code: |
+  import numpy as np
+
+  def euler_step(pose, v, omega, dt):
+      x, y, th = pose
+      return (x + v * np.cos(th) * dt, y + v * np.sin(th) * dt, th + omega * dt)
+starter_code: |
+  import numpy as np
+  # Provided for comparison: euler_step(pose, v, omega, dt)
+
+  def arc_step(pose, v, omega, dt):
+      """Exact integration of body twist (v, 0, omega) over dt.
+
+      Must handle |omega| < 1e-9 with the straight-line limit.
+      """
+      x, y, th = pose
+      # TODO
+      return pose
+
+  # One full circle: v = 1 m/s, omega = 0.5 rad/s, duration 4*pi seconds
+  pose = (0.0, 0.0, 0.0)
+  n = 200
+  dt = 4 * np.pi / n
+  for _ in range(n):
+      pose = arc_step(pose, 1.0, 0.5, dt)
+  print(pose)  # expect to return to (0, 0) with heading 2*pi
+tests: |
+  import numpy as np
+  _p = arc_step((0.0, 0.0, 0.0), 1.0, 0.0, 2.0)
+  assert np.allclose(_p, (2.0, 0.0, 0.0), atol=1e-9), "omega = 0 must reduce to straight-line motion (guard the division!)"
+  _p = arc_step((0.0, 0.0, 0.0), 1.0, 0.5, 4 * np.pi / 200)
+  assert np.isfinite(_p).all(), "arc step must be finite"
+  _pose = (0.0, 0.0, 0.0)
+  _dt = 4 * np.pi / 50
+  for _ in range(50):
+      _pose = arc_step(_pose, 1.0, 0.5, _dt)
+  assert abs(_pose[0]) < 1e-6 and abs(_pose[1]) < 1e-6, "arc integration of a constant twist is exact: the circle must close even at 50 coarse steps (closure error %.2e)" % np.hypot(_pose[0], _pose[1])
+  _a = _e = (0.0, 0.0, 0.0)
+  for _ in range(25):  # half revolution: true position is (0, 4)
+      _a = arc_step(_a, 1.0, 0.5, _dt)
+      _e = euler_step(_e, 1.0, 0.5, _dt)
+  assert np.hypot(_a[0] - 0.0, _a[1] - 4.0) < 1e-6, "arc model must hit the true half-circle point (0, 4) exactly"
+  assert np.hypot(_e[0] - 0.0, _e[1] - 4.0) > 0.1, "sanity: Euler should deviate visibly mid-trajectory (fun fact it re-closes at the end - a regular polygon!)"
+hints:
+  - "Radius r = v/omega. x' = x + r·(sin(θ + ω·dt) − sin θ); y' = y − r·(cos(θ + ω·dt) − cos θ); θ' = θ + ω·dt."
+  - "Guard first: `if abs(omega) < 1e-9: return straight-line Euler form` — the formula divides by omega."
+solution: |
+  import numpy as np
+
+  def arc_step(pose, v, omega, dt):
+      x, y, th = pose
+      if abs(omega) < 1e-9:
+          return (x + v * np.cos(th) * dt, y + v * np.sin(th) * dt, th)
+      r = v / omega
+      return (x + r * (np.sin(th + omega * dt) - np.sin(th)),
+              y - r * (np.cos(th + omega * dt) - np.cos(th)),
+              th + omega * dt)
+
+  pose = (0.0, 0.0, 0.0)
+  n = 200
+  dt = 4 * np.pi / n
+  for _ in range(n):
+      pose = arc_step(pose, 1.0, 0.5, dt)
+  print(pose)

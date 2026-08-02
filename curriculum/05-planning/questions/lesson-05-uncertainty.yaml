@@ -1,0 +1,52 @@
+id: planning-l5-uncertainty
+title: "Quiz — planning under uncertainty"
+lesson: modules/05-planning/05-uncertainty
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "In belief-space planning, 'drive past the landmark before threading the doorway' can be OPTIMAL because…"
+    options:
+      - text: "Actions change both the state AND what you know — information gathering is a planning action once uncertainty is in the state"
+        correct: true
+        explanation: "The POMDP reframe: no known-state planner would ever produce that detour, and real robots benefit from it constantly."
+      - text: "Landmarks exert attractive potential"
+        explanation: "Potential fields are a different (and famously local-minimum-prone) mechanism."
+      - text: "Longer paths are safer in general"
+        explanation: "Length buys nothing by itself; the *information* along this particular length does."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "The industry-default answer to planning under uncertainty is determinize-and-replan because…"
+    options:
+      - text: "Replanning at rate IS feedback — model error gets absorbed each cycle, at a tiny fraction of belief-space planning's cost"
+        correct: true
+        explanation: "The receding-horizon insight (2.6) carrying planning's whole uncertainty burden. Its blind spot: irreversible errors that replanning can't undo."
+      - text: "Uncertainty rarely matters in practice"
+        explanation: "It matters constantly — this strategy just handles it reactively rather than anticipatorily."
+      - text: "POMDPs are patent-encumbered"
+        explanation: "They're intractable, not proprietary."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Scaling costmap inflation with the localizer's covariance implements…"
+    options:
+      - text: "A poor-man's chance constraint: clearance demands grow exactly when you're least sure where you are"
+        correct: true
+        explanation: "Ten lines connecting Module 3's P to Module 5's costs — most of belief-space planning's benefit at almost none of its price."
+      - text: "Faster planning"
+        explanation: "Slightly slower if anything (fatter obstacles) — the win is safety-proportional-to-ignorance."
+      - text: "A replacement for localization"
+        explanation: "It CONSUMES the localizer's self-assessment; garbage covariance in, garbage margins out (lesson 3.6's stakes)."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "Determinize-and-replan fails structurally when…"
+    options:
+      - text: "Errors are irreversible — cliffs, one-way doors, collisions — where 'fix it next cycle' has no next cycle"
+        correct: true
+        explanation: "Regret-minimization logic requires recoverability. Where it's absent, plan conservatively up front (chance constraints, margins) — the capstone's recovery behaviors are this hedge in miniature."
+      - text: "The robot moves quickly"
+        explanation: "Speed stresses it but doesn't break it — irreversibility does."
+      - text: "Maps are large"
+        explanation: "Scale costs compute, not correctness."

@@ -1,0 +1,64 @@
+id: est-l6-tune
+title: "Tune to the consistency band"
+lesson: modules/03-estimation/06-consistency-lab
+description: >-
+  A filter tracks fine by RMSE but its assumed Q and R are both wrong, and
+  the NEES shows it. Adjust Q_ASSUMED and R_ASSUMED until the filter is
+  CONSISTENT: NEES and NIS in their χ² bands, honest covariance. Like the
+  PID tune-to-spec exercise — the tests grade the resulting statistics,
+  not your numbers.
+setup_code: |
+  import numpy as np
+
+  Q_TRUE, R_TRUE = 0.09, 2.25
+
+  def evaluate(q_assumed, r_assumed, seed=13):
+      rng = np.random.default_rng(seed)
+      x_true, x, P = 0.0, 0.0, 10.0
+      nees, nis, errs = [], [], []
+      for _ in range(600):
+          x_true += rng.normal(0, np.sqrt(Q_TRUE))
+          P = P + q_assumed
+          z = x_true + rng.normal(0, np.sqrt(R_TRUE))
+          y, S = z - x, P + r_assumed
+          nis.append(y * y / S)
+          K = P / S
+          x, P = x + K * y, (1 - K) * P
+          nees.append((x - x_true) ** 2 / P)
+          errs.append(x - x_true)
+      sl = slice(60, None)
+      return (float(np.mean(nees[sl])), float(np.mean(nis[sl])),
+              float(np.sqrt(np.mean(np.square(errs[sl])))))
+starter_code: |
+  import numpy as np
+  # Provided: evaluate(q_assumed, r_assumed) -> (mean_nees, mean_nis, rmse).
+  # The plant's true Q and R are hidden. Your job: find assumed values that
+  # make the filter CONSISTENT - both statistics near 1 for this scalar case.
+
+  Q_ASSUMED = 0.5   # TODO: tune me
+  R_ASSUMED = 0.5   # TODO: tune me
+
+  nees, nis, rmse = evaluate(Q_ASSUMED, R_ASSUMED)
+  print("NEES %.2f (want ~1)  NIS %.2f (want ~1)  RMSE %.3f" % (nees, nis, rmse))
+  # Detective hints: NIS > 1 means innovations are bigger than the filter
+  # expects (S too small -> raise Q or R). NEES tracks the same direction
+  # for the state. Bisect like you'd tune any hyperparameter.
+tests: |
+  import numpy as np
+  _nees, _nis, _rmse = evaluate(Q_ASSUMED, R_ASSUMED)
+  assert 0.6 < _nees < 1.6, "mean NEES %.2f is outside the consistency band [0.6, 1.6] - the covariance is lying" % _nees
+  assert 0.6 < _nis < 1.6, "mean NIS %.2f is outside [0.6, 1.6]" % _nis
+  assert _rmse < 0.80, "RMSE %.3f is worse than the ~0.64 a correctly-tuned filter achieves here" % _rmse
+  _n2, _i2, _r2 = evaluate(Q_ASSUMED, R_ASSUMED, seed=77)
+  assert 0.5 < _n2 < 1.8 and 0.5 < _i2 < 1.8, "must stay consistent on a fresh seed (NEES %.2f, NIS %.2f) - no seed-hacking" % (_n2, _i2)
+hints:
+  - "Start by fixing NIS: it needs no ground truth and reacts directly to Q+R. If NIS ≈ 2, your S is ~2x too small overall."
+  - "Then separate the two: too-small R with too-big Q can pass NIS while failing NEES. The true values are 'round' numbers; expect Q ~ 0.05-0.15, R ~ 1.5-3."
+solution: |
+  import numpy as np
+
+  Q_ASSUMED = 0.09
+  R_ASSUMED = 2.25
+
+  nees, nis, rmse = evaluate(Q_ASSUMED, R_ASSUMED)
+  print("NEES %.2f (want ~1)  NIS %.2f (want ~1)  RMSE %.3f" % (nees, nis, rmse))

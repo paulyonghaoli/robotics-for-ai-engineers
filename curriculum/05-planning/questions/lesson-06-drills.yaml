@@ -1,0 +1,64 @@
+id: planning-l6-drills
+title: "Diagnosis drills — planner pathologies"
+lesson: modules/05-planning/06-lab-planner-pathologies
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the robot reaches 7 m from the goal, retreats, re-advances, and times out. **Zero collisions.** Diagnosis?"
+    options:
+      - text: "Replanning thrash — successive plans disagree, each locally rational; fix with hysteresis (commit unless blocked or clearly better)"
+        correct: true
+        explanation: "The capstone's field note 5, exactly. Zero collisions plus no arrival is the signature: the robot is deciding badly, not driving badly."
+      - text: "The controller is unstable"
+        explanation: "An unstable controller produces oscillation *around a path*, not coherent journeys in opposite directions."
+      - text: "Localization failure"
+        explanation: "Possible in principle, but a lost robot usually collides or wanders; clean retreat-and-advance implicates the decision layer."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the robot stops 1.5 m before every doorway, creeps, and sometimes never enters — though it fits comfortably. Diagnosis?"
+    options:
+      - text: "Freezing — the local scorer's clearance/safety terms outvote progress, so standing still is optimal"
+        correct: true
+        explanation: "Check whether the required margin is even *achievable* in the gap before touching weights: a margin larger than the half-gap admits no arc at all."
+      - text: "Motor stiction at low speed"
+        explanation: "That's a hardware symptom; the giveaway here is that the robot chooses zero velocity rather than failing to execute it."
+      - text: "The global path is blocked"
+        explanation: "Then it wouldn't approach the doorway at all."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** paths are collision-free in cell space, but the robot scrapes walls in reality. Diagnosis?"
+    options:
+      - text: "Missing (or insufficient) inflation — planned for a point, drove a body"
+        correct: true
+        explanation: "Lesson 1.5's C-space construction, skipped. The capstone rubric catches it as collisions with a perfectly legal-looking plan."
+      - text: "The costmap decay skirt is too aggressive"
+        explanation: "An aggressive skirt makes paths *more* clear of walls, not less."
+      - text: "Odometry drift"
+        explanation: "Drift produces position error that grows with distance; scraping every wall equally points at a footprint that was never modelled."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the planner reports failure in a corridor the robot has physically driven through before. Most likely?"
+    options:
+      - text: "Composed margins — sensor padding, mapped-wall crust, and inflation stacking up to exceed the real gap"
+        correct: true
+        explanation: "Capstone field note 6: an online map's walls are ~1 cell fat, and full inflation on top welded a passable pocket shut. Audit margins end-to-end, not per-layer."
+      - text: "A* is incomplete"
+        explanation: "A* is complete on a finite grid — if it says no path exists, no path exists *in the grid you gave it*. The grid is the suspect."
+      - text: "The goal is unreachable"
+        explanation: "Possible, but the giveaway is that the robot has traversed this corridor before — the world didn't change, the representation did."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "Thrash and freezing are opposite failures of the same balance. What single instrumentation change diagnoses both fastest?"
+    options:
+      - text: "Log the *decision* each cycle — the chosen plan's identity and the top candidate arcs' score components — not just the trajectory"
+        correct: true
+        explanation: "Thrash shows as an alternating plan sequence; freezing shows as the zero-velocity arc winning on score. A planner that can explain its choice is debuggable; one that only emits cmd_vel is not."
+      - text: "Increase logging frequency of the pose"
+        explanation: "More pose data still only shows you the symptom, never the reason."
+      - text: "Add a second planner and compare"
+        explanation: "Useful sometimes, but you'd still be guessing why either one chose what it chose."

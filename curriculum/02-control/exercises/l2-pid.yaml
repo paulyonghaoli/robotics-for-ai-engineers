@@ -1,0 +1,91 @@
+id: ctl-l2-pid
+title: "Implement production PID"
+lesson: modules/02-control/02-pid
+description: >-
+  Implement a PID class with the three production guards: output clamping,
+  integral anti-windup, and no derivative kick on the first call. The tests
+  are behavioral — steady-state error with P-only, its removal by I, and a
+  saturation-recovery scenario that fails without anti-windup.
+setup_code: |
+  import numpy as np
+
+  def run_first_order(pid, setpoint, steps=1500, dt=0.01, tau=1.0):
+      y, ys = 0.0, []
+      for _ in range(steps):
+          u = pid.update(setpoint - y, dt)
+          y += (u - y) / tau * dt
+          ys.append(y)
+      return np.array(ys)
+starter_code: |
+  import numpy as np
+  # Provided: run_first_order(pid, setpoint) simulates dy/dt = (u - y)/tau.
+
+  class PID:
+      def __init__(self, kp, ki=0.0, kd=0.0, output_limits=None, integral_limit=None):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.output_limits = output_limits
+          self.integral_limit = integral_limit
+          self.reset()
+
+      def reset(self):
+          # TODO: initialize integral and previous-error state
+          pass
+
+      def update(self, error, dt):
+          # TODO:
+          # 1. accumulate integral, clamp to +/- integral_limit if set
+          # 2. derivative from previous error (zero on the first call!)
+          # 3. u = kp*e + ki*integral + kd*derivative
+          # 4. clamp u to output_limits if set
+          return 0.0
+
+  ys = run_first_order(PID(kp=2.0, ki=2.0), setpoint=1.0)
+  print("final:", ys[-1])   # expect ~1.0
+tests: |
+  import numpy as np
+  _ys = run_first_order(PID(kp=2.0), 1.0)
+  assert 0.6 < _ys[-1] < 0.72, "P-only on this plant settles at kp/(kp+1) = 2/3 — steady-state error is the expected physics (got %.3f)" % _ys[-1]
+  _ys = run_first_order(PID(kp=2.0, ki=2.0), 1.0)
+  assert abs(_ys[-1] - 1.0) < 5e-3, "adding I must remove steady-state error (got %.4f)" % _ys[-1]
+  _p = PID(kp=100.0, output_limits=(-1.0, 1.0))
+  assert _p.update(10.0, 0.01) == 1.0 and _p.update(-10.0, 0.01) == -1.0, "output must clamp to limits"
+  _p = PID(kp=0.0, ki=0.0, kd=1.0)
+  assert _p.update(5.0, 0.01) == 0.0, "first call must have zero derivative (no kick from undefined history)"
+  _p = PID(kp=1.0, ki=10.0, output_limits=(-1.0, 1.0), integral_limit=0.05)
+  for _ in range(500):
+      _p.update(5.0, 0.01)
+  _u = _p.update(-0.01, 0.01)
+  assert _u < 1.0, "after long saturation the integral must be clamped: with the clamp, a small negative error already pulls the output off the +1.0 rail (got %.3f — is your integral unbounded?)" % _u
+hints:
+  - "reset: self._integral = 0.0; self._prev_error = None."
+  - "Derivative: 0.0 if self._prev_error is None else (error − prev)/dt; then store error as prev."
+  - "Anti-windup: after accumulating, self._integral = np.clip(self._integral, −lim, +lim) when a limit is set."
+solution: |
+  import numpy as np
+
+  class PID:
+      def __init__(self, kp, ki=0.0, kd=0.0, output_limits=None, integral_limit=None):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.output_limits = output_limits
+          self.integral_limit = integral_limit
+          self.reset()
+
+      def reset(self):
+          self._integral = 0.0
+          self._prev_error = None
+
+      def update(self, error, dt):
+          self._integral += error * dt
+          if self.integral_limit is not None:
+              lim = self.integral_limit
+              self._integral = max(-lim, min(lim, self._integral))
+          d = 0.0 if self._prev_error is None else (error - self._prev_error) / dt
+          self._prev_error = error
+          u = self.kp * error + self.ki * self._integral + self.kd * d
+          if self.output_limits is not None:
+              lo, hi = self.output_limits
+              u = max(lo, min(hi, u))
+          return u
+
+  ys = run_first_order(PID(kp=2.0, ki=2.0), setpoint=1.0)
+  print("final:", ys[-1])

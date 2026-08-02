@@ -1,0 +1,108 @@
+id: map-l5-false-closure
+title: "Case 1: quarantine the confident lie"
+lesson: modules/04-mapping/05-lab-slam-failures
+description: >-
+  A square-loop pose graph with sixteen honest odometry edges, one honest
+  loop closure — and one FALSE closure asserting that two different places
+  are the same. Plain least squares folds the map to satisfy it. Implement
+  iteratively-reweighted least squares with a Huber kernel so the back-end
+  can decide an edge is a lie.
+setup_code: |
+  import numpy as np
+
+  RNG = np.random.default_rng(6)
+  _steps = ([(1.0, 0.0)] * 4 + [(0.0, 1.0)] * 4 + [(-1.0, 0.0)] * 4 + [(0.0, -1.0)] * 4)
+  TRUE = np.vstack([[0.0, 0.0], np.cumsum(_steps, axis=0)])          # (17, 2)
+  _odom = np.array(_steps) + RNG.normal(0, 0.04, (16, 2)) + [0.02, 0.01]
+
+  # Edge format: (i, j, z) meaning "pose j minus pose i measured as z".
+  EDGES = [(k, k + 1, _odom[k]) for k in range(16)]
+  EDGES.append((16, 0, np.array([0.0, 0.0])))        # HONEST closure: end == start
+  EDGES.append((4, 12, np.array([0.0, 0.0])))        # THE LIE: (4,0) is not (0,4)
+  N_POSES = 17
+
+  def solve_weighted(edges, weights):
+      """Linear least squares with per-edge weights; pose 0 pinned at origin."""
+      rows, rhs = [], []
+      for (i, j, z), w in zip(edges, weights):
+          sw = np.sqrt(max(w, 1e-9))
+          for d in range(2):
+              r = np.zeros(2 * (N_POSES - 1))
+              if i > 0:
+                  r[2 * (i - 1) + d] = -1.0
+              if j > 0:
+                  r[2 * (j - 1) + d] = 1.0
+              rows.append(sw * r)
+              rhs.append(sw * z[d])
+      x, *_ = np.linalg.lstsq(np.array(rows), np.array(rhs), rcond=None)
+      return np.vstack([[0.0, 0.0], x.reshape(-1, 2)])
+
+  def edge_residuals(poses, edges):
+      """Per-edge ||(x_j - x_i) - z||."""
+      return np.array([np.linalg.norm((poses[j] - poses[i]) - z) for (i, j, z) in edges])
+starter_code: |
+  import numpy as np
+  # Provided: EDGES (18 edges; index 17 is the FALSE closure), TRUE (17,2),
+  #           N_POSES, solve_weighted(edges, weights), edge_residuals(poses, edges)
+
+  DELTA = 0.15   # Huber threshold: residuals above this are treated as suspect
+
+  def huber_weights(residuals, delta=DELTA):
+      """Huber IRLS weight per edge: 1 if r <= delta, else delta/r."""
+      # TODO
+      return np.ones(len(residuals))
+
+  def robust_solve(edges, iters=12):
+      """IRLS: solve, reweight by Huber, repeat. Return (poses, final_weights)."""
+      weights = np.ones(len(edges))
+      # TODO: loop — poses = solve_weighted(...); r = edge_residuals(...);
+      #       weights = huber_weights(r)
+      poses = solve_weighted(edges, weights)
+      return poses, weights
+
+  naive = solve_weighted(EDGES, np.ones(len(EDGES)))
+  robust, w = robust_solve(EDGES)
+  print("naive  worst error: %.3f m" % np.abs(naive - TRUE).max())
+  print("robust worst error: %.3f m" % np.abs(robust - TRUE).max())
+  print("weight on the false edge: %.3f" % w[17])
+tests: |
+  import numpy as np
+  _w = huber_weights(np.array([0.05, 0.15, 0.30, 1.50]))
+  assert abs(_w[0] - 1.0) < 1e-9 and abs(_w[1] - 1.0) < 1e-9, "residuals at or below delta keep full weight"
+  assert abs(_w[2] - 0.5) < 1e-6, "a residual of 2*delta should get weight delta/r = 0.5"
+  assert abs(_w[3] - 0.1) < 1e-6, "a residual of 10*delta should get weight 0.1"
+  _naive = solve_weighted(EDGES, np.ones(len(EDGES)))
+  _robust, _wts = robust_solve(EDGES)
+  _en, _er = np.abs(_naive - TRUE).max(), np.abs(_robust - TRUE).max()
+  assert _en > 0.3, "sanity: plain least squares should be visibly folded by the lie (worst error %.3f)" % _en
+  assert _er < 0.5 * _en, "robust solve must beat naive substantially (%.3f vs %.3f)" % (_er, _en)
+  assert _er < 0.40, "robust trajectory should land close to truth (worst error %.3f m)" % _er
+  assert _wts[17] < 0.35, "the FALSE closure (edge 17) must be down-weighted below 0.35, got %.3f" % _wts[17]
+  assert _wts[16] > 0.7, "the HONEST closure (edge 16) must keep most of its weight, got %.3f" % _wts[16]
+  assert np.mean(_wts[:16]) > 0.7, "honest odometry edges must not be collateral damage"
+hints:
+  - "huber_weights: `np.where(residuals <= delta, 1.0, delta / np.maximum(residuals, 1e-9))`."
+  - "robust_solve: loop `iters` times — poses = solve_weighted(edges, weights); r = edge_residuals(poses, edges); weights = huber_weights(r). Return the final poses AND weights."
+  - "Why it works: the lie is inconsistent with 17 honest edges, so it carries the largest residual; down-weighting it lets the honest constraints win, which shrinks the honest residuals further — the loop reinforces the correct answer."
+solution: |
+  import numpy as np
+
+  DELTA = 0.15
+
+  def huber_weights(residuals, delta=DELTA):
+      r = np.asarray(residuals, dtype=float)
+      return np.where(r <= delta, 1.0, delta / np.maximum(r, 1e-9))
+
+  def robust_solve(edges, iters=12):
+      weights = np.ones(len(edges))
+      poses = solve_weighted(edges, weights)
+      for _ in range(iters):
+          poses = solve_weighted(edges, weights)
+          weights = huber_weights(edge_residuals(poses, edges))
+      return poses, weights
+
+  naive = solve_weighted(EDGES, np.ones(len(EDGES)))
+  robust, w = robust_solve(EDGES)
+  print("naive  worst error: %.3f m" % np.abs(naive - TRUE).max())
+  print("robust worst error: %.3f m" % np.abs(robust - TRUE).max())
+  print("weight on the false edge: %.3f" % w[17])

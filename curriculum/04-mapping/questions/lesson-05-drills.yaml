@@ -1,0 +1,64 @@
+id: mapping-l5-drills
+title: "Diagnosis drills — SLAM failures"
+lesson: modules/04-mapping/05-lab-slam-failures
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the map is internally crisp and self-consistent, but rotated ~5° from the surveyor's ground truth. Diagnosis?"
+    options:
+      - text: "Not a bug — gauge freedom. Global pose is unobservable without a world anchor"
+        correct: true
+        explanation: "A clean rigid offset is the unobservable direction behaving lawfully. GPS or a surveyed marker pins it; nothing internal can."
+      - text: "A Jacobian sign error"
+        explanation: "Jacobian bugs distort internal consistency; this map is internally perfect."
+      - text: "Loop closure failed"
+        explanation: "A failed closure leaves the map internally *inconsistent* — kinked, not cleanly rotated."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** after enabling place recognition in a warehouse of identical aisles, maps are usually better but occasionally fold catastrophically. Diagnosis and defence?"
+    options:
+      - text: "False loop closures from perceptual aliasing; defend with geometric verification before accepting an edge, plus robust kernels in the back-end"
+        correct: true
+        explanation: "The optimizer must satisfy a stiff constraint between places that aren't the same, and deforms everything else to comply. Defence in depth: verify, then down-weight."
+      - text: "The optimizer is diverging numerically"
+        explanation: "It converges beautifully — to a consistent solution of an inconsistent problem. That's what makes it dangerous."
+      - text: "The map is too large for the solver"
+        explanation: "Sparse solvers handle millions of edges; the failure is one bad constraint, not scale."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** scan matching in a long featureless corridor returns a small residual, yet poses slide 10–30 cm along the corridor axis between matches. The honest response is…"
+    options:
+      - text: "Detect the degeneracy from the cost Hessian and report inflated covariance along the flat direction, instead of handing the filter a confident point estimate"
+        correct: true
+        explanation: "The cost surface is genuinely a valley. The estimate isn't wrong so much as *underdetermined* — and saying so is what keeps the downstream filter consistent (lesson 3.6)."
+      - text: "Increase ICP iterations until the residual drops further"
+        explanation: "More iterations cannot manufacture information the geometry does not contain."
+      - text: "Discard corridor scans entirely"
+        explanation: "They constrain the lateral direction perfectly well — throw away only the unobservable component, not the measurement."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** walls appear smeared into gentle arcs, and the smearing worsens with distance travelled. Diagnosis?"
+    options:
+      - text: "Pose drift — the mapper is faithfully integrating a drifting localizer"
+        correct: true
+        explanation: "Map quality is bounded by trajectory quality. This is the picture that motivates SLAM; loop closure is what removes it."
+      - text: "Lidar miscalibration"
+        explanation: "A calibration error distorts every scan identically; it wouldn't grow with distance travelled."
+      - text: "Occupancy log-odds saturating"
+        explanation: "Saturation makes cells stubborn, not curved."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "In both lab cases, the optimizer reported a **small residual** while being wrong. The general lesson is…"
+    options:
+      - text: "A low residual means 'consistent with my constraints', not 'correct' — so validate the constraints and the conditioning, not just the fit"
+        correct: true
+        explanation: "False closure: consistent with a lie. Corridor: consistent along a flat direction. Same trap, two costumes — and the reason production systems monitor conditioning and gate inputs."
+      - text: "Residuals are unreliable and should be ignored"
+        explanation: "They're necessary but not sufficient — the discipline is knowing what they can't tell you."
+      - text: "Both were floating-point precision problems"
+        explanation: "Both are structural; they'd occur in exact arithmetic."

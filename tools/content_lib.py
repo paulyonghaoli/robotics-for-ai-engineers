@@ -1,0 +1,156 @@
+"""Shared loader/validator for interactive content (quiz banks, code exercises).
+
+Authoring format: YAML under curriculum/<module>/questions/*.yaml and
+curriculum/<module>/exercises/*.yaml. At mkdocs build time these are converted
+to JSON under docs/assets/generated/ for the front-end components; in CI every
+exercise's reference solution is executed against its own tests.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CURRICULUM = REPO_ROOT / "curriculum"
+GENERATED = REPO_ROOT / "docs" / "assets" / "generated"
+
+QUESTION_TYPES = {"single", "multi", "numeric"}
+
+
+@dataclass
+class ContentError:
+    path: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.path}: {self.message}"
+
+
+@dataclass
+class ContentSet:
+    quizzes: dict[str, dict] = field(default_factory=dict)   # id -> bank
+    exercises: dict[str, dict] = field(default_factory=dict)  # id -> spec
+    errors: list[ContentError] = field(default_factory=list)
+
+
+def _validate_quiz(bank: dict, path: str, errors: list[ContentError]) -> None:
+    if not bank.get("id"):
+        errors.append(ContentError(path, "quiz bank missing 'id'"))
+        return
+    questions = bank.get("questions")
+    if not isinstance(questions, list) or not questions:
+        errors.append(ContentError(path, "quiz bank needs a non-empty 'questions' list"))
+        return
+    seen: set[str] = set()
+    for q in questions:
+        qid = q.get("id", "?")
+        loc = f"{path}#{qid}"
+        if qid in seen:
+            errors.append(ContentError(loc, "duplicate question id"))
+        seen.add(qid)
+        qtype = q.get("type", "single")
+        if qtype not in QUESTION_TYPES:
+            errors.append(ContentError(loc, f"unknown type {qtype!r}"))
+        if not q.get("prompt"):
+            errors.append(ContentError(loc, "missing prompt"))
+        if qtype == "numeric":
+            if not isinstance(q.get("answer"), (int, float)):
+                errors.append(ContentError(loc, "numeric question needs a numeric 'answer'"))
+        else:
+            opts = q.get("options")
+            if not isinstance(opts, list) or len(opts) < 2:
+                errors.append(ContentError(loc, "needs >= 2 options"))
+                continue
+            n_correct = sum(1 for o in opts if o.get("correct"))
+            if qtype == "single" and n_correct != 1:
+                msg = f"single-choice needs exactly 1 correct, has {n_correct}"
+                errors.append(ContentError(loc, msg))
+            if qtype == "multi" and n_correct < 1:
+                errors.append(ContentError(loc, "multi-choice needs >= 1 correct option"))
+            for i, o in enumerate(opts):
+                if not o.get("text"):
+                    errors.append(ContentError(loc, f"option {i} missing text"))
+
+
+def _validate_exercise(spec: dict, path: str, errors: list[ContentError]) -> None:
+    for key in ("id", "title", "starter_code", "tests", "solution"):
+        if not spec.get(key):
+            errors.append(ContentError(path, f"exercise missing '{key}'"))
+
+
+def run_exercise_solution(spec: dict) -> str | None:
+    """Execute setup + reference solution + tests. Returns error text or None.
+
+    This is the guarantee that in-browser exercises can't silently rot: the
+    same namespace-exec model the Pyodide worker uses, run in local CPython.
+    """
+    ns: dict = {}
+    try:
+        exec(spec.get("setup_code", ""), ns)  # noqa: S102
+        exec(spec["solution"], ns)  # noqa: S102
+        exec(spec["tests"], ns)  # noqa: S102
+    except AssertionError as e:
+        return f"reference solution FAILS its own tests: {e}"
+    except Exception as e:  # noqa: BLE001
+        return f"error running solution: {type(e).__name__}: {e}"
+    return None
+
+
+def load_all() -> ContentSet:
+    cs = ContentSet()
+    for path in sorted(CURRICULUM.glob("*/questions/*.yaml")):
+        rel = str(path.relative_to(REPO_ROOT))
+        try:
+            bank = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as e:
+            cs.errors.append(ContentError(rel, f"YAML parse error: {e}"))
+            continue
+        _validate_quiz(bank, rel, cs.errors)
+        if bank.get("id"):
+            if bank["id"] in cs.quizzes:
+                cs.errors.append(ContentError(rel, f"duplicate quiz bank id {bank['id']!r}"))
+            cs.quizzes[bank["id"]] = bank
+    for path in sorted(CURRICULUM.glob("*/exercises/*.yaml")):
+        rel = str(path.relative_to(REPO_ROOT))
+        try:
+            spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as e:
+            cs.errors.append(ContentError(rel, f"YAML parse error: {e}"))
+            continue
+        _validate_exercise(spec, rel, cs.errors)
+        if spec.get("id"):
+            if spec["id"] in cs.exercises:
+                cs.errors.append(ContentError(rel, f"duplicate exercise id {spec['id']!r}"))
+            cs.exercises[spec["id"]] = spec
+    return cs
+
+
+def _write_if_changed(path: Path, content: str) -> bool:
+    """Avoid touching unchanged files: mkdocs serve watches docs/ and would
+    otherwise loop forever on rebuild."""
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return True
+
+
+def export_json(cs: ContentSet) -> int:
+    """Convert loaded content to docs/assets/generated/*.json. Returns count written."""
+    written = 0
+    for bank_id, bank in cs.quizzes.items():
+        out = json.dumps(bank, indent=1)
+        if _write_if_changed(GENERATED / "quizzes" / f"{bank_id}.json", out):
+            written += 1
+    for ex_id, spec in cs.exercises.items():
+        public = {k: spec.get(k) for k in
+                  ("id", "title", "description", "starter_code", "setup_code",
+                   "tests", "hints", "solution")}
+        out = json.dumps(public, indent=1)
+        if _write_if_changed(GENERATED / "exercises" / f"{ex_id}.json", out):
+            written += 1
+    return written

@@ -1,0 +1,118 @@
+id: geometry-l1-frames
+title: "Quiz — coordinate frames and rigid transforms"
+lesson: modules/01-geometry/01-coordinate-frames
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "`T_map_base` maps points expressed in which frame into which frame?"
+    options:
+      - text: "From `base` into `map`"
+        correct: true
+        explanation: "Read subscripts right-to-left: T_map_base takes base-frame coordinates and re-expresses them in the map frame."
+      - text: "From `map` into `base`"
+        explanation: "That's the inverse, `T_base_map`. Mixing these up is the single most common frame bug."
+      - text: "Either direction, depending on context"
+        explanation: "A transform has one direction. The whole point of the naming convention is that there is no 'context'."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "A LiDAR is mounted on a robot base. Which composition gives `T_map_lidar`?"
+    options:
+      - text: "`T_map_base @ T_base_lidar`"
+        correct: true
+        explanation: "Inner subscripts (`base`) cancel, like units in dimensional analysis."
+      - text: "`T_base_lidar @ T_map_base`"
+        explanation: "Adjacent subscripts are `lidar` then `map` — nothing cancels. This composes to nonsense."
+      - text: "`T_map_base @ T_lidar_base`"
+        explanation: "`base` meets `lidar` reading right-to-left through T_lidar_base's output — the inner pair is base/lidar, which doesn't cancel. You'd need the inverse of T_lidar_base."
+  - id: q3
+    type: multi
+    difficulty: intro
+    prompt: "Which quantities are preserved by a rigid (SE(2)) transform? Select all that apply."
+    options:
+      - text: "Distances between points"
+        correct: true
+        explanation: "Rigid = isometry. If distances change, your matrix has drifted or contains scale."
+      - text: "Angles between vectors"
+        correct: true
+        explanation: "Rotations and translations both preserve angles."
+      - text: "Handedness (no mirroring)"
+        correct: true
+        explanation: "det(R) = +1 for proper rotations. A reflection (det = -1) mirrors the world — see the debugging question in the lesson."
+      - text: "The coordinates of each point"
+        explanation: "Coordinates are exactly what changes — that's the transform's job. The *point* is the same; its description differs per frame."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: >-
+      Robot base at pose (2, 1, 90°) in the map. A camera is mounted 0.2 m
+      ahead of the base (along the base's +x). What is the camera's
+      **y-coordinate** in the map frame?
+    answer: 1.2
+    tolerance: 0.001
+    hint: "the base faces +y, so 'ahead' points along map +y."
+    explanation: "Base +x axis points along map +y (90° rotation), so the mount offset lands at (2, 1.2)."
+  - id: q5
+    type: numeric
+    difficulty: core
+    prompt: "Compute `wrap_angle(3π)` — the angle 3π wrapped to the interval (-π, π]. Give a decimal value in radians."
+    answer: 3.14159265
+    tolerance: 0.001
+    hint: "3π is one full turn (2π) plus π."
+    explanation: "Removing the full turn leaves exactly π, which is inside the half-open interval."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "Why does the inverse of a rigid transform have the closed form `[Rᵀ, -Rᵀt]` instead of requiring general matrix inversion?"
+    options:
+      - text: "Because rotation matrices are orthogonal: R⁻¹ = Rᵀ"
+        correct: true
+        explanation: "Orthogonality does all the work; the translation term follows by solving T·T⁻¹ = I."
+      - text: "Because homogeneous matrices are always symmetric"
+        explanation: "They are not symmetric — check any example with nonzero rotation."
+      - text: "Because the determinant of a rigid transform is 0"
+        explanation: "det = +1, not 0. A zero determinant would make it non-invertible."
+  - id: q7
+    type: single
+    difficulty: core
+    prompt: "Your occupancy-grid map **rotates around the robot** as the robot drives. The most likely cause is…"
+    options:
+      - text: "The transform convention is inverted somewhere (using `T_base_map` where `T_map_base` is expected)"
+        correct: true
+        explanation: "Anchoring the world to the robot instead of the robot to the world is the classic signature of an inverted transform."
+      - text: "The LiDAR is miscalibrated by a few centimeters"
+        explanation: "A static mount offset shifts the map slightly; it cannot make the map rotate with robot motion."
+      - text: "Process noise in the localization filter is too high"
+        explanation: "That produces jitter and drift, not a systematic rotation locked to the robot's heading."
+  - id: q8
+    type: single
+    difficulty: core
+    prompt: "A heading controller computes `error = target - current` without angle wrapping. When does it misbehave, and how?"
+    options:
+      - text: "Only when target and current straddle ±π — the robot turns the long way around"
+        correct: true
+        explanation: "An error like 6.2 rad instead of -0.08 rad commands a near-full spin. Intermittent, direction-dependent, maddening to reproduce."
+      - text: "On every control cycle — the robot cannot track any heading"
+        explanation: "Away from the ±π seam the arithmetic is fine, which is exactly why this bug survives most tests."
+      - text: "Never — subtraction of angles is always safe"
+        explanation: "Angles live on a circle, not a line. Subtraction is only safe after wrapping."
+  - id: q9
+    type: single
+    difficulty: stretch
+    prompt: "You pair each LiDAR scan with the most recent robot pose instead of the pose at the scan's timestamp. Driving fast, obstacles in the map appear…"
+    options:
+      - text: "Smeared/duplicated along the direction of motion"
+        correct: true
+        explanation: "Each scan is projected from a pose the robot had ~100 ms later, displacing returns opposite to travel; over many scans this smears structure."
+      - text: "Uniformly inflated in size"
+        explanation: "Inflation comes from sensor noise or grid resolution, not timing."
+      - text: "Mirrored across the robot's path"
+        explanation: "Mirroring indicates a handedness/reflection bug, not a timing bug."
+  - id: q10
+    type: numeric
+    difficulty: intro
+    prompt: "What is the determinant of a proper 2D rotation matrix R(θ), for any θ?"
+    answer: 1.0
+    tolerance: 0.0001
+    explanation: "cos²θ + sin²θ = 1. det = -1 would mean a reflection; det ≠ ±1 means numerical drift or scale contamination."

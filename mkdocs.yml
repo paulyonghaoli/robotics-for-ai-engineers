@@ -1,0 +1,126 @@
+site_name: Robotics for AI Engineers
+site_description: >-
+  A systems-oriented, project-based path from machine learning and data
+  engineering to perception, planning, control, ROS 2, simulation, and
+  robot learning.
+repo_url: https://github.com/paulyonghaoli/robotics-for-ai-engineers
+repo_name: robotics-for-ai-engineers
+
+theme:
+  name: material
+  custom_dir: overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - tables
+  - toc:
+      permalink: true
+
+hooks:
+  - tools/mkdocs_hooks.py
+
+extra_css:
+  - stylesheets/interactive.css
+  - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+  - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js
+  - javascripts/interactive.js
+
+nav:
+  - Home: index.md
+  - Curriculum map: curriculum.md
+  - "Module 0 · From ML to Robotics":
+      - Overview: modules/00-transition/index.md
+      - "0.1 What changes": modules/00-transition/01-what-changes.md
+      - "0.2 Anatomy of an autonomy stack": modules/00-transition/02-anatomy.md
+      - "0.3 Roles field guide": modules/00-transition/03-roles.md
+      - "0.4 Math diagnostic": modules/00-transition/04-diagnostic.md
+  - "Module 1 · Geometry & Motion":
+      - Overview: modules/01-geometry/index.md
+      - "1.1 Coordinate frames & rigid transforms": modules/01-geometry/01-coordinate-frames.md
+      - "1.2 3D rotations & quaternions": modules/01-geometry/02-quaternions.md
+      - "1.3 Transform trees": modules/01-geometry/03-transform-trees.md
+      - "1.4 Twists & velocities": modules/01-geometry/04-twists.md
+      - "1.5 Configuration space": modules/01-geometry/05-configuration-space.md
+      - "1.6 Lab: frame debugging": modules/01-geometry/06-lab-frame-debugging.md
+      - "Mini-project: frame transforms (autograded)": modules/01-geometry/project-frames.md
+  - "Module 2 · Kinematics & Control":
+      - Overview: modules/02-control/index.md
+      - "2.1 Forward & inverse kinematics": modules/02-control/01-kinematics.md
+      - "2.2 PID control, properly": modules/02-control/02-pid.md
+      - "2.3 Jacobians & differential kinematics": modules/02-control/03-jacobians.md
+      - "2.4 Trajectory tracking: pure pursuit": modules/02-control/04-trajectory-tracking.md
+      - "2.5 Dynamics & gravity compensation": modules/02-control/05-dynamics.md
+      - "2.6 MPC: a first look": modules/02-control/06-mpc.md
+  - "Module 3 · State Estimation":
+      - Overview: modules/03-estimation/index.md
+      - "3.1 The Kalman filter": modules/03-estimation/01-kalman.md
+      - "3.2 The particle filter": modules/03-estimation/02-particle-filter.md
+      - "3.3 The extended Kalman filter": modules/03-estimation/03-ekf.md
+      - "3.4 Sensor models": modules/03-estimation/04-sensor-models.md
+      - "3.5 Fusion architecture": modules/03-estimation/05-fusion.md
+      - "3.6 Lab: catching a lying filter": modules/03-estimation/06-consistency-lab.md
+      - "Project: PF localization (autograded)": modules/03-estimation/project-localization.md
+  - "Course I exam": course-1-exam.md
+  - "The frontier (living doc)": frontier.md
+  - "Module 4 · Mapping & SLAM":
+      - Overview: modules/04-mapping/index.md
+      - "4.1 Occupancy grids": modules/04-mapping/01-occupancy-grids.md
+      - "4.2 Scan matching and ICP": modules/04-mapping/02-scan-matching.md
+      - "4.3 EKF-SLAM": modules/04-mapping/03-ekf-slam.md
+      - "4.4 Pose graphs and loop closure": modules/04-mapping/04-pose-graphs.md
+      - "4.5 Lab: the SLAM failure gallery": modules/04-mapping/05-lab-slam-failures.md
+  - "Module 5 · Planning & Control":
+      - Overview: modules/05-planning/index.md
+      - "5.1 Graph search and A*": modules/05-planning/01-astar.md
+      - "5.2 Costmaps": modules/05-planning/02-costmaps.md
+      - "5.3 Sampling-based planning: RRT": modules/05-planning/03-rrt.md
+      - "5.4 Local planning: the dynamic window": modules/05-planning/04-local-planning.md
+      - "5.5 Planning under uncertainty": modules/05-planning/05-uncertainty.md
+      - "5.6 Lab: planner pathologies": modules/05-planning/06-lab-planner-pathologies.md
+  - "Module 6 · ROS 2":
+      - Overview: modules/06-ros2/index.md
+  - "Capstone · Autonomous 2D Robot":
+      - Overview: modules/capstone/index.md
+      - "Engineering log: eight bugs": capstone-log.md
+  - "Module 10 · Evaluation & Data Systems":
+      - Overview: modules/10-evaluation/index.md
+      - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md

@@ -1,0 +1,67 @@
+id: estimation-l1-kalman
+title: "Quiz — the Kalman filter"
+lesson: modules/03-estimation/01-kalman
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "Scalar filter: prediction x = 5 with variance P = 4; measurement z = 6 with variance R = 1. What is the posterior mean?"
+    answer: 5.8
+    tolerance: 0.005
+    hint: "K = P/(P+R)."
+    explanation: "K = 0.8; x = 5 + 0.8·(6−5) = 5.8 — pulled 80% toward the 4×-more-confident sensor."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "Same numbers: what is the posterior variance?"
+    answer: 0.8
+    tolerance: 0.005
+    explanation: "(1−K)·P = 0.2·4 = 0.8 — smaller than either source alone; two opinions beat one."
+  - id: q3
+    type: single
+    difficulty: intro
+    prompt: "In the predict/update rhythm, uncertainty…"
+    options:
+      - text: "Grows in predict (Q is added) and shrinks in update (information arrives)"
+        correct: true
+        explanation: "Motion models add doubt; measurements remove it. A filter whose P never shrinks isn't receiving usable measurements."
+      - text: "Shrinks in predict and grows in update"
+        explanation: "Backwards — prediction can't create information about the world."
+      - text: "Stays constant unless the robot moves"
+        explanation: "P evolves every step by construction — that evolution IS the filter."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A filter has low RMSE but its NIS averages 8 on a 1-D measurement (expected ≈ 1). Diagnosis?"
+    options:
+      - text: "Overconfident: covariance far smaller than actual error — accurate today, but it will ignore the measurement that matters tomorrow"
+        correct: true
+        explanation: "Consistency is honesty about uncertainty. Downstream consumers (gating, fusion, planners) trust P; an overconfident P poisons them all."
+      - text: "The filter is fine — RMSE is what matters"
+        explanation: "Until an outlier or model change arrives and the tiny gain refuses to correct. Consistency failures are deferred failures."
+      - text: "The sensor is broken"
+        explanation: "A broken sensor typically shows in RMSE too; NIS-vs-RMSE divergence points at the filter's self-assessment."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "A consistently *biased* (nonzero-mean) innovation sequence indicates…"
+    options:
+      - text: "A modeling error — sensor bias, wrong H, or a frame bug — that no Q/R tuning can fix"
+        correct: true
+        explanation: "Noise terms model zero-mean effects. A mean says your equations disagree with your hardware; go find which (Module 1's tools apply)."
+      - text: "Q is too large"
+        explanation: "Q scales the innovation's variance, not its mean."
+      - text: "Normal behavior early in convergence"
+        explanation: "Transients decay; a *persistent* mean is structural."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Fusing 1 Hz absolute GPS with 200 Hz drifting IMU: what does each contribute?"
+    options:
+      - text: "IMU carries the state between GPS fixes (smooth, fast, drifting); GPS periodically anchors the drift (absolute, slow, noisy)"
+        correct: true
+        explanation: "Complementary error structures are what make fusion worth it: high-frequency accuracy from one, low-frequency truth from the other."
+      - text: "GPS should be ignored — 200 Hz beats 1 Hz"
+        explanation: "Rate isn't truth: integrating the IMU alone diverges without bound."
+      - text: "They should be averaged with equal weight"
+        explanation: "The whole point of R-per-sensor is that weights follow confidence, not democracy."

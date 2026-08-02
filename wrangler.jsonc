@@ -1,0 +1,11 @@
+// Cloudflare Workers static-assets deployment (soft launch).
+// The build command (`pip install mkdocs-material pyyaml && mkdocs build`)
+// produces ./site; wrangler uploads it as static assets — no Worker code.
+{
+  "name": "robotics-for-ai-engineers",
+  "compatibility_date": "2026-08-02",
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "404-page"
+  }
+}

@@ -1,0 +1,95 @@
+id: plan-l1-heuristic
+title: "Admissibility, empirically"
+lesson: modules/05-planning/01-astar
+description: >-
+  Implement three heuristics — Euclidean, octile, Manhattan — and test them
+  against TRUE shortest distances (a reference solver is provided). You'll
+  prove empirically what section C claimed: octile and Euclidean never
+  overestimate on 8-connected grids; Manhattan does, and would silently
+  break A*'s optimality.
+setup_code: |
+  import heapq
+  import numpy as np
+
+  SQRT2 = np.sqrt(2.0)
+
+  def true_distance(grid, start, goal):
+      """Dijkstra ground truth on the 8-connected grid."""
+      rows, cols = grid.shape
+      dist = {start: 0.0}
+      heap = [(0.0, 0, start)]
+      tie = 0
+      nbrs = [(-1,0,1.0),(1,0,1.0),(0,-1,1.0),(0,1,1.0),
+              (-1,-1,SQRT2),(-1,1,SQRT2),(1,-1,SQRT2),(1,1,SQRT2)]
+      seen = set()
+      while heap:
+          d, _, cur = heapq.heappop(heap)
+          if cur in seen:
+              continue
+          if cur == goal:
+              return d
+          seen.add(cur)
+          for dy, dx, c in nbrs:
+              ny, nx = cur[0]+dy, cur[1]+dx
+              if 0 <= ny < rows and 0 <= nx < cols and not grid[ny, nx]:
+                  nd = d + c
+                  if nd < dist.get((ny, nx), np.inf):
+                      dist[(ny, nx)] = nd
+                      tie += 1
+                      heapq.heappush(heap, (nd, tie, (ny, nx)))
+      return np.inf
+starter_code: |
+  import numpy as np
+  # Provided: true_distance(grid, start, goal), SQRT2
+
+  def h_euclid(a, b):
+      # TODO
+      return 0.0
+
+  def h_octile(a, b):
+      # TODO: (dy + dx) + (sqrt(2) - 2) * min(dy, dx)
+      return 0.0
+
+  def h_manhattan(a, b):
+      # TODO
+      return 0.0
+
+  # Compare on an empty grid:
+  grid = np.zeros((12, 12), dtype=bool)
+  for h in (h_euclid, h_octile, h_manhattan):
+      print(h.__name__, h((0, 0), (5, 3)), " true:", true_distance(grid, (0, 0), (5, 3)))
+tests: |
+  import numpy as np
+  _grid = np.zeros((12, 12), dtype=bool)
+  _rng = np.random.default_rng(2)
+  _pairs = [((int(_rng.integers(0,12)), int(_rng.integers(0,12))),
+             (int(_rng.integers(0,12)), int(_rng.integers(0,12)))) for _ in range(30)]
+  _manhattan_over = 0
+  for _a, _b in _pairs:
+      _t = true_distance(_grid, _a, _b)
+      assert h_euclid(_a, _b) <= _t + 1e-9, "Euclidean must never overestimate (admissible), but h(%s,%s)=%.3f > true %.3f" % (_a, _b, h_euclid(_a,_b), _t)
+      assert h_octile(_a, _b) <= _t + 1e-9, "octile must never overestimate on 8-connected grids"
+      assert abs(h_octile(_a, _b) - _t) < 1e-9, "on an EMPTY grid octile is exact — it should equal the true distance"
+      if h_manhattan(_a, _b) > _t + 1e-9:
+          _manhattan_over += 1
+  assert _manhattan_over > 0, "Manhattan SHOULD overestimate on some diagonal-ish pairs (that's the lesson) — did you implement |dy|+|dx|?"
+  assert h_octile((0, 0), (5, 3)) > h_euclid((0, 0), (5, 3)) - 1e-9, "octile dominates Euclidean (tighter admissible bound)"
+hints:
+  - "Euclidean: np.hypot(dy, dx). Manhattan: dy + dx. Octile: from the docstring formula."
+  - "The point of the empirical check: admissible = h(a,b) <= true shortest distance for ALL pairs. One overestimate anywhere is enough to break A*'s optimality guarantee."
+solution: |
+  import numpy as np
+
+  def h_euclid(a, b):
+      return float(np.hypot(a[0]-b[0], a[1]-b[1]))
+
+  def h_octile(a, b):
+      dy, dx = abs(a[0]-b[0]), abs(a[1]-b[1])
+      return (dy + dx) + (SQRT2 - 2.0) * min(dy, dx)
+
+  def h_manhattan(a, b):
+      return float(abs(a[0]-b[0]) + abs(a[1]-b[1]))
+
+  grid = np.zeros((12, 12), dtype=bool)
+  for h in (h_euclid, h_octile, h_manhattan):
+      print(h.__name__, h((0, 0), (5, 3)), " true:", true_distance(grid, (0, 0), (5, 3)))

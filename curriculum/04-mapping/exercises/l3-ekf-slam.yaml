@@ -1,0 +1,101 @@
+id: map-l3-ekf-slam
+title: "EKF-SLAM: watch correlations do the work"
+lesson: modules/04-mapping/03-ekf-slam
+description: >-
+  A minimal joint-state SLAM: robot position (known heading, for clarity)
+  plus TWO landmarks in one 6-D state with full covariance. You implement
+  the joint update; the tests then verify the lesson's central claims —
+  observing landmark A shrinks landmark B's uncertainty (through the
+  correlations), and absolute uncertainty never drops below the initial
+  pose uncertainty.
+setup_code: |
+  import numpy as np
+
+  RNG = np.random.default_rng(8)
+  LM_TRUE = np.array([[4.0, 6.0], [8.0, 2.0]])
+  R_MEAS = np.eye(2) * 0.09          # per-landmark (x,y)-offset measurement noise
+  Q_STEP = np.eye(2) * 0.02          # robot motion noise per step
+
+  def simulate(steps=40):
+      """Robot walks +x 0.5/step; observes lm 0 on even, lm 1 on odd steps.
+      Observation = landmark position MINUS robot position + noise."""
+      robot = np.array([0.0, 4.0])
+      obs = []
+      for k in range(steps):
+          robot = robot + [0.5, 0.0] + RNG.multivariate_normal([0, 0], Q_STEP)
+          lm = k % 2
+          z = LM_TRUE[lm] - robot + RNG.multivariate_normal([0, 0], R_MEAS)
+          obs.append((lm, z, robot.copy()))
+      return obs
+starter_code: |
+  import numpy as np
+  # State: [rx, ry, l0x, l0y, l1x, l1y]. Provided: simulate(), Q_STEP, R_MEAS.
+  # Observation model for landmark i: z = lm_i - robot  (relative offset).
+
+  x = np.array([0.0, 4.0, 3.0, 7.0, 9.0, 1.0])   # rough initial guesses
+  P = np.diag([0.25, 0.25, 4.0, 4.0, 4.0, 4.0])   # vague landmarks, decent pose
+
+  def predict(x, P):
+      """Robot moves +0.5 in x; landmarks are static. Add Q_STEP to the
+      ROBOT block only."""
+      # TODO
+      return x, P
+
+  def update(x, P, lm_id, z):
+      """Joint EKF update. H is 2x6: d z / d state = [-I2 | ... I2 at lm block ...]."""
+      # TODO: build H; S = H P H' + R_MEAS; K = P H' S^-1;
+      #       x += K @ (z - h(x)); P = (I - K H) P
+      return x, P
+
+  for lm_id, z, _ in simulate():
+      x, P = predict(x, P)
+      x, P = update(x, P, lm_id, z)
+
+  print("landmark estimates:", np.round(x[2:], 2).reshape(2, 2))
+  print("robot std:", np.round(np.sqrt(np.diag(P)[:2]), 3))
+tests: |
+  import numpy as np
+  assert np.abs(x[2:4] - LM_TRUE[0]).max() < 0.4, "landmark 0 should be mapped near (4, 6), got %s" % np.round(x[2:4], 2)
+  assert np.abs(x[4:6] - LM_TRUE[1]).max() < 0.4, "landmark 1 should be mapped near (8, 2)"
+  np.testing.assert_allclose(P, P.T, atol=1e-9, err_msg="joint covariance must stay symmetric")
+  _corr = P[2, 4] / np.sqrt(P[2, 2] * P[4, 4])
+  assert _corr > 0.3, "landmarks observed from shared poses must become POSITIVELY correlated (got %.2f) - the off-diagonals are the whole point" % _corr
+  _x2, _P2 = predict(x.copy(), P.copy())
+  _P3_before_l1 = _P2[4, 4]
+  _x3, _P3 = update(_x2, _P2, 0, LM_TRUE[0] - _x2[:2])   # observe ONLY landmark 0
+  assert _P3[4, 4] < _P3_before_l1 - 1e-6, "observing landmark 0 must ALSO shrink landmark 1's variance - correction flows through the correlation"
+  assert np.sqrt(_P3[2, 2]) > 0.15, "landmark absolute uncertainty stays floored near the initial pose uncertainty (0.5^2=0.25): nothing anchors the map to the world"
+hints:
+  - "predict: x[0] += 0.5; P[:2, :2] += Q_STEP. Landmark blocks untouched — statics have zero process noise."
+  - "H = np.zeros((2, 6)); H[:, :2] = -np.eye(2); H[:, 2+2*lm_id : 4+2*lm_id] = np.eye(2). Innovation: z − (x[lm_block] − x[:2])."
+  - "The last two asserts ARE the lesson: cross-landmark correction, and the unobservable global anchor."
+solution: |
+  import numpy as np
+
+  x = np.array([0.0, 4.0, 3.0, 7.0, 9.0, 1.0])
+  P = np.diag([0.25, 0.25, 4.0, 4.0, 4.0, 4.0])
+
+  def predict(x, P):
+      x = x.copy(); P = P.copy()
+      x[0] += 0.5
+      P[:2, :2] += Q_STEP
+      return x, P
+
+  def update(x, P, lm_id, z):
+      H = np.zeros((2, 6))
+      H[:, :2] = -np.eye(2)
+      H[:, 2 + 2*lm_id: 4 + 2*lm_id] = np.eye(2)
+      pred = x[2 + 2*lm_id: 4 + 2*lm_id] - x[:2]
+      y = z - pred
+      S = H @ P @ H.T + R_MEAS
+      K = P @ H.T @ np.linalg.inv(S)
+      x = x + K @ y
+      P = (np.eye(6) - K @ H) @ P
+      return x, (P + P.T) / 2
+
+  for lm_id, z, _ in simulate():
+      x, P = predict(x, P)
+      x, P = update(x, P, lm_id, z)
+
+  print("landmark estimates:", np.round(x[2:], 2).reshape(2, 2))
+  print("robot std:", np.round(np.sqrt(np.diag(P)[:2]), 3))

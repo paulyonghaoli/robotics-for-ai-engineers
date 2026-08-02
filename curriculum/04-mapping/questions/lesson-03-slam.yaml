@@ -1,0 +1,47 @@
+id: mapping-l3-slam
+title: "Quiz — EKF-SLAM"
+lesson: modules/04-mapping/03-ekf-slam
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Observing landmark 3 improves landmark 1's estimate because…"
+    options:
+      - text: "Both were mapped from shared robot poses, so their errors are correlated — the off-diagonal covariance carries the correction across"
+        correct: true
+        explanation: "If landmark 3 reveals the robot was 20 cm left, everything mapped from those poses was 20 cm left too. The correlations ARE the product."
+      - text: "The filter re-observes landmark 1 implicitly"
+        explanation: "No observation of 1 occurs — the information flows through the joint covariance."
+      - text: "It doesn't; landmark updates are independent"
+        explanation: "Believing this is the classic pre-SLAM mistake — and exactly what the exercise's assert disproves."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "EKF-SLAM with 50 2-D landmarks: what is the state dimension (robot pose = 3)?"
+    answer: 103
+    tolerance: 0.1
+    explanation: "3 + 2·50. The covariance has ~10⁴ entries and each update touches all of them — the O(N²) wall that sent the field to graphs."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your SLAM map is internally crisp but globally rotated 5° from surveyed ground truth. This is…"
+    options:
+      - text: "Expected: the map is determined only relative to the start — global pose is unobservable without a world anchor"
+        correct: true
+        explanation: "The gauge freedom. GPS or a surveyed marker pins it; nothing internal can."
+      - text: "A Jacobian bug"
+        explanation: "Bugs distort internal consistency; a clean global rotation is the unobservable direction, behaving lawfully."
+      - text: "Accumulated float error"
+        explanation: "Float error doesn't organize itself into one clean rigid rotation."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "One confident wrong data association in EKF-SLAM…"
+    options:
+      - text: "Corrupts robot AND map jointly — which then mis-associates further observations: a self-reinforcing spiral with no undo"
+        correct: true
+        explanation: "The filter marginalizes history; there's nothing to roll back. Gating helps; graph back-ends (4.4) with robust kernels are the deeper answer."
+      - text: "Averages out with more observations"
+        explanation: "The corrupted state biases what 'more observations' get matched against — errors compound, not cancel."
+      - text: "Only affects the misassociated landmark"
+        explanation: "The joint covariance spreads the poison exactly as efficiently as it spreads corrections."

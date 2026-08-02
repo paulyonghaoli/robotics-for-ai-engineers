@@ -1,0 +1,72 @@
+id: ctl-l1-fk
+title: "Forward kinematics + closed-form IK"
+lesson: modules/02-control/01-kinematics
+description: >-
+  Implement FK for the 2-link arm and the closed-form (law-of-cosines) IK.
+  The tests round-trip them and probe both elbow branches and an
+  unreachable target.
+setup_code: |
+  import numpy as np
+  L1, L2 = 1.0, 0.8
+starter_code: |
+  import numpy as np
+  # Link lengths L1 = 1.0, L2 = 0.8 are defined.
+
+  def fk(theta1, theta2):
+      """Hand position (x, y) for joint angles."""
+      # TODO
+      return np.zeros(2)
+
+  def ik(x, y, elbow_up=True):
+      """Closed-form IK. Return (theta1, theta2), or None if unreachable.
+
+      elbow_up selects the branch: theta2 = +acos(D) or -acos(D).
+      """
+      # TODO — D = (x^2 + y^2 - L1^2 - L2^2) / (2 L1 L2); |D| > 1 -> None
+      return None
+
+  print(fk(0.0, 0.0))            # expect [1.8, 0.0] (fully stretched)
+  print(ik(1.2, 0.6))            # one valid solution
+  print(ik(3.0, 0.0))            # expect None (out of reach)
+tests: |
+  import numpy as np
+  assert np.allclose(fk(0.0, 0.0), [L1 + L2, 0.0], atol=1e-9), "stretched arm (0,0) should reach (1.8, 0)"
+  assert np.allclose(fk(np.pi/2, 0.0), [0.0, 1.8], atol=1e-9), "arm at (pi/2, 0) points straight up"
+  assert np.allclose(fk(0.0, np.pi/2), [1.0, 0.8], atol=1e-9), "elbow bent 90deg: hand at (L1, L2)"
+  assert ik(3.0, 0.0) is None, "targets beyond L1+L2 are unreachable -> None"
+  assert ik(0.05, 0.0) is None, "targets inside the inner workspace ring (|p| < L1-L2 = 0.2) are also unreachable"
+  _rng = np.random.default_rng(1)
+  for _ in range(10):
+      _r = _rng.uniform(L1 - L2 + 0.05, L1 + L2 - 0.05)
+      _a = _rng.uniform(-np.pi, np.pi)
+      _t = (_r * np.cos(_a), _r * np.sin(_a))
+      for _up in (True, False):
+          _sol = ik(_t[0], _t[1], elbow_up=_up)
+          assert _sol is not None, "reachable target %s reported unreachable" % (np.round(_t, 3),)
+          assert np.allclose(fk(*_sol), _t, atol=1e-6), "fk(ik(p)) must return p (branch elbow_up=%s)" % _up
+  _s1 = ik(1.2, 0.6, elbow_up=True)
+  _s2 = ik(1.2, 0.6, elbow_up=False)
+  assert abs(_s1[1] + _s2[1]) < 1e-9 and abs(_s1[1]) > 1e-3, "the two branches must have opposite theta2"
+hints:
+  - "FK: x = L1·cos(t1) + L2·cos(t1+t2); y likewise with sin."
+  - "IK: D = (x²+y²−L1²−L2²)/(2·L1·L2). If |D| > 1 return None. theta2 = ±acos(D); theta1 = atan2(y,x) − atan2(L2·sin(t2), L1+L2·cos(t2))."
+solution: |
+  import numpy as np
+
+  def fk(theta1, theta2):
+      return np.array([
+          L1 * np.cos(theta1) + L2 * np.cos(theta1 + theta2),
+          L1 * np.sin(theta1) + L2 * np.sin(theta1 + theta2),
+      ])
+
+  def ik(x, y, elbow_up=True):
+      D = (x * x + y * y - L1 * L1 - L2 * L2) / (2 * L1 * L2)
+      if abs(D) > 1.0:
+          return None
+      t2 = np.arccos(D) if elbow_up else -np.arccos(D)
+      t1 = np.arctan2(y, x) - np.arctan2(L2 * np.sin(t2), L1 + L2 * np.cos(t2))
+      return (t1, t2)
+
+  print(fk(0.0, 0.0))
+  print(ik(1.2, 0.6))
+  print(ik(3.0, 0.0))

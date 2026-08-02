@@ -1,0 +1,110 @@
+id: plan-l6-thrash
+title: "Case 1: the robot that changes its mind"
+lesson: modules/05-planning/06-lab-planner-pathologies
+description: >-
+  A robot must pass an obstacle it can round on either side. Costs are
+  nearly equal, so every replan flips the answer and the robot oscillates
+  in place — the capstone's field note 5, reproduced. **Run** to watch it
+  fail, then add commitment WITHOUT making the planner blind to a route
+  that genuinely becomes blocked.
+setup_code: |
+  import numpy as np
+
+  GOAL = np.array([16.0, 8.0])
+  START = np.array([2.0, 8.0])
+
+  def route_cost(route, x, blocked_route=None, t=0):
+      """Cost-to-go via 'left' or 'right' around the obstacle, from x.
+
+      The two are nearly tied and jitter slightly as the robot advances
+      (newly mapped geometry). A blocked route becomes infinitely costly
+      after step 45 — the planner MUST still be able to abandon it.
+      """
+      if blocked_route is not None and route == blocked_route and t > 45:
+          return np.inf
+      base = np.linalg.norm(GOAL - x)
+      wobble = 0.20 * np.sin(0.7 * t + (0.0 if route == "left" else 1.9))
+      detour = 1.0 if route == "left" else 1.05
+      return base + detour + wobble
+
+  def advance(x, route, speed=0.25):
+      """Move one step along the chosen route's corridor."""
+      lane_y = 10.5 if route == "left" else 5.5
+      target = np.array([GOAL[0], lane_y]) if x[0] < 13.0 else GOAL
+      d = target - x
+      n = np.linalg.norm(d)
+      return x + speed * d / n if n > 1e-9 else x
+starter_code: |
+  import numpy as np
+  # Provided: START, GOAL, route_cost(route, x, blocked_route, t), advance(x, route)
+
+  def choose_route(current, x, t, blocked_route=None):
+      """Pick 'left' or 'right' for this cycle.
+
+      Naive version (the bug): always take the cheaper route right now.
+      Your job: commit to `current` unless it is genuinely worse — i.e.
+      unless the alternative beats it by a margin, or `current` is now
+      infinite (blocked).
+      """
+      costs = {r: route_cost(r, x, blocked_route, t) for r in ("left", "right")}
+      return min(costs, key=costs.get)          # <-- replace this
+
+  def run(blocked_route=None, steps=200):
+      x, route, switches, hist = START.copy(), "left", 0, []
+      for t in range(steps):
+          new_route = choose_route(route, x, t, blocked_route)
+          if new_route != route:
+              switches += 1
+          route = new_route
+          x = advance(x, route)
+          hist.append(x.copy())
+          if np.linalg.norm(x - GOAL) < 0.5:
+              break
+      return np.array(hist), switches, float(np.linalg.norm(x - GOAL))
+
+  hist, switches, final = run()
+  print("switches: %d   final distance: %.2f" % (switches, final))
+tests: |
+  import numpy as np
+  _hist, _switches, _final = run()
+  assert _switches <= 3, "the robot should commit to a route, not flip every cycle (got %d switches)" % _switches
+  assert _final < 0.5, "it must actually reach the goal (final distance %.2f)" % _final
+  _prog = [np.linalg.norm(p - GOAL) for p in _hist]
+  assert all(_prog[i] <= _prog[i - 1] + 0.05 for i in range(1, len(_prog))), "distance-to-goal must decrease monotonically - any sustained retreat is thrash"
+  # ...but commitment must not become stubbornness:
+  _hist2, _sw2, _final2 = run(blocked_route="left")
+  assert _final2 < 0.5, "when the committed route BECOMES blocked, the planner must switch and still arrive (final %.2f)" % _final2
+  assert _sw2 >= 1, "the blocked scenario requires at least one deliberate switch"
+hints:
+  - "The fix is hysteresis: `if costs[current] is finite and costs[current] <= costs[other] + MARGIN: keep current`. A margin of ~0.5 comfortably exceeds the 0.35 wobble."
+  - "Guard the blocked case first: if `np.isinf(costs[current])`, you must switch regardless of margin."
+  - "This is the capstone's field note 5 in miniature - and lesson 5.1 lists 'replanning thrash' among A*'s failure modes for exactly this reason."
+solution: |
+  import numpy as np
+
+  MARGIN = 0.5
+
+  def choose_route(current, x, t, blocked_route=None):
+      costs = {r: route_cost(r, x, blocked_route, t) for r in ("left", "right")}
+      other = "right" if current == "left" else "left"
+      if np.isinf(costs[current]):
+          return other
+      if costs[current] <= costs[other] + MARGIN:
+          return current
+      return other
+
+  def run(blocked_route=None, steps=200):
+      x, route, switches, hist = START.copy(), "left", 0, []
+      for t in range(steps):
+          new_route = choose_route(route, x, t, blocked_route)
+          if new_route != route:
+              switches += 1
+          route = new_route
+          x = advance(x, route)
+          hist.append(x.copy())
+          if np.linalg.norm(x - GOAL) < 0.5:
+              break
+      return np.array(hist), switches, float(np.linalg.norm(x - GOAL))
+
+  hist, switches, final = run()
+  print("switches: %d   final distance: %.2f" % (switches, final))

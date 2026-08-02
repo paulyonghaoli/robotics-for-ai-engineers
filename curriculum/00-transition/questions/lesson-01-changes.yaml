@@ -1,0 +1,68 @@
+id: transition-l1-changes
+title: "Quiz — what changes in embodied ML"
+lesson: modules/00-transition/01-what-changes
+questions:
+  - id: q1
+    type: single
+    difficulty: intro
+    prompt: "A perception model with 95% offline accuracy is deployed on a robot. Why can its closed-loop failure rate be far worse than 5%?"
+    options:
+      - text: "The robot's actions correlate with its errors — acting on a mistake steers it into states where mistakes compound"
+        correct: true
+        explanation: "Closed-loop error is not i.i.d. The feedback edge makes the input distribution a function of the model's own outputs — the defining difference from offline ML."
+      - text: "Robots always run models at lower precision"
+        explanation: "Quantization effects are real but small and measurable offline — not the structural issue."
+      - text: "Offline test sets are always mislabeled"
+        explanation: "Label noise cuts both ways and exists in every domain; it doesn't explain the closed-loop gap."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "A robot at 2 m/s receives a perfect obstacle detection with 300 ms total latency. The practical consequence is…"
+    options:
+      - text: "The detection describes a world 60 cm stale — correctness has a deadline"
+        correct: true
+        explanation: "2 m/s × 0.3 s. In embodied systems, latency isn't a performance metric separate from accuracy; it's part of accuracy."
+      - text: "None, since the detection was accurate"
+        explanation: "Accurate about the *past*. The robot must act in the present."
+      - text: "The robot should drive slower until latency improves"
+        explanation: "Sometimes a valid mitigation, but it concedes the point: latency bounds the operating envelope."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Offline metrics (mAP, RMSE on a test set) in robotics are best treated as…"
+    options:
+      - text: "Unit tests — necessary gates, but not verdicts on system behavior"
+        correct: true
+        explanation: "A regression in mAP tells you something broke. A good mAP does NOT tell you the robot is safe — only closed-loop evaluation does."
+      - text: "The primary acceptance criteria for deployment"
+        explanation: "That's the offline-ML habit this lesson exists to break."
+      - text: "Useless in embodied systems"
+        explanation: "Overcorrection — they're cheap, fast, and catch regressions early. Just not sufficient."
+  - id: q4
+    type: multi
+    difficulty: core
+    prompt: "Which of your ML-engineering skills transfer to robotics **nearly unchanged**? Select all that apply."
+    options:
+      - text: "Bayesian inference and hidden-state modeling"
+        correct: true
+        explanation: "State estimation IS applied Bayes — Module 3 will feel familiar."
+      - text: "Data-pipeline and evaluation discipline"
+        correct: true
+        explanation: "Sensor pipelines, scenario suites, replay-based regression — same discipline, harder deadlines."
+      - text: "Distributed-systems experience"
+        correct: true
+        explanation: "A robot is a distributed system; ROS 2 is pub/sub middleware."
+      - text: "The assumption that outputs don't affect future inputs"
+        explanation: "That's the one assumption you must *unlearn* — it's the definition of open-loop thinking."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why does feedback control bound error growth under persistent disturbance, while open-loop replay accumulates it?"
+    options:
+      - text: "Feedback measures the actual state each step, so correction scales with accumulated error; open-loop never observes its own drift"
+        correct: true
+        explanation: "The disturbance is the same in both cases — the difference is whether the system can see the error it's accumulating. You built exactly this in the exercise."
+      - text: "Feedback controllers predict disturbances before they occur"
+        explanation: "That's feedforward. Feedback is reactive — it needs no disturbance model, which is its superpower."
+      - text: "Open-loop systems use worse actuators"
+        explanation: "Identical actuators; the difference is purely informational."

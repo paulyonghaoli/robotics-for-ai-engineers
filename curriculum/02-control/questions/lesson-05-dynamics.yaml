@@ -1,0 +1,47 @@
+id: control-l5-dynamics
+title: "Quiz — dynamics and gravity compensation"
+lesson: modules/02-control/05-dynamics
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "Uniform rod arm, m = 2 kg, l = 0.5 m, held horizontal (g = 9.81): compute the gravity torque m·g·(l/2)."
+    answer: 4.905
+    tolerance: 0.01
+    explanation: "2 · 9.81 · 0.25 — the feedforward the controller should be paying instead of the integral."
+  - id: q2
+    type: single
+    difficulty: intro
+    prompt: "PD control (no integral) holding an arm against gravity settles…"
+    options:
+      - text: "Below the target — at the angle where the P 'spring' torque balances gravity"
+        correct: true
+        explanation: "KP·error = τ_gravity defines the sag. Higher gains shrink it; only feedforward (or an integral) eliminates it."
+      - text: "Exactly at the target, given enough time"
+        explanation: "Nothing supplies the standing torque at zero error — the equilibrium REQUIRES an error."
+      - text: "Above the target"
+        explanation: "Gravity pulls down; the equilibrium error is on gravity's side."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "The controls maxim this lesson turns on is…"
+    options:
+      - text: "Feedback fights what you didn't predict; feedforward pays what you can predict"
+        correct: true
+        explanation: "Gravity is perfectly predictable from θ — making the feedback loop pay for it (via integral windup-and-relearn) wastes performance at every setpoint change."
+      - text: "More gain solves more problems"
+        explanation: "Until it oscillates — and the sag never fully leaves."
+      - text: "Integral action is always preferable to model knowledge"
+        explanation: "The integral is a size-one lookup table that relearns per setpoint; the model generalizes."
+  - id: q4
+    type: single
+    difficulty: stretch
+    prompt: "You can push a torque-controlled collaborative robot around by hand because…"
+    options:
+      - text: "Gravity compensation is always on — the motors cancel the arm's own weight, leaving it 'weightless' to external forces"
+        correct: true
+        explanation: "The controller pays g(θ) continuously; your hand only feels inertia and friction."
+      - text: "The motors are disengaged in that mode"
+        explanation: "Disengaged motors would drop the arm — try it (don't)."
+      - text: "The arm is made of very light materials"
+        explanation: "Cobots are not light; the weightlessness is active, not structural."

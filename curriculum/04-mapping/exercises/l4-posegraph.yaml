@@ -1,0 +1,100 @@
+id: map-l4-posegraph
+title: "Close the loop: pose-graph least squares"
+lesson: modules/04-mapping/04-pose-graphs
+description: >-
+  A robot drives a square loop with drifting odometry; a loop-closure edge
+  says 'the final pose is where the first one was'. Build the sparse
+  linear system and solve it. The tests verify the lesson's signature:
+  the correction is DISTRIBUTED along the whole loop, not dumped at the
+  closure — and the drifted arc snaps back into a square.
+setup_code: |
+  import numpy as np
+
+  RNG = np.random.default_rng(6)
+  # True trajectory: a 4x4 square loop, 16 poses, back to start.
+  _steps = ([(1.0, 0.0)] * 4 + [(0.0, 1.0)] * 4 + [(-1.0, 0.0)] * 4 + [(0.0, -1.0)] * 4)
+  TRUE = np.vstack([[0.0, 0.0], np.cumsum(_steps, axis=0)])   # (17, 2)
+  # Odometry: each step measured with noise + a small systematic bias.
+  ODOM = np.array(_steps) + RNG.normal(0, 0.04, (16, 2)) + [0.02, 0.01]
+  # Loop closure: pose 16 re-observes pose 0's location exactly-ish.
+  LOOP = (16, 0, np.array([0.0, 0.0]))   # (i, j, measured x_j - x_i)
+starter_code: |
+  import numpy as np
+  # Provided: TRUE (17,2) ground truth, ODOM (16,2) noisy step measurements,
+  # LOOP = (16, 0, z) closure edge. Position-only graph => LINEAR least squares.
+  # Unknowns: poses x_1..x_16 (x_0 pinned at the origin). Stack as 32-vector.
+
+  def build_system(odom, loop, w_odom=1.0, w_loop=1.0):
+      """Return (A, b): rows are edge residual equations, scaled by sqrt(w).
+
+      Odometry edge k (x_{k+1} - x_k = odom[k]) contributes 2 rows.
+      x_0 is PINNED: it simply doesn't appear as an unknown (columns are
+      x_1..x_16), so edge 0 becomes x_1 = odom[0].
+      Loop edge (i, j, z): x_j - x_i = z (here j=0 -> -x_i = z, i.e. x_16 = -z).
+      """
+      # TODO
+      return np.zeros((2, 32)), np.zeros(2)
+
+  def solve_graph(odom, loop, w_odom=1.0, w_loop=1.0):
+      A, b = build_system(odom, loop, w_odom, w_loop)
+      x, *_ = np.linalg.lstsq(A, b, rcond=None)
+      return np.vstack([[0.0, 0.0], x.reshape(-1, 2)])
+
+  dead_reckoning = np.vstack([[0.0, 0.0], np.cumsum(ODOM, axis=0)])
+  optimized = solve_graph(ODOM, LOOP)
+  print("dead-reckoning end error:", np.linalg.norm(dead_reckoning[-1] - TRUE[-1]))
+  print("optimized end error:     ", np.linalg.norm(optimized[-1] - TRUE[-1]))
+tests: |
+  import numpy as np
+  _dr = np.vstack([[0.0, 0.0], np.cumsum(ODOM, axis=0)])
+  _opt = solve_graph(ODOM, LOOP)
+  assert _opt.shape == (17, 2), "must return all 17 poses (x_0 pinned at origin)"
+  assert np.allclose(_opt[0], 0.0), "pose 0 stays pinned"
+  _err_dr = np.abs(_dr - TRUE).max()
+  _err_opt = np.abs(_opt - TRUE).max()
+  assert _err_opt < 0.6 * _err_dr, "optimization should substantially beat dead reckoning (worst error %.3f vs %.3f)" % (_err_opt, _err_dr)
+  assert np.linalg.norm(_opt[-1] - TRUE[-1]) < 0.15, "with the closure, the final pose must land near the start"
+  _mid_correction = np.linalg.norm(_opt[8] - _dr[8])
+  assert _mid_correction > 0.05, "poses MID-loop must move too (correction distributed, got %.3f) - if only the last pose moved, your loop edge is a patch, not a constraint" % _mid_correction
+  _opt_stiff = solve_graph(ODOM, LOOP, w_loop=100.0)
+  assert np.linalg.norm(_opt_stiff[-1] - TRUE[-1]) < np.linalg.norm(_opt[-1] - TRUE[-1]) + 1e-9, "a stiffer loop edge must pull the closure at least as tight"
+hints:
+  - "32 unknowns (16 poses x 2). Row pair for odometry edge k>0: +1 at pose k+1's columns, −1 at pose k's, b = odom[k]. Edge 0 has only the +1 (x_0 is not a column)."
+  - "Loop edge (16, 0, z): x_0 − x_16 = z with x_0 pinned to 0 → rows: −1 at pose 16's columns, b = z. Scale each edge's rows and b by sqrt(weight)."
+  - "The mid-loop assert is the lesson: least squares spreads the closure disagreement across every spring in the chain."
+solution: |
+  import numpy as np
+
+  def build_system(odom, loop, w_odom=1.0, w_loop=1.0):
+      n = len(odom)                     # 16 steps -> unknowns x_1..x_n
+      rows, rhs = [], []
+      sw = np.sqrt(w_odom)
+      for k in range(n):
+          for d in range(2):
+              r = np.zeros(2 * n)
+              r[2 * k + d] = 1.0        # pose k+1 (unknown index k)
+              if k > 0:
+                  r[2 * (k - 1) + d] = -1.0
+              rows.append(sw * r)
+              rhs.append(sw * odom[k, d])
+      i, j, z = loop
+      sl = np.sqrt(w_loop)
+      for d in range(2):
+          r = np.zeros(2 * n)
+          if i > 0:
+              r[2 * (i - 1) + d] = -1.0
+          if j > 0:
+              r[2 * (j - 1) + d] = 1.0
+          rows.append(sl * r)
+          rhs.append(sl * z[d])
+      return np.array(rows), np.array(rhs)
+
+  def solve_graph(odom, loop, w_odom=1.0, w_loop=1.0):
+      A, b = build_system(odom, loop, w_odom, w_loop)
+      x, *_ = np.linalg.lstsq(A, b, rcond=None)
+      return np.vstack([[0.0, 0.0], x.reshape(-1, 2)])
+
+  dead_reckoning = np.vstack([[0.0, 0.0], np.cumsum(ODOM, axis=0)])
+  optimized = solve_graph(ODOM, LOOP)
+  print("dead-reckoning end error:", np.linalg.norm(dead_reckoning[-1] - TRUE[-1]))
+  print("optimized end error:     ", np.linalg.norm(optimized[-1] - TRUE[-1]))

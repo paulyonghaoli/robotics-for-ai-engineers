@@ -1,0 +1,124 @@
+id: plan-l2-costmap
+title: "Build a costmap and watch paths gain manners"
+lesson: modules/05-planning/02-costmaps
+description: >-
+  Implement the three-band costmap — lethal core, inscribed inflation,
+  exponential decay skirt — from a distance field. A provided cost-aware
+  Dijkstra then plans on it; the tests verify your bands and the payoff:
+  the costmap path keeps meaningfully more clearance than the binary path.
+setup_code: |
+  import heapq
+  import numpy as np
+
+  RES = 0.1  # m per cell
+
+  def distance_field(grid):
+      inf = 1e9
+      free = ~grid
+      boundary = grid & (np.roll(free,1,0)|np.roll(free,-1,0)|np.roll(free,1,1)|np.roll(free,-1,1))
+      d = np.where(boundary, 0.0, inf)
+      rows, cols = d.shape
+      w1, w2 = 1.0, np.sqrt(2.0)
+      for rng in (range(rows), range(rows-1, -1, -1)):
+          fwd = rng == range(rows)
+          for y in rng:
+              xs = range(cols) if fwd else range(cols-1, -1, -1)
+              for x in xs:
+                  v = d[y, x]
+                  for dy, dx, w in (((-1,0,w1),(0,-1,w1),(-1,-1,w2),(-1,1,w2)) if fwd else ((1,0,w1),(0,1,w1),(1,-1,w2),(1,1,w2))):
+                      ny, nx = y+dy, x+dx
+                      if 0 <= ny < rows and 0 <= nx < cols:
+                          v = min(v, d[ny, nx] + w)
+                  d[y, x] = v
+      d[grid & (d > 1e8)] = 0.0
+      return d * RES
+
+  def plan(costmap, start, goal):
+      """Dijkstra minimizing steplength + cell cost; inf cells are walls."""
+      rows, cols = costmap.shape
+      dist = {start: 0.0}; parent = {}; heap = [(0.0, 0, start)]; tie = 0; seen = set()
+      nbrs = [(-1,0,1.0),(1,0,1.0),(0,-1,1.0),(0,1,1.0),
+              (-1,-1,1.414),(-1,1,1.414),(1,-1,1.414),(1,1,1.414)]
+      while heap:
+          dcur, _, cur = heapq.heappop(heap)
+          if cur in seen: continue
+          if cur == goal:
+              path = [cur]
+              while cur in parent: cur = parent[cur]; path.append(cur)
+              return path[::-1]
+          seen.add(cur)
+          for dy, dx, w in nbrs:
+              ny, nx = cur[0]+dy, cur[1]+dx
+              if not (0 <= ny < rows and 0 <= nx < cols): continue
+              c = costmap[ny, nx]
+              if not np.isfinite(c): continue
+              nd = dcur + w + c
+              if nd < dist.get((ny,nx), np.inf):
+                  dist[(ny,nx)] = nd; parent[(ny,nx)] = cur; tie += 1
+                  heapq.heappush(heap, (nd, tie, (ny,nx)))
+      return None
+
+  GRID = np.zeros((60, 60), dtype=bool)
+  GRID[20:40, 28:32] = True                     # a wall slab mid-map
+  DF = distance_field(GRID)
+starter_code: |
+  import numpy as np
+  # Provided: GRID (60x60 bool), DF = distance to obstacle surface (m),
+  #           plan(costmap, start, goal), RES = 0.1 m/cell.
+
+  ROBOT_R, C_MAX, ALPHA = 0.25, 50.0, 8.0
+
+  def make_costmap(df, robot_r=ROBOT_R, c_max=C_MAX, alpha=ALPHA):
+      """Three bands: d <= robot_r -> np.inf (lethal+inscribed);
+      beyond: c_max * exp(-alpha * (d - robot_r))."""
+      # TODO
+      return np.zeros_like(df)
+
+  costmap = make_costmap(DF)
+  binary = np.where(DF <= ROBOT_R, np.inf, 0.0)   # hard inflation, no skirt
+
+  p_soft = plan(costmap, (30, 2), (30, 57))
+  p_hard = plan(binary,  (30, 2), (30, 57))
+
+  def min_clearance(path):
+      return min(DF[c] for c in path)
+
+  print("skirt path clearance: %.2f m" % min_clearance(p_soft))
+  print("binary path clearance: %.2f m" % min_clearance(p_hard))
+tests: |
+  import numpy as np
+  _cm = make_costmap(DF)
+  assert np.isinf(_cm[30, 29]), "cells inside the obstacle must be lethal (inf)"
+  assert np.isinf(_cm[30, 26]), "cells within the robot radius of the wall (d <= 0.25 m) must also be inf - inscribed inflation is HARD"
+  _far = _cm[30, 2]
+  assert 0 <= _far < 1.0, "cells far from obstacles should have near-zero cost (got %.2f)" % _far
+  _near = _cm[DF > ROBOT_R]
+  _dnear = DF[DF > ROBOT_R]
+  _i = np.argmin(np.abs(_dnear - 0.35))
+  assert abs(_near[_i] - C_MAX*np.exp(-ALPHA*(_dnear[_i]-ROBOT_R))) < 1e-6, "skirt must follow c_max * exp(-alpha (d - r))"
+  _ps = plan(_cm, (30, 2), (30, 57)); _pb = plan(np.where(DF <= ROBOT_R, np.inf, 0.0), (30, 2), (30, 57))
+  assert _ps is not None and _pb is not None, "both plans must succeed"
+  _cs, _cb = min(DF[c] for c in _ps), min(DF[c] for c in _pb)
+  assert _cs > _cb + 0.15, "the costmap path should keep visibly more clearance than the binary path (%.2f vs %.2f m)" % (_cs, _cb)
+hints:
+  - "np.where(df <= robot_r, np.inf, c_max * np.exp(-alpha * (df - robot_r))) — one line, three bands."
+  - "The binary comparison path hugs the inflation boundary exactly (clearance ≈ robot_r); the skirt pushes yours wider. That gap is the lesson."
+solution: |
+  import numpy as np
+
+  ROBOT_R, C_MAX, ALPHA = 0.25, 50.0, 8.0
+
+  def make_costmap(df, robot_r=ROBOT_R, c_max=C_MAX, alpha=ALPHA):
+      return np.where(df <= robot_r, np.inf, c_max * np.exp(-alpha * (df - robot_r)))
+
+  costmap = make_costmap(DF)
+  binary = np.where(DF <= ROBOT_R, np.inf, 0.0)
+
+  p_soft = plan(costmap, (30, 2), (30, 57))
+  p_hard = plan(binary,  (30, 2), (30, 57))
+
+  def min_clearance(path):
+      return min(DF[c] for c in path)
+
+  print("skirt path clearance: %.2f m" % min_clearance(p_soft))
+  print("binary path clearance: %.2f m" % min_clearance(p_hard))
