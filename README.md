@@ -12,10 +12,10 @@ I'm a data and ML engineer teaching myself robotics. What I couldn't find was ma
 
 A differential-drive robot navigating randomized worlds. Four versions, each one removing an assumption the last one leaned on. These GIFs come from real evaluation runs — the same code path that scores it.
 
-| Localizing with no idea where it is | Building the map while driving | Avoiding things that aren't on the map |
-|---|---|---|
-| ![global localization](docs/assets/demo/capstone-global-localization.gif) | ![online mapping](docs/assets/demo/capstone-v2-mapping.gif) | ![dynamic obstacles](docs/assets/demo/capstone-v3-dynamic.gif) |
-| 8,000 particles from a uniform prior → 0.2 m | unknown world, carved out by lidar | 6 movers that never yield |
+| Localizing with no idea where it is | Building the map while driving | Avoiding things that aren't on the map | Neither a map nor a pose |
+|---|---|---|---|
+| ![global localization](docs/assets/demo/capstone-global-localization.gif) | ![online mapping](docs/assets/demo/capstone-v2-mapping.gif) | ![dynamic obstacles](docs/assets/demo/capstone-v3-dynamic.gif) | ![SLAM](docs/assets/demo/capstone-v4-slam.gif) |
+| 8,000 particles from a uniform prior → 0.2 m | unknown world, carved out by lidar | 6 movers that never yield | mapping while lost, 0.39 m drift |
 
 | Version | What it's allowed to assume | How it scored |
 |---|---|---|
@@ -23,8 +23,11 @@ A differential-drive robot navigating randomized worlds. Four versions, each one
 | v1 | Known map; localizes from lidar alone | 20/20, 6–11 cm error |
 | v2 | Only the goal — builds its own map | 20/20 |
 | v3 | Six moving obstacles, not on the map | 18/18, 17/18 collision-free |
+| v4 | **Nothing** — no map, no pose sensor after step 0 | 18/24, 0.39 m drift |
 
-The [engineering log](docs/capstone-log.md) is the part I'd actually recommend reading: eight ways this broke, what each one looked like from the outside, and how it was found. Most were not algorithm bugs — they were bad assumptions about what a sensor reading *meant*.
+v4 is the one that stops short of the others on purpose. Giving up the pose sensor costs a quarter of the episodes, because 0.39 m of drift against a 0.5 m goal tolerance means a quarter of runs park just outside it *believing they arrived*. That gap doesn't close by tuning — it closes with loop closure — so it's published as a measured envelope rather than tuned away.
+
+The [engineering log](docs/capstone-log.md) is the part I'd actually recommend reading: thirteen ways this broke, what each one looked like from the outside, and how it was found. Most were not algorithm bugs — they were bad assumptions about what a sensor reading *meant*. One of them I found, documented, wrote a lesson about, and then committed again three stacks later.
 
 ## Why it's built the way it is
 
