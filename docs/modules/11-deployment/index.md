@@ -9,7 +9,7 @@ This is the module where your platform-engineering instincts transfer most direc
 ## Lessons
 
 1. [Latency budgets and the real-time contract](01-latency-budgets.md) — **available**
-2. Edge inference: quantization and the accuracy/latency trade *(planned)*
+2. [Edge inference: quantization and the accuracy/latency trade](02-edge-inference.md) — **available**
 3. Rollout and rollback across a fleet *(planned)*
 4. Fleet telemetry and incident forensics *(planned)*
 5. Safety cases for learned components *(planned)*
@@ -17,4 +17,4 @@ This is the module where your platform-engineering instincts transfer most direc
 
 ## What you'll build
 
-A latency budget for a real control pipeline — and the discovery that the stage with the largest *mean* is usually not the one causing deadline misses.
+A latency budget for a real control pipeline — and the discovery that the stage with the largest *mean* is usually not the one causing deadline misses. Then the same lens applied to model precision, where ranking by accuracy and ranking by robot reliability put opposite models first.

@@ -104,6 +104,7 @@ nav:
   - "Module 11 · Deployment, Fleet & Safety":
       - Overview: modules/11-deployment/index.md
       - "11.1 Latency budgets": modules/11-deployment/01-latency-budgets.md
+      - "11.2 Edge inference": modules/11-deployment/02-edge-inference.md
   - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md

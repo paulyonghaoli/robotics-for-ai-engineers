@@ -1,0 +1,71 @@
+id: dep-l2-quant-quiz
+title: "Quiz — edge inference and quantization"
+lesson: modules/11-deployment/02-edge-inference
+questions:
+  - id: q1
+    type: numeric
+    difficulty: core
+    prompt: "A model is 97.0% accurate but misses the deadline 40% of the time. What is its end-to-end success rate (correct AND on time), as a decimal?"
+    answer: 0.582
+    tolerance: 0.01
+    explanation: "0.97 × 0.60 = 0.582. A correct answer that arrives late is not a success, which is why offline accuracy alone is the wrong objective on a robot."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "In the exercise, ranking precisions by model accuracy puts FP32 first; ranking by robot reliability puts it LAST. Why?"
+    options:
+      - text: "Success needs a correct answer that arrives in time — FP32's 3-point accuracy edge is swamped by missing the deadline 40% of the time"
+        correct: true
+        explanation: "Even INT4 at 72% accuracy beats FP32 end-to-end. Two independent failure paths, and the deadline one dominated."
+      - text: "FP32 is numerically unstable on embedded hardware"
+        explanation: "It's the most numerically faithful option; latency is the problem."
+      - text: "The accuracy figures must be wrong"
+        explanation: "They're consistent — the ranking flip comes from combining accuracy with timeliness."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your model already clears the deadline comfortably at FP16. Should you quantize to INT8?"
+    options:
+      - text: "Usually not — latency you don't need has no value, while the accuracy INT8 costs is real. Quantize until you clear the deadline with margin, then stop"
+        correct: true
+        explanation: "The exercise shows INT8 scoring slightly *below* FP16 end-to-end for exactly this reason. The exception is when memory or power is separately binding."
+      - text: "Yes — smaller is always better on embedded hardware"
+        explanation: "Only while the latency still buys you something."
+      - text: "Yes, INT8 has better accuracy than FP16"
+        explanation: "It has worse accuracy; it's faster."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "INT8 accuracy is fine offline but on-robot performance drops sharply. Two most likely causes?"
+    options:
+      - text: "Calibration data that doesn't match deployment, and thermal throttling making sustained latency worse than the cold benchmark"
+        correct: true
+        explanation: "Both are cheap to check: re-calibrate on logged on-robot data, and re-benchmark after twenty minutes of sustained load."
+      - text: "INT8 is fundamentally unsuitable for robotics"
+        explanation: "It's the default on Jetson via TensorRT; the failures here are process failures."
+      - text: "The robot's sensors changed"
+        explanation: "Possible in principle, but the quantization-specific suspects are calibration and thermals."
+  - id: q5
+    type: single
+    difficulty: stretch
+    prompt: "Why do throughput tricks from ML serving mostly not apply on a robot?"
+    options:
+      - text: "Batch size is 1 — there is one robot with one observation per cycle, so per-sample latency is all that matters"
+        correct: true
+        explanation: "Batching is the main lever in serving and it simply isn't available. Memory bandwidth also tends to bind before compute does, which is why INT8's 4× memory reduction sometimes buys more than its arithmetic speedup suggests."
+      - text: "Robots use different neural architectures"
+        explanation: "Often the same ones; the serving regime is what differs."
+      - text: "Robots have more compute available"
+        explanation: "Considerably less, and shared with a thermal budget."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Quantization halves your model's MEAN latency but deadline misses barely improve. What happened?"
+    options:
+      - text: "The misses came from the tail, and the quantization moved the mean without moving the p99 — check the percentile you actually miss on"
+        correct: true
+        explanation: "Lesson 11.1's point applied here. A speedup that doesn't touch the tail doesn't touch the deadline, no matter how good the average looks."
+      - text: "Quantization never reduces real latency"
+        explanation: "It usually does; the question is which part of the distribution moved."
+      - text: "The deadline is set too aggressively"
+        explanation: "Maybe, but that doesn't explain why halving the mean changed nothing."

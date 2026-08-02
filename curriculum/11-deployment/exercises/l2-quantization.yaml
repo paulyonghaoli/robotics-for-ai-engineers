@@ -1,0 +1,113 @@
+id: dep-l2-quantization
+title: "The most accurate model makes the worst robot"
+lesson: modules/11-deployment/02-edge-inference
+description: >-
+  Four precisions of the same perception model, benchmarked on the target
+  hardware. Rank them by accuracy and you get one answer; rank them by how
+  often the robot actually succeeds and you get a different one. Build the
+  end-to-end evaluation that shows why.
+setup_code: |
+  import numpy as np
+
+  DEADLINE_MS = 50.0
+  _rng = np.random.default_rng(0)
+  _N = 20000
+
+  # The rest of the pipeline (estimation, planning, control), in ms.
+  OTHER_STAGES_MS = _rng.gamma(6, 2.0, _N)
+
+  # Measured on the target board, batch size 1, under sustained load.
+  PRECISIONS = {
+      "fp32": {"accuracy": 0.970, "latency_ms": _rng.gamma(12, 3.0, _N)},
+      "fp16": {"accuracy": 0.968, "latency_ms": _rng.gamma(10, 1.9, _N)},
+      "int8": {"accuracy": 0.941, "latency_ms": _rng.gamma(8, 1.4, _N)},
+      "int4": {"accuracy": 0.723, "latency_ms": _rng.gamma(6, 1.1, _N)},
+  }
+starter_code: |
+  import numpy as np
+  # Provided: PRECISIONS (accuracy + measured latency per precision),
+  #           OTHER_STAGES_MS, DEADLINE_MS = 50.0.
+  # The robot succeeds on a cycle only if the model is RIGHT *and* the
+  # whole pipeline finished before the deadline.
+
+  def total_latency(name):
+      """Model latency plus the rest of the pipeline, per cycle."""
+      # TODO
+      return np.zeros(1)
+
+  def miss_rate(name):
+      """Fraction of cycles exceeding DEADLINE_MS."""
+      # TODO
+      return 0.0
+
+  def end_to_end_success(name):
+      """P(correct AND on time) = accuracy * (1 - miss_rate)."""
+      # TODO
+      return 0.0
+
+  def rank_by(metric_fn):
+      """Precision names sorted best-first by the given metric."""
+      # TODO
+      return []
+
+  print("precision  accuracy  lat_mean  lat_p99  miss   end-to-end")
+  for name in PRECISIONS:
+      lat = PRECISIONS[name]["latency_ms"]
+      print("%-9s  %.3f    %6.1f   %6.1f   %.3f  %.3f" % (
+          name, PRECISIONS[name]["accuracy"], lat.mean(),
+          np.percentile(lat, 99), miss_rate(name), end_to_end_success(name)))
+  print()
+  print("ranked by model accuracy   :", rank_by(lambda n: PRECISIONS[n]["accuracy"]))
+  print("ranked by robot reliability:", rank_by(end_to_end_success))
+tests: |
+  import numpy as np
+  _t = total_latency("fp32")
+  assert len(_t) == len(OTHER_STAGES_MS), "one total per cycle"
+  assert abs(_t.mean() - (PRECISIONS["fp32"]["latency_ms"].mean() + OTHER_STAGES_MS.mean())) < 1e-6, "stages are sequential; latencies add"
+  # FP32 is the most accurate model...
+  assert PRECISIONS["fp32"]["accuracy"] == max(p["accuracy"] for p in PRECISIONS.values()), "fp32 has the best raw accuracy"
+  assert miss_rate("fp32") > 0.3, "...and blows the deadline constantly (got %.3f)" % miss_rate("fp32")
+  # ...and the worst robot.
+  _e2e = {n: end_to_end_success(n) for n in PRECISIONS}
+  assert _e2e["fp32"] < 0.65, "fp32's end-to-end success should be poor (got %.3f)" % _e2e["fp32"]
+  assert _e2e["fp16"] > 0.9, "fp16 should be excellent (got %.3f)" % _e2e["fp16"]
+  assert _e2e["fp16"] - _e2e["fp32"] > 0.3, "the gap should be enormous: %.3f vs %.3f" % (_e2e["fp16"], _e2e["fp32"])
+  # The rankings genuinely disagree - that is the whole exercise.
+  _by_acc = rank_by(lambda n: PRECISIONS[n]["accuracy"])
+  _by_e2e = rank_by(end_to_end_success)
+  assert _by_acc[0] == "fp32", "accuracy ranks fp32 first"
+  assert _by_e2e[0] != "fp32", "reliability does NOT rank fp32 first - ranking by accuracy picks the wrong model"
+  assert _by_e2e[0] == "fp16", "fp16 should win on end-to-end success (got %s)" % _by_e2e[0]
+  # And past the deadline, more quantization only costs you.
+  assert miss_rate("int8") < 0.01, "int8 clears the deadline comfortably"
+  assert _e2e["int8"] < _e2e["fp16"], "once inside the deadline, further quantization is pure accuracy loss (%.3f vs %.3f)" % (_e2e["int8"], _e2e["fp16"])
+  assert _e2e["int4"] < _e2e["int8"], "int4 falls off the accuracy cliff"
+hints:
+  - "total_latency: `PRECISIONS[name]['latency_ms'] + OTHER_STAGES_MS`."
+  - "end_to_end_success: `PRECISIONS[name]['accuracy'] * (1.0 - miss_rate(name))` — a correct answer that arrives late is not a success."
+  - "rank_by: `sorted(PRECISIONS, key=metric_fn, reverse=True)`."
+  - "The two printed rankings should disagree at the top. That disagreement is the lesson: offline accuracy and on-robot reliability are different objectives, and only one of them is what you ship."
+solution: |
+  import numpy as np
+
+  def total_latency(name):
+      return PRECISIONS[name]["latency_ms"] + OTHER_STAGES_MS
+
+  def miss_rate(name):
+      return float(np.mean(total_latency(name) > DEADLINE_MS))
+
+  def end_to_end_success(name):
+      return float(PRECISIONS[name]["accuracy"] * (1.0 - miss_rate(name)))
+
+  def rank_by(metric_fn):
+      return sorted(PRECISIONS, key=metric_fn, reverse=True)
+
+  print("precision  accuracy  lat_mean  lat_p99  miss   end-to-end")
+  for name in PRECISIONS:
+      lat = PRECISIONS[name]["latency_ms"]
+      print("%-9s  %.3f    %6.1f   %6.1f   %.3f  %.3f" % (
+          name, PRECISIONS[name]["accuracy"], lat.mean(),
+          np.percentile(lat, 99), miss_rate(name), end_to_end_success(name)))
+  print()
+  print("ranked by model accuracy   :", rank_by(lambda n: PRECISIONS[n]["accuracy"]))
+  print("ranked by robot reliability:", rank_by(end_to_end_success))
