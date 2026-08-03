@@ -1,0 +1,83 @@
+id: man-l1-quiz
+title: "Quiz — manipulator kinematics"
+lesson: modules/08-manipulation/01-kinematics
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A 3-link planar arm is fully extended along +x. Which direction of tool motion has it lost?"
+    options:
+      - text: "Radially outward, along the arm — every joint's lever arm to the tool is perpendicular to the arm, so all Jacobian columns point sideways and none can extend it"
+        correct: true
+        explanation: "The intuition to fix: at full extension the arm can still swing freely. What it cannot do is reach any further, which is exactly what 'workspace boundary' means."
+      - text: "Perpendicular to the arm — it can extend but not swing"
+        explanation: "The opposite. Swinging is the one thing it does easily there."
+      - text: "Both directions equally"
+        explanation: "A singularity loses specific directions, not all of them."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why check an analytic Jacobian against finite differences?"
+    options:
+      - text: "Because a sign or index error produces a Jacobian that is the right shape and plausible magnitude, and shows up downstream as a controller drifting the wrong way"
+        correct: true
+        explanation: "Derivative bugs almost never announce themselves. A twenty-line finite-difference check over random configurations is the cheapest insurance in robotics."
+      - text: "Because finite differences are more accurate"
+        explanation: "They are less accurate — they are just independently derived, which is what makes them a useful cross-check."
+      - text: "To measure numerical conditioning"
+        explanation: "That's what manipulability is for."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "Manipulability at a mid-workspace pose is 1.29; near full extension it is 0.013. The radial joint speed for 1 m/s is 0.9 rad/s at the first. Roughly what is it at the second? (rad/s)"
+    answer: 214
+    tolerance: 60
+    explanation: "About 214 rad/s — the required joint speed scales roughly as the inverse of manipulability, so a hundredfold drop in conditioning is a hundredfold rise in what the motors are asked for. No motor delivers that, so the arm simply fails to track."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A 3-link planar arm reaching an (x, y) target has a one-dimensional null space. What is it good for?"
+    options:
+      - text: "Moving the elbow to dodge an obstacle or back away from a joint limit while the tool stays exactly where it is"
+        correct: true
+        explanation: "Redundancy is a resource. Any joint velocity in the null space is free motion as far as the task is concerned."
+      - text: "Nothing — it is a degeneracy to be removed"
+        explanation: "It is precisely what lets a redundant arm work in cluttered space."
+      - text: "It makes the IK solution unique"
+        explanation: "It does the reverse: it is why the solution is a continuum rather than a point."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why is a loss function with a unique minimiser the wrong model for inverse kinematics?"
+    options:
+      - text: "The forward map is many-to-one, so multiple joint configurations reach the same pose — 'the' answer does not exist"
+        correct: true
+        explanation: "Which is also why an IK solver that picks arbitrarily among solutions can make the arm flip configuration mid-trajectory."
+      - text: "Because the loss is non-differentiable"
+        explanation: "Forward kinematics is smooth; multiplicity is the issue, not differentiability."
+      - text: "Because joint angles are periodic"
+        explanation: "Periodicity is a real complication and a separate one from redundancy."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "A gripper adds a fixed transform between the flange and the tool tip, and it was left out of the model. How does that failure present?"
+    options:
+      - text: "As a constant offset in the tool frame that rotates with the wrist — so in the base frame it looks like a calibration error that changes with configuration"
+        correct: true
+        explanation: "Constant in one frame, configuration-dependent in another. The tell is that the error is fixed in magnitude and rotates, rather than growing with reach."
+      - text: "As an error that grows with distance from the base"
+        explanation: "That signature belongs to a link-length or scale error."
+      - text: "As random noise in the tool pose"
+        explanation: "It is entirely deterministic."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "You plan a straight line in task space between two ordinary, well-conditioned poses. Why might the arm still fail to execute it?"
+    options:
+      - text: "The straight line can pass through a poorly-conditioned region even though both endpoints are fine — conditioning is a property of the path, not of its endpoints"
+        correct: true
+        explanation: "This is the central argument for planning in configuration space rather than interpolating in task space and hoping."
+      - text: "Straight lines are never achievable for a revolute arm"
+        explanation: "They are, in the well-conditioned interior."
+      - text: "Because task space is higher-dimensional than joint space"
+        explanation: "For a redundant arm it is the other way round."

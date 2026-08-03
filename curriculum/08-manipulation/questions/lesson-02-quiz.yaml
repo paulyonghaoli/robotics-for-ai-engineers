@@ -1,0 +1,88 @@
+id: man-l2-quiz
+title: "Quiz — inverse kinematics"
+lesson: modules/08-manipulation/02-inverse-kinematics
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is it wrong to speak of 'the' inverse-kinematics solution?"
+    options:
+      - text: "IK is a relation, not a function — a pose may have zero, one, two, or infinitely many solutions, and code returning one has silently made a choice"
+        correct: true
+        explanation: "And when that silent choice changes between adjacent waypoints, the arm flips configuration: fast, loud, and absent from the planner's output."
+      - text: "Because numerical solvers are approximate"
+        explanation: "Multiplicity is a property of the geometry, not of the solver."
+      - text: "Because joint limits make some solutions invalid"
+        explanation: "Limits prune solutions; they are not why there are several."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Your IK solver returns 'failed' for a target. What two very different things could that mean?"
+    options:
+      - text: "The target is outside the workspace, or it is reachable but this starting guess fell into a local minimum — and they need different responses"
+        correct: true
+        explanation: "One check separates them: is the target within the summed link lengths? Reporting both as 'failed' invites a caller to retry an impossible goal forever with fresh seeds."
+      - text: "The damping was too high, or too low"
+        explanation: "Damping affects the rate of convergence, not whether a solution exists."
+      - text: "Both mean the same thing operationally"
+        explanation: "One warrants a different seed; the other warrants telling the planner the goal is impossible."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Damped least squares near a singularity trades what for what?"
+    options:
+      - text: "Task-space accuracy for bounded joint velocity — you accept not quite reaching the target rather than commanding speeds no motor can deliver"
+        correct: true
+        explanation: "It is a physical statement about how much joint motion you will spend per unit of task progress, which is why the right value depends on where you are in the workspace."
+      - text: "Memory for speed"
+        explanation: "The cost is identical either way."
+      - text: "Nothing — damping is strictly better"
+        explanation: "It slows convergence and leaves a steady-state error; those are real costs paid for stability."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "You want the elbow to move away from a joint limit while the gripper holds a glass perfectly still. What makes that possible?"
+    options:
+      - text: "The null space — for a redundant arm there are joint velocities with J·q̇ = 0, so projecting a secondary objective into it produces no tool motion at all"
+        correct: true
+        explanation: "Exactly none, to the precision of the linearisation. That is what redundancy buys, and it is why 'more joints than the task needs' is a feature."
+      - text: "Solving IK again with the glass position as a constraint"
+        explanation: "That gives you one configuration; it does not give you a direction you can move along freely."
+      - text: "Nothing — any joint motion moves the tool"
+        explanation: "True only for a non-redundant arm."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why should the null-space projector use the TRUE pseudo-inverse rather than the damped one you used for the task step?"
+    options:
+      - text: "A damped inverse leaves a residual, so I − J⁺J no longer annihilates tool motion and the 'free' motion quietly drags the tool along"
+        correct: true
+        explanation: "Damping is right where you are inverting to achieve something and wrong where you are inverting to describe a subspace. The idempotence check catches it immediately."
+      - text: "The damped inverse is slower to compute"
+        explanation: "Cost is comparable; correctness is the issue."
+      - text: "It makes no difference in practice"
+        explanation: "It produces a measurable drift — several millimetres over a couple of hundred steps."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Even with an exact projector, stepping repeatedly along the null space drifts the tool by centimetres. Why, and what fixes it?"
+    options:
+      - text: "The projector is a linearisation, so a finite step lands slightly off the constant-tool manifold and the error accumulates — keeping the task term in the update corrects it"
+        correct: true
+        explanation: "Which is why the full formula carries both terms even when the task is 'stay exactly where you are': the task term doubles as drift feedback."
+      - text: "Floating-point error accumulates"
+        explanation: "The drift is far larger than round-off and shrinks with step size, which points at linearisation."
+      - text: "The Jacobian is being computed at the wrong configuration"
+        explanation: "Recomputing it every step is necessary and still not sufficient on its own."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "An IK solution is not a plan. What is the distinction, and what goes wrong if you conflate them?"
+    options:
+      - text: "IK gives a destination configuration; it says nothing about whether a collision-free path reaches it — so the arm knows where it wants to be and drives its elbow through a table getting there"
+        correct: true
+        explanation: "Joint-space planning is a separate stage precisely because the straight line between two valid configurations need not be valid itself."
+      - text: "There is no real distinction for a redundant arm"
+        explanation: "Redundancy makes it worse, not better — more ways to reach the goal, more of them colliding."
+      - text: "A plan is just several IK solutions in sequence"
+        explanation: "Only if you have already established that the transitions between them are safe, which is the hard part."

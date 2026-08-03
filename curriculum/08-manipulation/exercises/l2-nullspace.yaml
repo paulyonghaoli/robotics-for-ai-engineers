@@ -1,0 +1,156 @@
+id: man-l2-nullspace
+title: "Move the elbow without moving the gripper"
+lesson: modules/08-manipulation/02-inverse-kinematics
+description: >-
+  A 3-link arm reaching an (x, y) target has one spare degree of freedom.
+  Project a secondary objective into the null space and you pursue it while
+  the tool stays *exactly* where it is — not approximately, exactly, to the
+  precision of the linearisation. Here the secondary objective is keeping the
+  joints away from their limits, which is what stops a solver walking into a
+  configuration the hardware refuses.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+  Q_MIN = np.array([-2.6, -2.4, -2.4])
+  Q_MAX = np.array([ 2.6,  2.4,  2.4])
+  Q_MID = 0.5 * (Q_MIN + Q_MAX)
+  Q_SPAN = Q_MAX - Q_MIN
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+
+  def fk(q):
+      return joint_positions(q)[-1]
+
+  def jacobian(q):
+      pts = joint_positions(q)
+      d = pts[-1] - pts[:-1]
+      return np.stack([-d[:, 1], d[:, 0]])
+
+  def limit_cost(q):
+      """How close the configuration sits to its limits. Lower is better."""
+      return float(np.sum(((np.asarray(q) - Q_MID) / Q_SPAN) ** 2))
+starter_code: |
+  import numpy as np
+  # Provided: LINKS, Q_MIN/Q_MAX/Q_MID/Q_SPAN, fk, jacobian, limit_cost
+
+  def null_space_projector(q):
+      """(n, n) projector  I - J^+ J  for the configuration q.
+
+      Use the TRUE pseudo-inverse here (`np.linalg.pinv`), not the damped
+      one. Damping is right when you are inverting to *achieve* a task step,
+      because it trades accuracy for bounded joint speed. In a projector it
+      is simply wrong: a damped inverse leaves a residual, so the motion you
+      call "free" quietly drags the tool along with it.
+      """
+      # TODO
+      return np.eye(len(q))
+
+  def posture_gradient(q, gain=30.0):
+      """Descent direction for limit_cost: push each joint toward the middle
+      of its range.  z_i = -gain * (q_i - mid_i) / span_i^2
+      """
+      # TODO
+      return np.zeros(len(q))
+
+  def relax_posture(q, steps=400, rate=0.2, damping=0.02):
+      """Improve the posture while holding the tool where it started.
+
+      Use the full step from the lesson, with the task being "stay put":
+
+          e  = p0 - fk(q)                      (p0 = the starting tool pose)
+          dq = J^+_damped @ e  +  rate * N @ z
+
+      The task term is not optional even though the tool is not meant to
+      move. N @ z is only tangent to the constant-tool manifold, so a finite
+      step lands slightly off it, and over a couple of hundred steps that
+      linearisation error accumulates into real drift. The task term is what
+      pulls it back — it does double duty as error feedback.
+
+      Use the DAMPED inverse for the task term (you are achieving something)
+      and the exact projector for the null-space term (you are not).
+      """
+      # TODO
+      return np.asarray(q, dtype=float)
+
+  q_awkward = np.array([1.599, -1.591, 1.547])
+  before = fk(q_awkward)
+  q_relaxed = relax_posture(q_awkward)
+  print("tool before %s   after %s   moved %.6f m"
+        % (np.round(before, 4), np.round(fk(q_relaxed), 4),
+           np.linalg.norm(fk(q_relaxed) - before)))
+  print("limit cost  %.4f -> %.4f" % (limit_cost(q_awkward), limit_cost(q_relaxed)))
+tests: |
+  import numpy as np
+  _q = np.array([0.7, -0.9, 1.1])
+
+  # The projector must annihilate tool motion.
+  _N = np.asarray(null_space_projector(_q))
+  assert _N.shape == (3, 3), "projector must be (n, n), got %s" % str(_N.shape)
+  _J = jacobian(_q)
+  _rng = np.random.default_rng(0)
+  for _ in range(20):
+      _z = _rng.normal(size=3)
+      assert np.linalg.norm(_J @ (_N @ _z)) < 1e-6, "J @ (N @ z) must be zero — a null-space motion produces no tool velocity; got %.2e" % np.linalg.norm(_J @ (_N @ _z))
+  # A projector is idempotent.
+  assert np.allclose(_N @ _N, _N, atol=1e-6), "I - J^+ J must be idempotent (N @ N == N)"
+  # ...and it must not be the zero matrix (that would trivially satisfy the above).
+  assert np.linalg.matrix_rank(_N, tol=1e-6) == 1, "a 3-link arm on a 2-D task has a 1-dimensional null space; got rank %d" % np.linalg.matrix_rank(_N, tol=1e-6)
+
+  # The gradient must point downhill on limit_cost.
+  _bad = np.array([2.4, -2.2, 2.1])
+  _g = np.asarray(posture_gradient(_bad))
+  assert limit_cost(_bad + 1e-3 * _g) < limit_cost(_bad), "posture_gradient should reduce limit_cost — check the sign"
+
+  # THE POINT: posture improves, tool does not move.
+  for _start in ([1.599, -1.591, 1.547], [-1.866, 1.595, -1.604], [1.969, -1.775, 1.791]):
+      _q0 = np.array(_start)
+      _t0 = fk(_q0)
+      _q1 = relax_posture(_q0)
+      assert np.all(_q1 >= Q_MIN - 1e-9) and np.all(_q1 <= Q_MAX + 1e-9), "relaxation left the joint limits"
+      _moved = float(np.linalg.norm(fk(_q1) - _t0))
+      assert _moved < 2e-3, "the tool moved %.4f m from %s. Null-space motion must leave the task untouched — if the tool drifts, the secondary term is not being projected." % (_moved, _start)
+      assert limit_cost(_q1) < 0.55 * limit_cost(_q0), "posture barely improved: %.4f -> %.4f. How much is achievable depends on where the 1-D null space points at this configuration; these starts admit roughly a 4x reduction." % (limit_cost(_q0), limit_cost(_q1))
+hints:
+  - "null_space_projector: `np.eye(n) - np.linalg.pinv(J) @ J`. Resist reaching for the damped inverse you used for the task step — check the idempotence assertion if you are tempted."
+  - "posture_gradient is the negative gradient of limit_cost, so it carries a minus sign: `-gain * (q - Q_MID) / Q_SPAN**2`."
+  - "In relax_posture, recompute the projector at EVERY step — it depends on q. And keep the task term: without it the tool drifts a couple of hundred millimetres over 200 steps purely from linearisation error, even with a perfect projector."
+solution: |
+  import numpy as np
+
+  def null_space_projector(q):
+      J = jacobian(q)
+      # True pseudo-inverse: a damped one leaves a residual, and then the
+      # "null-space" motion is not actually null and the tool drifts.
+      return np.eye(len(q)) - np.linalg.pinv(J) @ J
+
+  def posture_gradient(q, gain=30.0):
+      q = np.asarray(q, dtype=float)
+      return -gain * (q - Q_MID) / (Q_SPAN ** 2)
+
+  def relax_posture(q, steps=400, rate=0.2, damping=0.02):
+      q = np.asarray(q, dtype=float).copy()
+      p0 = fk(q)                       # where the tool must stay
+      for _ in range(steps):
+          J = jacobian(q)
+          # Task term: damped, because it is achieving something. It also
+          # cleans up the drift the null-space step leaves behind, since
+          # N @ z is only tangent to the constant-tool manifold.
+          e = p0 - fk(q)
+          task = J.T @ np.linalg.solve(J @ J.T + (damping ** 2) * np.eye(2), e)
+          # Null-space term: exact projector, recomputed at this q.
+          free = null_space_projector(q) @ posture_gradient(q)
+          q = np.clip(q + task + rate * free, Q_MIN, Q_MAX)
+      return q
+
+  q_awkward = np.array([1.599, -1.591, 1.547])
+  before = fk(q_awkward)
+  q_relaxed = relax_posture(q_awkward)
+  print("tool before %s   after %s   moved %.6f m"
+        % (np.round(before, 4), np.round(fk(q_relaxed), 4),
+           np.linalg.norm(fk(q_relaxed) - before)))
+  print("limit cost  %.4f -> %.4f" % (limit_cost(q_awkward), limit_cost(q_relaxed)))

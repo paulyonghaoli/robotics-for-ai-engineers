@@ -1,0 +1,120 @@
+id: man-l1-fk
+title: "Forward kinematics and the analytic Jacobian"
+lesson: modules/08-manipulation/01-kinematics
+description: >-
+  Build the chain for an n-link planar arm: joint positions, tool pose, and
+  the Jacobian. The Jacobian is checked against finite differences, which is
+  the only way to be sure an analytic derivative is right — and the check
+  that catches the sign and indexing errors that otherwise surface as a
+  controller that drifts the wrong way.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+
+  def wrap(a):
+      w = np.mod(-np.asarray(a, dtype=float) + np.pi, 2.0 * np.pi)
+      r = -(w - np.pi)
+      return float(r) if np.ndim(a) == 0 else r
+starter_code: |
+  import numpy as np
+  # Provided: LINKS (3 link lengths), wrap(angle)
+
+  def joint_positions(q, links=LINKS):
+      """(n,) joint angles -> (n+1, 2) positions: the base, then the far end
+      of each link.
+
+      Angles are RELATIVE to the previous link, so link i points along the
+      cumulative sum of q[0..i].
+      """
+      # TODO
+      return np.zeros((len(q) + 1, 2))
+
+  def forward_kinematics(q, links=LINKS):
+      """(n,) joint angles -> tool pose (x, y, theta).
+
+      theta is the tool's absolute orientation: the sum of all joint angles,
+      wrapped to (-pi, pi].
+      """
+      # TODO
+      return np.zeros(3)
+
+  def jacobian(q, links=LINKS):
+      """(2, n) position Jacobian d(x, y)/d(q).
+
+      Column j is the perpendicular from joint j to the tool:
+          [-(p_y - joint_y[j]), (p_x - joint_x[j])]
+      Moving joint j sweeps the tool around joint j, so the tool velocity is
+      perpendicular to the vector from that joint to the tool.
+      """
+      # TODO
+      return np.zeros((2, len(q)))
+
+  q = np.array([0.4, 0.6, -0.3])
+  print("tool pose:", np.round(forward_kinematics(q), 4))
+  print("jacobian:\n", np.round(jacobian(q), 4))
+tests: |
+  import numpy as np
+  # Fully extended along +x.
+  _z = np.zeros(3)
+  _p = joint_positions(_z)
+  assert _p.shape == (4, 2), "joint_positions must return (n+1, 2), got %s" % str(_p.shape)
+  assert np.allclose(_p[0], [0.0, 0.0]), "the first row is the base at the origin"
+  assert np.allclose(_p[-1], [LINKS.sum(), 0.0], atol=1e-9), "with all joints at zero the tool is at the summed link length on +x, got %s" % np.round(_p[-1], 4)
+  assert np.allclose(forward_kinematics(_z), [LINKS.sum(), 0.0, 0.0], atol=1e-9), "forward_kinematics disagrees with joint_positions"
+
+  # A quarter turn at the base points the whole arm along +y.
+  _q = np.array([np.pi / 2, 0.0, 0.0])
+  assert np.allclose(forward_kinematics(_q)[:2], [0.0, LINKS.sum()], atol=1e-9), "base rotated 90 deg should put the tool on +y"
+  assert abs(wrap(forward_kinematics(_q)[2] - np.pi / 2)) < 1e-9, "tool orientation is the SUM of the joint angles"
+
+  # Angles are relative: q = [pi/2, -pi/2, 0] folds back to horizontal.
+  _rel = forward_kinematics(np.array([np.pi / 2, -np.pi / 2, 0.0]))
+  assert abs(wrap(_rel[2])) < 1e-9, "joint angles are relative to the previous link, so these sum to zero orientation"
+
+  # THE CHECK: analytic Jacobian against finite differences.
+  _rng = np.random.default_rng(0)
+  for _ in range(25):
+      _qq = _rng.uniform(-2.5, 2.5, 3)
+      _J = np.asarray(jacobian(_qq))
+      assert _J.shape == (2, 3), "jacobian must be (2, n), got %s" % str(_J.shape)
+      _num = np.zeros((2, 3))
+      _h = 1e-6
+      for _j in range(3):
+          _d = np.zeros(3); _d[_j] = _h
+          _num[:, _j] = (forward_kinematics(_qq + _d)[:2] - forward_kinematics(_qq - _d)[:2]) / (2 * _h)
+      assert np.allclose(_J, _num, atol=1e-5), "analytic Jacobian disagrees with finite differences at q=%s:\nanalytic\n%s\nnumeric\n%s" % (np.round(_qq, 3), np.round(_J, 4), np.round(_num, 4))
+
+  # At full extension the Jacobian loses rank: nothing can move the tool
+  # along the arm's own direction.
+  _Js = np.asarray(jacobian(np.zeros(3)))
+  assert abs(np.linalg.svd(_Js, compute_uv=False)[-1]) < 1e-9, "with the arm straight, the smallest singular value must be 0 — that is the singularity"
+hints:
+  - "joint_positions: take `np.cumsum(q)` for the absolute angle of each link, then accumulate `links[i] * [cos, sin]` with `np.cumsum` again. Prepend the origin so the result has n+1 rows."
+  - "jacobian: get the joint positions first. Column j uses the vector from joint j (row j of the positions) to the tool (the last row), rotated 90 degrees: `[-(dy), dx]`."
+  - "If your Jacobian's columns are right but in the wrong order, you have indexed the joints from the tool end. Column 0 is the base joint, and it has the largest lever arm."
+solution: |
+  import numpy as np
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)                      # absolute angle of each link
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+
+  def forward_kinematics(q, links=LINKS):
+      pts = joint_positions(q, links)
+      return np.array([pts[-1, 0], pts[-1, 1], wrap(float(np.sum(q)))])
+
+  def jacobian(q, links=LINKS):
+      pts = joint_positions(q, links)
+      tool = pts[-1]
+      # Moving joint j sweeps the tool about joint j, so the tool velocity is
+      # perpendicular to (tool - joint_j). When those perpendiculars become
+      # parallel, the columns are dependent and the arm has lost a direction.
+      d = tool - pts[:-1]
+      return np.stack([-d[:, 1], d[:, 0]])
+
+  q = np.array([0.4, 0.6, -0.3])
+  print("tool pose:", np.round(forward_kinematics(q), 4))
+  print("jacobian:\n", np.round(jacobian(q), 4))

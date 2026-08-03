@@ -1,0 +1,121 @@
+id: man-l1-manipulability
+title: "Where the arm is about to become useless"
+lesson: modules/08-manipulation/01-kinematics
+description: >-
+  Manipulability condenses the Jacobian's conditioning into one number, and
+  it is zero exactly at a singularity. Compute it, then use it to price a
+  task-space path: a perfectly ordinary straight line between two ordinary
+  poses can demand joint velocities an order of magnitude larger in the
+  middle than at either end.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+
+  def fk(q, links=LINKS):
+      return joint_positions(q, links)[-1]
+
+  def jacobian(q, links=LINKS):
+      pts = joint_positions(q, links)
+      d = pts[-1] - pts[:-1]
+      return np.stack([-d[:, 1], d[:, 0]])
+starter_code: |
+  import numpy as np
+  # Provided: LINKS, joint_positions(q), fk(q) -> (x,y), jacobian(q) -> (2,n)
+
+  def manipulability(q):
+      """Yoshikawa's measure: sqrt(det(J @ J.T)).
+
+      Zero exactly when the arm has lost a direction of motion.
+      """
+      # TODO
+      return 0.0
+
+  def joint_speed_for(q, task_velocity, damping=0.0):
+      """Norm of the joint velocity needed to move the tool at
+      `task_velocity` (2,) from configuration q.
+
+      Note which direction is expensive: for a nearly-straight arm along +x,
+      every Jacobian column points along +y, so swinging the tool sideways is
+      cheap and pushing it further OUT is what the arm cannot do.
+
+      Use damped least squares:
+          dq = J.T @ solve(J @ J.T + damping^2 * I, v)
+      With damping = 0 that is the plain pseudo-inverse.
+
+      Near a singularity the motion is still achievable and merely ruinous,
+      and that finite-but-enormous number is what you are here to observe —
+      do not add a fallback that hides it. (AT an exact singularity the
+      velocity is unachievable and the solve is undefined; every
+      configuration used here is near-singular, not singular.)
+      """
+      # TODO
+      return 0.0
+
+  RADIAL = np.array([1.0, 0.0])   # outward along a straight arm: the lost direction
+  print("%-28s %12s %16s" % ("configuration", "manipulability", "|dq| radial 1 m/s"))
+  for name, q in (("mid-workspace", np.array([0.5, 0.7, 0.4])),
+                  ("nearly straight", np.array([0.0, 0.02, 0.02])),
+                  ("very nearly straight", np.array([0.0, 0.005, 0.005]))):
+      print("%-28s %12.4f %16.1f"
+            % (name, manipulability(q), joint_speed_for(q, RADIAL)))
+tests: |
+  import numpy as np
+  # Zero at the singular configuration, positive away from it.
+  assert manipulability(np.zeros(3)) < 1e-9, "a fully extended arm is singular: manipulability must be 0, got %.6f" % manipulability(np.zeros(3))
+  _mid = manipulability(np.array([0.5, 0.7, 0.4]))
+  assert _mid > 0.5, "mid-workspace manipulability should be comfortably positive, got %.4f" % _mid
+
+  # It must match the definition.
+  _q = np.array([0.3, 0.9, -0.4])
+  _J = jacobian(_q)
+  assert abs(manipulability(_q) - np.sqrt(np.linalg.det(_J @ _J.T))) < 1e-9, "manipulability should equal sqrt(det(J J^T))"
+
+  # It degrades monotonically as the arm straightens.
+  _seq = [manipulability(np.array([0.0, a, a])) for a in (0.8, 0.4, 0.2, 0.05)]
+  assert all(b < a for a, b in zip(_seq, _seq[1:], strict=False)), "manipulability should fall monotonically as the arm approaches full extension, got %s" % [round(v, 4) for v in _seq]
+
+  # The consequence: near a singularity the required joint speed explodes.
+  # Radially outward along a nearly-straight arm: that is the direction the
+  # arm loses at full extension, and the one that explodes.
+  _v = np.array([1.0, 0.0])
+  _good = joint_speed_for(np.array([0.5, 0.7, 0.4]), _v)
+  _bad = joint_speed_for(np.array([0.0, 0.02, 0.02]), _v)
+  assert _good < 5.0, "mid-workspace should need a modest joint speed, got %.2f" % _good
+  assert _bad > 10.0 * _good, "near the singularity the undamped pseudo-inverse should demand an order of magnitude more joint speed (%.2f vs %.2f) — that explosion IS the singularity, not a numerical artifact" % (_bad, _good)
+
+  # Damping trades a little accuracy for not exploding.
+  _damped = joint_speed_for(np.array([0.0, 0.02, 0.02]), _v, damping=0.1)
+  assert _damped < 0.5 * _bad, "damping should substantially cap the joint speed near a singularity (%.2f vs undamped %.2f)" % (_damped, _bad)
+hints:
+  - "manipulability is one line: `np.sqrt(np.linalg.det(J @ J.T))`. Guard against a tiny negative determinant from floating point with `max(det, 0.0)` before the square root."
+  - "joint_speed_for: build `A = J @ J.T + damping**2 * np.eye(2)`, then `dq = J.T @ np.linalg.solve(A, v)`, and return `np.linalg.norm(dq)`."
+  - "With damping=0 and a near-singular J, `np.linalg.solve` still returns an answer — an enormous one. That is the point of the exercise, so do not add a fallback that hides it."
+solution: |
+  import numpy as np
+
+  def manipulability(q):
+      J = jacobian(q)
+      return float(np.sqrt(max(np.linalg.det(J @ J.T), 0.0)))
+
+  def joint_speed_for(q, task_velocity, damping=0.0):
+      J = jacobian(q)
+      A = J @ J.T + (damping ** 2) * np.eye(2)
+      # solve, not lstsq: lstsq truncates small singular values and would
+      # quietly regularize away the very blow-up this exercise exists to show.
+      dq = J.T @ np.linalg.solve(A, np.asarray(task_velocity, dtype=float))
+      return float(np.linalg.norm(dq))
+
+  RADIAL = np.array([1.0, 0.0])   # outward along a straight arm: the lost direction
+  print("%-28s %12s %16s" % ("configuration", "manipulability", "|dq| radial 1 m/s"))
+  for name, q in (("mid-workspace", np.array([0.5, 0.7, 0.4])),
+                  ("nearly straight", np.array([0.0, 0.02, 0.02])),
+                  ("very nearly straight", np.array([0.0, 0.005, 0.005]))):
+      print("%-28s %12.4f %16.1f"
+            % (name, manipulability(q), joint_speed_for(q, RADIAL)))
