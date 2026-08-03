@@ -115,3 +115,73 @@ class TestCandidateIsScorable:
         v, w = stack.step(obs)
         assert 0.0 <= v <= 1.2 and -2.0 <= w <= 2.0
         assert stack.last_estimate is not None
+
+
+class TestRegressionGate:
+    """Stage 2: the gate, and the ordering of its verdicts."""
+
+    def _gate(self):
+        from gate import gate
+        return gate
+
+    def test_mde_shrinks_with_sample_size(self):
+        from gate import minimum_detectable_effect as mde
+        small = mde(30, 0.9, 0.4)
+        large = mde(300, 0.9, 0.4)
+        assert large < small
+        # sqrt(n): ten times the episodes is about a third the effect
+        assert abs(small / large - np.sqrt(10.0)) < 0.05
+
+    def test_mde_depends_on_discordance_not_volume(self):
+        from gate import minimum_detectable_effect as mde
+        # A suite everything agrees on carries no information about the
+        # difference, however many episodes it contains.
+        assert mde(500, 0.9, 0.0) >= 1.0
+        assert mde(100, 0.9, 0.5) > mde(100, 0.9, 0.1)
+
+    def test_paired_bootstrap_preserves_pairing(self):
+        from gate import paired_bootstrap
+        rng = np.random.default_rng(0)
+        shared = rng.random(200) < 0.7
+        a = shared.copy()
+        b = shared.copy()
+        # A regression is ONE-directional: turn successes into failures.
+        # Flipping entries with ~ turns some failures into successes too,
+        # which is a mixed effect and not what a regression looks like.
+        b[np.nonzero(a)[0][:25]] = False
+        r = paired_bootstrap(a, b, n_boot=4000, seed=1)
+        assert r["lo"] <= r["diff"] <= r["hi"]
+        assert r["lo"] > 0.0, "a consistent regression should exclude zero"
+
+    def test_block_beats_underpowered(self):
+        """An obvious regression must BLOCK even when the MDE is large."""
+        gate = self._gate()
+        inc = np.ones(20, dtype=bool)
+        cand = np.zeros(20, dtype=bool)
+        g = gate(inc, cand, tolerance=0.05)
+        assert g["verdict"] == "BLOCK", (
+            "a 1.000 regression must block; reporting INCONCLUSIVE because "
+            "the design's MDE is large gets the check order backwards")
+
+    def test_underpowered_pass_becomes_inconclusive(self):
+        """No difference, but too few episodes to have proven it."""
+        gate = self._gate()
+        rng = np.random.default_rng(2)
+        a = rng.random(12) < 0.7
+        b = a.copy()
+        b[0] = ~b[0]
+        g = gate(a, b, tolerance=0.02)
+        assert g["verdict"] == "INCONCLUSIVE", (
+            "with 12 episodes the gate cannot resolve a 0.02 bar, so a PASS "
+            "would be unearned")
+
+    def test_genuine_pass_when_powered(self):
+        gate = self._gate()
+        rng = np.random.default_rng(3)
+        shared = rng.random(4000) < 0.7
+        a = shared.copy()
+        b = shared.copy()
+        b[np.nonzero(a)[0][:20]] = False     # 0.005 regression, inside 0.05
+        g = gate(a, b, tolerance=0.05)
+        assert g["verdict"] == "PASS"
+        assert g["mde"] < 0.05, "with 4000 episodes the design should resolve 0.05"

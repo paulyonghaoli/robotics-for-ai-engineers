@@ -52,6 +52,9 @@ jobs:
       - name: Capstone II self-check (candidate still loses to the incumbent)
         run: python solutions/evaluate.py --episodes 20 --check
         working-directory: projects/capstone_ship
+      - name: Capstone II stage 2 (regression gate runs)
+        run: python solutions/gate.py --episodes 24
+        working-directory: projects/capstone_ship
       - name: Capstone III self-check (grasp pipeline passes its rubric)
         run: python -m eval run --episodes 12 --seed 0
         working-directory: projects/capstone_grasp

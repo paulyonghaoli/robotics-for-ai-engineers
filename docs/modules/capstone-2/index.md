@@ -1,6 +1,6 @@
 # Capstone IV · Ship a Learned Policy
 
-**Status:** stages 0–1 live at `projects/capstone_ship/`, CI-gated; stages 2–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
+**Status:** stages 0–2 live at `projects/capstone_ship/`, CI-gated; stages 3–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
 
 ---
 
@@ -61,11 +61,26 @@ Three things fall out, and none of them are visible in the validation loss:
 
 The CI gate asserts the *relationship*, not the numbers: the incumbent stays above 0.85, the candidate stays below 0.70, and their intervals must not overlap. That last clause is the interesting one — if the sample is too small to resolve the gap, the gate fails rather than reporting a difference it hasn't earned.
 
+## What stage 2 adds
+
+The gate that runs on *every* future change, where the question is not "is there a difference" but **"what size of regression would this miss?"**
+
+Two results worth carrying:
+
+**Pairing is not free power — it is power proportional to correlation.** Running both stacks on the same seeds removes the variance they *share*. Measured here it removes essentially none, because the incumbent succeeds on 46 of 48 episodes and a near-ceiling arm has no variance to share. A simulation in the same tool shows what it *is* worth as correlation rises: −1%, +4%, +18%, +56% at ρ = 0, 0.3, 0.6, 0.9. Pairing pays when both stacks struggle on the same scenarios — which is the normal regression-gate case of successive versions of one policy, and not this one.
+
+**The order of the checks is the design.** A first draft reported INCONCLUSIVE on a 0.542 regression because the minimum detectable effect (0.298) exceeded the tolerance. That is backwards. If the interval already excludes the tolerance, the design was evidently powerful enough for *this* effect. Power gates only the reassuring verdict: "no regression detected" means nothing unless you could have detected one. So `BLOCK` is checked first, then `INCONCLUSIVE`, then `PASS`.
+
+The minimum detectable effect itself depends on the **discordant** pairs — episodes where exactly one stack succeeded. Concordant pairs carry no information about the difference, which is why a scenario suite everything passes tells you nothing however long you run it.
+
 ## Doing it yourself
 
-`projects/capstone_ship/student_evaluate.py` is the starter: five TODOs —
-`wilson`, `world_properties`, `build_suite`, `summarize`, `check` — with the
-contract and the reasoning documented, and the harness plumbing given.
+Two starters, one per stage:
+
+- `student_evaluate.py` (stage 1) — five TODOs: `wilson`, `world_properties`, `build_suite`, `summarize`, `check`.
+- `student_gate.py` (stage 2) — three TODOs: `paired_bootstrap`, `minimum_detectable_effect`, `gate`. The last one asks you to decide the order of the verdicts before writing it.
+
+Both come with the contract and the reasoning documented, and the harness plumbing given.
 
 The candidate policy, its training pipeline and its trained weights are handed
 to you. They are the *system under test*, not the exercise. Reference
