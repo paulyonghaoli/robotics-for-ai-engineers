@@ -1,0 +1,78 @@
+id: per-l5-quiz
+title: "Quiz — BEV and fusion"
+lesson: modules/07-perception/05-bev-fusion
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is bird's-eye view the natural space to fuse camera and lidar in?"
+    options:
+      - text: "It is the frame the downstream task lives in — planning, tracking and prediction all happen on the ground plane, so both sensors can be reduced to channels of one tensor there"
+        correct: true
+        explanation: "Fusing in image space forces the lidar into a representation that discards the metric layout the planner needs; fusing in 3D is expensive and mostly empty."
+      - text: "Because cameras produce BEV output natively"
+        explanation: "They emphatically do not — lifting camera features into BEV is a whole research area."
+      - text: "Because it is the highest-resolution representation available"
+        explanation: "It is usually a good deal coarser than the source image."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Lidar projected onto the image lands perfectly when driving straight and slides off objects in every turn. What is the cause?"
+    options:
+      - text: "A time offset between the two sensors — the error is proportional to yaw rate, so it vanishes when you aren't turning"
+        correct: true
+        explanation: "An extrinsic error would be present at all times, including standing still. 'Only breaks in corners' is a clock problem, not a calibration problem."
+      - text: "An extrinsic rotation error"
+        explanation: "That would be constant frame to frame and would not care whether you were turning."
+      - text: "Motion blur in the camera"
+        explanation: "Blur softens the image; it does not displace lidar points geometrically."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "An extrinsic yaw error of 0.5°. How far off, in metres, does a point at 50 m land?"
+    answer: 0.44
+    tolerance: 0.03
+    explanation: "50 × tan(0.5°) ≈ 0.44 m. Linear in range, so the same error is 9 cm at 10 m — cheap up close and expensive exactly where the objects you must react to earliest are."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: "A 60 ms sync offset while turning at 1.0 rad/s. How many degrees of angular error is that?"
+    answer: 3.4
+    tolerance: 0.3
+    explanation: "1.0 × 0.060 = 0.06 rad ≈ 3.4°, which is roughly seven times worse than the half-degree calibration error in the previous question. Sync is usually the larger effect and gets a fraction of the attention."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Both an extrinsic error and a sync error produce lateral error that grows linearly with range. What separates them?"
+    options:
+      - text: "Plot the error against yaw rate: the extrinsic one is flat, the sync one is a straight line through the origin"
+        correct: true
+        explanation: "Which is why ego motion should be logged beside every fused frame — without it the two causes are genuinely indistinguishable in a single frame."
+      - text: "The extrinsic error is larger"
+        explanation: "Often the opposite, and in any case magnitude does not identify a cause."
+      - text: "Only the sync error affects the vertical axis"
+        explanation: "Both are essentially horizontal for a yaw error or a yaw rate."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "Why can't a network simply learn around a consistent extrinsic calibration error?"
+    options:
+      - text: "It can, and that is the danger — it absorbs the bias and appears to work until the mount is bumped, at which point performance collapses for reasons no retraining explains"
+        correct: true
+        explanation: "Calibration is an upstream invariant, so it should be tested separately from the model rather than laundered through it."
+      - text: "It cannot; geometric errors are unlearnable"
+        explanation: "A fixed bias is very learnable, which is exactly the problem."
+      - text: "Because the error is random"
+        explanation: "An extrinsic error is systematic and constant — that is what makes it absorbable."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "A 10 Hz spinning lidar is described as producing one 'frame'. What is wrong with that?"
+    options:
+      - text: "The sweep spreads over 100 ms, so every point has its own timestamp — at 15 m/s that is 1.5 m of ego motion smeared through a single frame"
+        correct: true
+        explanation: "Which is why per-point motion compensation exists. Treating the sweep as an instant is the same class of mistake as treating the two sensors as synchronous, one level finer."
+      - text: "Nothing — the sweep is fast enough to be instantaneous"
+        explanation: "100 ms is an eternity at road speeds."
+      - text: "The frame rate is too low for detection"
+        explanation: "10 Hz is normal; the issue is what happens within a single rotation."

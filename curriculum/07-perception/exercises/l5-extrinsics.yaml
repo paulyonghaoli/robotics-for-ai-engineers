@@ -1,0 +1,125 @@
+id: per-l5-extrinsics
+title: "Project lidar into the image, and price a half-degree"
+lesson: modules/07-perception/05-bev-fusion
+description: >-
+  Build the lidar-to-camera projection chain, then measure what a small
+  extrinsic error costs. Half a degree of rotation is well inside what a
+  tape measure and a good afternoon will give you, and it puts a point 44 cm
+  off at 50 m — which is the difference between a lidar return landing on a
+  car and landing on the lane beside it.
+setup_code: |
+  import numpy as np
+
+  K = np.array([[600.0, 0.0, 320.0],
+                [0.0, 600.0, 240.0],
+                [0.0, 0.0, 1.0]])
+
+  def rot_z(a):
+      c, s = np.cos(a), np.sin(a)
+      return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+  def make_extrinsics(yaw_err=0.0):
+      """T_cam_lidar as (R, t). The camera sits 0.10 m left of the lidar and
+      looks down the lidar's +x axis. `yaw_err` injects a calibration error."""
+      # lidar frame: x forward, y left, z up.  camera frame: x right, y down, z fwd
+      base = np.array([[0.0, -1.0, 0.0],
+                       [0.0, 0.0, -1.0],
+                       [1.0, 0.0, 0.0]])
+      R = base @ rot_z(yaw_err)
+      t = np.array([0.0, 0.0, 0.10])
+      return R, t
+
+  def scene(ranges):
+      """Points straight ahead of the lidar at the given ranges."""
+      return np.stack([np.asarray(ranges, dtype=float),
+                       np.zeros(len(ranges)), np.zeros(len(ranges))], axis=1)
+starter_code: |
+  import numpy as np
+  # Provided: K, rot_z, make_extrinsics(yaw_err), scene(ranges)
+
+  def project_lidar(points_lidar, K, R, t):
+      """(N,3) lidar-frame points -> (N,2) pixels in the camera image.
+
+          p_cam = R @ p_lidar + t
+          pixel = pinhole(K @ p_cam)
+
+      Points with Z_cam <= 0 are behind the camera: return np.nan.
+      """
+      # TODO
+      return np.zeros((len(points_lidar), 2))
+
+  def lateral_error(range_m, yaw_err_rad):
+      """Lateral world error, in metres, caused by `yaw_err_rad` of extrinsic
+      yaw error for a point at `range_m` straight ahead.
+
+      Use the small-angle relation e = Z * tan(theta) (or Z * theta).
+      """
+      # TODO
+      return 0.0
+
+  R0, t0 = make_extrinsics(0.0)
+  Rb, tb = make_extrinsics(np.radians(0.5))
+  pts = scene([10.0, 25.0, 50.0])
+  good, bad = project_lidar(pts, K, R0, t0), project_lidar(pts, K, Rb, tb)
+  for i, z in enumerate([10.0, 25.0, 50.0]):
+      print("Z=%4.0f m  pixel shift %5.1f px  world error %5.2f m"
+            % (z, abs(bad[i, 0] - good[i, 0]), lateral_error(z, np.radians(0.5))))
+tests: |
+  import numpy as np
+  _R, _t = make_extrinsics(0.0)
+
+  # A point straight ahead lands on the principal point (camera looks down +x).
+  _c = project_lidar(scene([12.0]), K, _R, _t)
+  assert np.all(np.isfinite(_c)), "a point 12 m straight ahead should be visible, got %s" % _c[0]
+  assert abs(_c[0, 0] - 320.0) < 1e-6, "horizontally it should sit on cx=320, got %.2f" % _c[0, 0]
+
+  # Behind the lidar -> behind the camera -> NaN.
+  _behind = project_lidar(np.array([[-8.0, 0.0, 0.0]]), K, _R, _t)
+  assert np.all(np.isnan(_behind)), "points behind the camera must be NaN, got %s" % _behind[0]
+
+  # A point to the LEFT in the lidar frame must appear left of centre.
+  _left = project_lidar(np.array([[12.0, 2.0, 0.0]]), K, _R, _t)
+  assert _left[0, 0] < 320.0, "a point 2 m to the left should project left of cx, got u=%.1f" % _left[0, 0]
+
+  # The error model: linear in range, and matching the projection.
+  assert abs(lateral_error(10.0, np.radians(0.5)) - 10.0 * np.tan(np.radians(0.5))) < 1e-9, "lateral_error should be Z*tan(theta)"
+  _e10, _e50 = lateral_error(10.0, np.radians(0.5)), lateral_error(50.0, np.radians(0.5))
+  assert abs(_e50 / _e10 - 5.0) < 1e-6, "the error is LINEAR in range: 5x the distance is 5x the error, got %.2fx" % (_e50 / _e10)
+  assert 0.40 < _e50 < 0.48, "half a degree at 50 m should be about 0.44 m, got %.3f" % _e50
+
+  # The predicted world error must match what the projection actually does:
+  # convert the pixel shift back to metres with Z/fx.
+  _Rb, _tb = make_extrinsics(np.radians(0.5))
+  for _z in (10.0, 25.0, 50.0):
+      _g = project_lidar(scene([_z]), K, _R, _t)[0, 0]
+      _b = project_lidar(scene([_z]), K, _Rb, _tb)[0, 0]
+      _world = abs(_b - _g) * _z / K[0, 0]
+      assert abs(_world - lateral_error(_z, np.radians(0.5))) < 0.02, "at %.0f m the projection shifts by %.3f m but lateral_error predicts %.3f m" % (_z, _world, lateral_error(_z, np.radians(0.5)))
+hints:
+  - "project_lidar is the same shape as lesson 7.1's `project`, with R,t already given as the sensor-to-sensor transform rather than world-to-camera: `cam = points @ R.T + t`, then `hom = cam @ K.T`, then divide by the third column."
+  - "Mask on `cam[:, 2] <= 0` and write np.nan there before dividing, so a point behind the camera cannot come back as a plausible pixel."
+  - "lateral_error is one line. Check the ratio before the magnitude: 50 m should give exactly 5x the error of 10 m."
+solution: |
+  import numpy as np
+
+  def project_lidar(points_lidar, K, R, t):
+      pts = np.atleast_2d(np.asarray(points_lidar, dtype=float))
+      cam = pts @ R.T + t
+      hom = cam @ K.T
+      out = np.full((len(pts), 2), np.nan)
+      front = cam[:, 2] > 0
+      out[front] = hom[front, :2] / hom[front, 2:3]
+      return out
+
+  def lateral_error(range_m, yaw_err_rad):
+      # Linear in range: the same angular error is cheap up close and
+      # expensive far away, which is where the objects that matter are.
+      return float(range_m) * float(np.tan(yaw_err_rad))
+
+  R0, t0 = make_extrinsics(0.0)
+  Rb, tb = make_extrinsics(np.radians(0.5))
+  pts = scene([10.0, 25.0, 50.0])
+  good, bad = project_lidar(pts, K, R0, t0), project_lidar(pts, K, Rb, tb)
+  for i, z in enumerate([10.0, 25.0, 50.0]):
+      print("Z=%4.0f m  pixel shift %5.1f px  world error %5.2f m"
+            % (z, abs(bad[i, 0] - good[i, 0]), lateral_error(z, np.radians(0.5))))

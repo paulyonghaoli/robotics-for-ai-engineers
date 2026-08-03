@@ -141,6 +141,7 @@ nav:
       - "7.2 Stereo and depth": modules/07-perception/02-stereo-depth.md
       - "7.3 Point clouds": modules/07-perception/03-point-clouds.md
       - "7.4 3D detection": modules/07-perception/04-3d-detection.md
+      - "7.5 BEV and fusion": modules/07-perception/05-bev-fusion.md
       - "Mini-project: Perception geometry": modules/07-perception/project-perception.md
   - "Module 9 · Robot Learning":
       - Overview: modules/09-robot-learning/index.md

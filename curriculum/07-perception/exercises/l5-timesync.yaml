@@ -1,0 +1,119 @@
+id: per-l5-timesync
+title: "Fusion that only breaks in corners"
+lesson: modules/07-perception/05-bev-fusion
+description: >-
+  **Symptom:** lidar projected onto the camera image lands beautifully on
+  objects when the robot drives straight, and slides off them in every turn.
+  The calibration has been redone twice. It is not the calibration — the two
+  sensors sampled 60 ms apart, and the robot rotated in between.
+
+  Compensate for the ego motion between the two capture instants, then build
+  the probe that tells this apart from an extrinsic error.
+setup_code: |
+  import numpy as np
+
+  K = np.array([[600.0, 0.0, 320.0],
+                [0.0, 600.0, 240.0],
+                [0.0, 0.0, 1.0]])
+  DT = 0.060                       # lidar sampled 60 ms before the camera
+
+  BASE = np.array([[0.0, -1.0, 0.0],
+                   [0.0, 0.0, -1.0],
+                   [1.0, 0.0, 0.0]])       # lidar frame -> camera frame
+  T_CAM = (BASE, np.array([0.0, 0.0, 0.10]))
+
+  def rot_z(a):
+      c, s = np.cos(a), np.sin(a)
+      return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+  def project(points_lidar, R, t):
+      pts = np.atleast_2d(np.asarray(points_lidar, dtype=float))
+      cam = pts @ R.T + t
+      hom = cam @ K.T
+      out = np.full((len(pts), 2), np.nan)
+      front = cam[:, 2] > 0
+      out[front] = hom[front, :2] / hom[front, 2:3]
+      return out
+
+  def truth_pixels(points_lidar_at_t0, omega):
+      """Where the points REALLY appear in the camera frame: the world is
+      fixed, so in the robot frame at t0+DT everything has rotated by
+      -omega*DT."""
+      moved = np.atleast_2d(points_lidar_at_t0) @ rot_z(-omega * DT).T
+      return project(moved, *T_CAM)
+starter_code: |
+  import numpy as np
+  # Provided: K, DT (0.060 s), T_CAM = (R, t), rot_z, project, truth_pixels
+
+  def compensate(points_lidar, omega, dt=DT):
+      """Move points sampled at t0 into the robot frame at t0+dt.
+
+      The robot yawed by omega*dt between the two captures. The world did
+      not move, so in the newer frame every point has rotated by -omega*dt.
+      Return the transformed (N,3) points.
+      """
+      # TODO
+      return np.asarray(points_lidar, dtype=float)
+
+  def fuse_error(points_lidar, omega, compensated):
+      """Mean pixel distance between where we PROJECT the points and where
+      they really appear.
+
+      If `compensated` is True, run the points through `compensate` first;
+      otherwise project them as-is (the naive pipeline).
+      """
+      # TODO
+      return 0.0
+
+  pts = np.stack([np.full(6, 20.0), np.linspace(-3, 3, 6), np.zeros(6)], axis=1)
+  print("%8s %12s %12s" % ("omega", "naive px", "compensated"))
+  for w in (0.0, 0.2, 0.6, 1.0):
+      print("%8.1f %12.2f %12.4f"
+            % (w, fuse_error(pts, w, False), fuse_error(pts, w, True)))
+tests: |
+  import numpy as np
+  _pts = np.stack([np.full(6, 20.0), np.linspace(-3, 3, 6), np.zeros(6)], axis=1)
+
+  # Standing still, compensation is a no-op and both agree with the truth.
+  assert fuse_error(_pts, 0.0, False) < 1e-6, "with omega=0 the naive projection is already correct, got %.4f px" % fuse_error(_pts, 0.0, False)
+  assert fuse_error(_pts, 0.0, True) < 1e-6, "with omega=0 compensation must change nothing, got %.4f px" % fuse_error(_pts, 0.0, True)
+  assert np.allclose(compensate(_pts, 0.0), _pts, atol=1e-12), "compensate with omega=0 must be the identity"
+
+  # Turning, the naive pipeline is wrong and compensation fixes it.
+  for _w in (0.2, 0.6, 1.0):
+      _naive, _comp = fuse_error(_pts, _w, False), fuse_error(_pts, _w, True)
+      assert _comp < 1e-6, "at omega=%.1f rad/s compensation should be essentially exact, got %.4f px" % (_w, _comp)
+      assert _naive > 5.0 * max(_comp, 1e-9), "at omega=%.1f rad/s the naive projection should be far worse than the compensated one (%.3f vs %.3f px)" % (_w, _naive, _comp)
+
+  # THE DIAGNOSTIC: the error is proportional to yaw rate. An extrinsic
+  # error would be flat in omega instead — that is how you tell them apart.
+  _e = [fuse_error(_pts, w, False) for w in (0.25, 0.5, 1.0)]
+  assert abs(_e[1] / _e[0] - 2.0) < 0.05 and abs(_e[2] / _e[0] - 4.0) < 0.05, "naive error should scale LINEARLY with yaw rate (got %s for omega = 0.25, 0.5, 1.0) — that proportionality is the signature that separates a sync bug from a calibration bug" % [round(v, 2) for v in _e]
+
+  # Sanity on the direction of the correction.
+  _rot = compensate(_pts, 1.0)
+  assert not np.allclose(_rot, _pts), "compensate must actually move the points when omega != 0"
+  assert np.allclose(np.linalg.norm(_rot, axis=1), np.linalg.norm(_pts, axis=1), atol=1e-9), "a rotation must preserve each point's range from the sensor"
+hints:
+  - "compensate is one rotation: `points @ rot_z(-omega*dt).T`. The sign is the part to get right — the robot turned by +omega*dt, so relative to the robot the fixed world turned the other way."
+  - "fuse_error: project (optionally compensated) points with `project(pts, *T_CAM)`, get the reference from `truth_pixels(points, omega)`, and take the mean of the per-row pixel distances."
+  - "If your compensated error is roughly double the naive one, you have the sign backwards — you moved the points the same way the robot moved instead of the opposite way."
+solution: |
+  import numpy as np
+
+  def compensate(points_lidar, omega, dt=DT):
+      # The robot yawed +omega*dt; the world is fixed, so expressed in the
+      # newer robot frame every point has rotated by -omega*dt.
+      return np.atleast_2d(np.asarray(points_lidar, dtype=float)) @ rot_z(-omega * dt).T
+
+  def fuse_error(points_lidar, omega, compensated):
+      pts = compensate(points_lidar, omega) if compensated else np.atleast_2d(points_lidar)
+      got = project(pts, *T_CAM)
+      ref = truth_pixels(points_lidar, omega)
+      return float(np.mean(np.linalg.norm(got - ref, axis=1)))
+
+  pts = np.stack([np.full(6, 20.0), np.linspace(-3, 3, 6), np.zeros(6)], axis=1)
+  print("%8s %12s %12s" % ("omega", "naive px", "compensated"))
+  for w in (0.0, 0.2, 0.6, 1.0):
+      print("%8.1f %12.2f %12.4f"
+            % (w, fuse_error(pts, w, False), fuse_error(pts, w, True)))

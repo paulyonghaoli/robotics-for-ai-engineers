@@ -12,7 +12,7 @@ That geometry is where the transition from ML to robotics actually bites. A dete
 2. [Stereo and depth: the error grows as Z²](02-stereo-depth.md) — **available**
 3. [Point clouds: unordered, metric, and mostly empty](03-point-clouds.md) — **available**
 4. [3D detection: pillars, anchors and NMS](04-3d-detection.md) — **available**
-5. BEV and sensor fusion — *planned*
+5. [BEV and fusion: two sensors, one frame, one clock](05-bev-fusion.md) — **available**
 6. Lab: the perception stack that lied — *planned*
 
 ## What you'll build
