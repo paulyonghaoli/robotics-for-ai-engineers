@@ -1,0 +1,148 @@
+id: per-l4-nms
+title: "The NMS that deleted the pedestrian"
+lesson: modules/07-perception/04-3d-detection
+description: >-
+  **Symptom:** the detector finds a pedestrian standing in front of a parked
+  truck in every frame. The tracker never sees one. The network is not the
+  problem — the box was correct and then something removed it.
+
+  The suppression here scores overlap as **intersection over the smaller
+  area**, which production stacks use because a small duplicate box nested
+  inside a larger one has low IoU and survives plain IoU-NMS. That choice is
+  right, and it makes the class restriction load-bearing: a pedestrian
+  entirely inside a truck's bird's-eye footprint scores 1.0 against it.
+setup_code: |
+  import numpy as np
+
+  # Boxes are (x_min, y_min, x_max, y_max) in the ground plane, metres.
+  BOXES = np.array([
+      [ 0.00, 0.00, 8.00, 2.50],   # truck, best
+      [ 0.30, 0.10, 7.60, 2.40],   # truck, a nested duplicate (low IoU!)
+      [ 2.00, 0.80, 2.80, 1.60],   # PEDESTRIAN, standing in front of it
+      [ 2.05, 0.85, 2.85, 1.65],   # pedestrian, duplicate
+      [20.00, 6.00, 24.20, 7.90],  # a car, well separated
+      [12.00, 3.00, 12.80, 3.80],  # a low-confidence phantom
+  ])
+  SCORES = np.array([0.95, 0.84, 0.66, 0.58, 0.91, 0.04])
+  LABELS = np.array(["truck", "truck", "ped", "ped", "car", "ped"])
+starter_code: |
+  import numpy as np
+  # Provided: BOXES (N,4) as (x_min, y_min, x_max, y_max), SCORES, LABELS
+
+  def bev_iou(a, b):
+      """IoU between one box `a` (4,) and many boxes `b` (M,4).
+
+      Intersection per axis is max(0, min(highs) - max(lows)); union is
+      area(a) + area(b) - intersection.
+      """
+      # TODO
+      return np.zeros(len(b))
+
+  def bev_ios(a, b):
+      """Intersection over the SMALLER area — the same intersection, divided
+      by min(area_a, area_b) instead of the union.
+
+      Why bother: a duplicate box nested inside a larger one has a small IoU
+      (the union is dominated by the big box) and survives IoU-NMS as a
+      phantom. IoS catches it.
+      """
+      # TODO
+      return np.zeros(len(b))
+
+  def nms(boxes, scores, labels, thresh=0.60, score_threshold=0.10):
+      """Return the indices to KEEP, ordered by descending score.
+
+      1. Drop anything below `score_threshold` first.
+      2. Repeatedly take the highest-scoring survivor and suppress boxes
+         whose `bev_ios` against it exceeds `thresh`.
+
+      Suppress WITHIN a class only. Because IoS is used, anything fully
+      contained in a larger box scores 1.0 against it — including a
+      pedestrian standing in front of a truck, which is not a duplicate of
+      the truck and must survive.
+      """
+      # TODO
+      return list(range(len(boxes)))
+
+  keep = nms(BOXES, SCORES, LABELS)
+  print("kept:", [(str(LABELS[i]), round(float(SCORES[i]), 2)) for i in keep])
+tests: |
+  import numpy as np
+  _a = np.array([0.0, 0.0, 2.0, 2.0])
+  assert abs(float(bev_iou(_a, np.array([[0.0, 0.0, 2.0, 2.0]]))[0]) - 1.0) < 1e-9, "a box against itself must be IoU 1.0"
+  assert abs(float(bev_iou(_a, np.array([[5.0, 5.0, 6.0, 6.0]]))[0])) < 1e-12, "disjoint boxes must be IoU 0 — check the max(0, ...) clamp"
+  assert abs(float(bev_iou(_a, np.array([[1.0, 0.0, 3.0, 2.0]]))[0]) - 1.0 / 3.0) < 1e-9, "half-overlapping equal boxes give IoU 1/3"
+  assert bev_iou(_a, np.array([[0.0, 0.0, 2.0, 2.0], [5.0, 5.0, 6.0, 6.0]])).shape == (2,), "bev_iou must return one value per box in b"
+
+  # IoS: a fully nested box scores 1.0 where IoU would be small.
+  _small = np.array([[0.5, 0.5, 1.0, 1.0]])
+  _ios = float(bev_ios(_a, _small)[0])
+  _iou = float(bev_iou(_a, _small)[0])
+  assert abs(_ios - 1.0) < 1e-9, "a box fully inside another must have IoS 1.0, got %.4f" % _ios
+  assert _iou < 0.1, "sanity: the same nested pair has low IoU (%.4f) — that is why IoS exists" % _iou
+
+  _keep = list(nms(BOXES, SCORES, LABELS))
+  _labels = [str(LABELS[i]) for i in _keep]
+
+  assert 5 not in _keep, "the 0.04-score box should have been dropped by the score threshold"
+  assert _labels.count("truck") == 1, "the nested duplicate truck box should collapse; got %d trucks" % _labels.count("truck")
+  assert "ped" in _labels, "the pedestrian was suppressed. It sits entirely inside the truck's bird's-eye footprint, so IoS scores it 1.0 against the truck — but it is not a duplicate of the truck. Suppress within a class."
+  assert _labels.count("ped") == 1, "expected exactly 1 pedestrian after its duplicate collapses, got %d" % _labels.count("ped")
+  assert 0 in _keep and 2 in _keep and 4 in _keep, "expected to keep the best truck (0), the best pedestrian (2) and the car (4); got %s" % _keep
+
+  _s = [float(SCORES[i]) for i in _keep]
+  assert _s == sorted(_s, reverse=True), "returned indices must be ordered by descending score, got %s" % _s
+  assert len(nms(BOXES, SCORES, LABELS, thresh=0.999)) > len(_keep), "a near-1.0 threshold should suppress almost nothing"
+hints:
+  - "Both overlap functions share the intersection: `lo = np.maximum(a[:2], b[:, :2])`, `hi = np.minimum(a[2:], b[:, 2:])`, `inter = np.prod(np.clip(hi - lo, 0, None), axis=1)`. They differ only in the denominator."
+  - "Apply the score threshold before the loop and keep a mapping back to the ORIGINAL indices — the tests check specific index values."
+  - "In the suppression step, build a boolean `same = labels[rest] == labels[i]` and only remove candidates where `same & (ios > thresh)`. Everything of another class survives this round no matter how much it overlaps."
+solution: |
+  import numpy as np
+
+  def _inter(a, b):
+      lo = np.maximum(a[:2], b[:, :2])
+      hi = np.minimum(a[2:], b[:, 2:])
+      return np.prod(np.clip(hi - lo, 0.0, None), axis=1)
+
+  def bev_iou(a, b):
+      a = np.asarray(a, dtype=float)
+      b = np.atleast_2d(np.asarray(b, dtype=float))
+      inter = _inter(a, b)
+      area_a = float((a[2] - a[0]) * (a[3] - a[1]))
+      area_b = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
+      return inter / np.maximum(area_a + area_b - inter, 1e-12)
+
+  def bev_ios(a, b):
+      a = np.asarray(a, dtype=float)
+      b = np.atleast_2d(np.asarray(b, dtype=float))
+      inter = _inter(a, b)
+      area_a = float((a[2] - a[0]) * (a[3] - a[1]))
+      area_b = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
+      return inter / np.maximum(np.minimum(area_a, area_b), 1e-12)
+
+  def nms(boxes, scores, labels, thresh=0.60, score_threshold=0.10):
+      boxes = np.asarray(boxes, dtype=float)
+      scores = np.asarray(scores, dtype=float)
+      labels = np.asarray(labels)
+
+      # Score threshold first: cheap, and it keeps junk out of the O(N^2) part.
+      alive = np.nonzero(scores >= score_threshold)[0]
+      alive = alive[np.argsort(-scores[alive])]
+
+      keep = []
+      while len(alive):
+          i, rest = alive[0], alive[1:]
+          keep.append(int(i))
+          if not len(rest):
+              break
+          ios = bev_ios(boxes[i], boxes[rest])
+          # Only a box of the SAME class may be suppressed. Under IoS,
+          # anything contained in a larger box scores 1.0 — a pedestrian in
+          # front of a truck is contained, and is not a duplicate of it.
+          same = labels[rest] == labels[i]
+          alive = rest[~(same & (ios > thresh))]
+      return keep
+
+  keep = nms(BOXES, SCORES, LABELS)
+  print("kept:", [(str(LABELS[i]), round(float(SCORES[i]), 2)) for i in keep])

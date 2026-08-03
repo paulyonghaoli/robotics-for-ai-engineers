@@ -1,0 +1,83 @@
+id: per-l4-quiz
+title: "Quiz — 3D detection"
+lesson: modules/07-perception/04-3d-detection
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why do pillars (x, y only) work nearly as well as voxels (x, y, z) for outdoor detection?"
+    options:
+      - text: "Outdoor scenes are effectively 2.5D — objects sit on the ground and rarely stack — and the 2D output lets you reuse every image backbone you already have"
+        correct: true
+        explanation: "That reuse is the entire PointPillars argument. Indoors, where things sit on shelves above other things, the assumption is much weaker."
+      - text: "Height information is not useful for detection"
+        explanation: "It is, which is why pillar features include max-z and z-range — the height statistics survive even though the grid doesn't divide z."
+      - text: "Voxels are too slow to compute"
+        explanation: "Voxelization is cheap; the cost is in the 3D convolutions that a voxel grid then demands."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "A pillar contains a variable number of points in arbitrary order. What constrains the feature function?"
+    options:
+      - text: "It must be permutation-invariant — a symmetric aggregation such as max or sum over the points"
+        correct: true
+        explanation: "Otherwise the same scene produces different features depending on how the driver serialised the frame, and nothing downstream is reproducible."
+      - text: "It must pad every pillar to a fixed count"
+        explanation: "Implementations often do pad for tensor shape, but padding does not by itself make the function order-independent."
+      - text: "It must sort the points first"
+        explanation: "Sorting imposes an order rather than being invariant to it, and there is no natural ordering to choose."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You clamp out-of-range points to the edge of the pillar grid instead of dropping them. What happens?"
+    options:
+      - text: "The entire out-of-range world piles onto the border pillars, inventing a dense wall around the scene"
+        correct: true
+        explanation: "The signature is border pillars holding far more points than any interior one. It is the same family as clipping in a scoring function — ask what the clamp just made free."
+      - text: "Nothing — border pillars are ignored by the detector"
+        explanation: "They are ordinary inputs, and a phantom wall is exactly the kind of structure a detector will happily fire on."
+      - text: "The grid resolution changes"
+        explanation: "The grid is unchanged; only what lands in the edge cells changes."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: "A pedestrian box is 0.8 × 0.8 m; a car box is 4.2 × 1.9 m; they overlap by 0.36 m². What is their BEV IoU, to two decimal places?"
+    answer: 0.04
+    tolerance: 0.01
+    explanation: "0.36 / (7.98 + 0.64 − 0.36) = 0.36/8.26 ≈ 0.044. The union is dominated by the car, which is exactly why plain-IoU NMS almost never suppresses a small object beside a large one — and why the class-agnostic bug needs a containment-based overlap to appear."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why do some stacks score NMS overlap as intersection-over-smaller rather than IoU?"
+    options:
+      - text: "A duplicate box nested inside a larger one has low IoU and survives IoU-NMS as a phantom; IoS scores containment at 1.0 and removes it"
+        correct: true
+        explanation: "It is a reasonable fix for a real problem — and it is what makes class-agnostic suppression dangerous, because a pedestrian inside a truck's footprint now also scores 1.0."
+      - text: "It's faster to compute"
+        explanation: "Both cost the same; they share the intersection and differ only in the denominator."
+      - text: "It's the standard definition used by all benchmarks"
+        explanation: "Benchmarks generally use IoU, or centre distance; IoS is an implementation choice inside a pipeline."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "A car is detected with correct extent and position but 180° of heading error. Why is a naive angle loss the wrong response?"
+    options:
+      - text: "A box and the same box rotated 180° describe identical geometry, so the loss punishes a prediction that is geometrically perfect — most implementations predict direction separately from the axis"
+        correct: true
+        explanation: "The geometry is ambiguous but the motion is not, which is why direction is a separate classification rather than part of the regression."
+      - text: "Heading doesn't matter for detection"
+        explanation: "It matters enormously for prediction — where the car will be in two seconds depends on which way it points."
+      - text: "The loss should be weighted higher"
+        explanation: "That amplifies a penalty for something the box representation genuinely cannot distinguish."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "nuScenes scores detections by centre distance rather than IoU. Why?"
+    options:
+      - text: "IoU on small distant objects is dominated by extent error rather than localisation error, so it measures the wrong thing where the sensor is weakest"
+        correct: true
+        explanation: "A pedestrian at 40 m has a handful of returns, so the box extent is a guess. Centre distance asks the question you actually care about: is the thing where you say it is?"
+      - text: "Centre distance is easier to compute"
+        explanation: "Both are trivial; the choice is about what the metric rewards."
+      - text: "It makes the benchmark easier"
+        explanation: "It makes it more meaningful, and in some regimes stricter."

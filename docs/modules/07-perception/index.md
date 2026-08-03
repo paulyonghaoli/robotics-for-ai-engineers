@@ -11,7 +11,7 @@ That geometry is where the transition from ML to robotics actually bites. A dete
 1. [Camera models: pixels are rays](01-camera-models.md) — **available**
 2. [Stereo and depth: the error grows as Z²](02-stereo-depth.md) — **available**
 3. [Point clouds: unordered, metric, and mostly empty](03-point-clouds.md) — **available**
-4. 3D detection: pillars, anchors and 3D NMS — *planned*
+4. [3D detection: pillars, anchors and NMS](04-3d-detection.md) — **available**
 5. BEV and sensor fusion — *planned*
 6. Lab: the perception stack that lied — *planned*
 

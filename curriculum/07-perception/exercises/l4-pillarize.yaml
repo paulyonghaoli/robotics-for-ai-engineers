@@ -1,0 +1,147 @@
+id: per-l4-pillarize
+title: "Pillarize a cloud into a pseudo-image"
+lesson: modules/07-perception/04-3d-detection
+description: >-
+  Turn an unordered point cloud into the dense bird's-eye tensor a 2D
+  backbone can consume — the PointPillars encoder, without the network.
+  The feature must be permutation-invariant, points outside the range must
+  be dropped rather than clamped to the edge, and the vast majority of
+  pillars are empty, which is the property the whole design exploits.
+setup_code: |
+  import numpy as np
+
+  X_RANGE = (0.0, 32.0)
+  Y_RANGE = (-16.0, 16.0)
+  PILLAR = 0.4                      # metres per pillar side
+
+  def synth_scene(rng, n=12000):
+      """Ground returns plus two upright objects, some points out of range."""
+      g = np.stack([rng.uniform(-4, 40, n), rng.uniform(-20, 20, n),
+                    rng.normal(0.0, 0.02, n)], axis=1)
+      def box(cx, cy, k):
+          return np.stack([rng.uniform(cx - 0.9, cx + 0.9, k),
+                           rng.uniform(cy - 0.8, cy + 0.8, k),
+                           rng.uniform(0.1, 1.7, k)], axis=1)
+      return np.vstack([g, box(8.0, 2.0, 500), box(20.0, -6.0, 400)])
+starter_code: |
+  import numpy as np
+  # Provided: X_RANGE, Y_RANGE, PILLAR, synth_scene(rng)
+
+  def pillarize(points, x_range=X_RANGE, y_range=Y_RANGE, pillar=PILLAR):
+      """(N,3) cloud -> (H, W, 4) bird's-eye feature map.
+
+      Grid: W = round((x_max - x_min)/pillar), H = round((y_max - y_min)/pillar).
+      Index i (row) from y, index j (column) from x:
+          j = floor((x - x_min) / pillar)
+          i = floor((y - y_min) / pillar)
+
+      Points outside the range must be DROPPED, not clamped — clamping piles
+      the whole out-of-range world onto the border pillars and invents a wall
+      around your scene.
+
+      Per occupied pillar compute four features:
+          [0] number of points
+          [1] maximum z
+          [2] mean z
+          [3] z range (max - min)
+
+      Empty pillars stay all zeros. Every one of these is a symmetric
+      function of the points in the cell, so the result cannot depend on the
+      order they arrived in.
+      """
+      # TODO
+      return np.zeros((1, 1, 4))
+
+  rng = np.random.default_rng(0)
+  cloud = synth_scene(rng)
+  feat = pillarize(cloud)
+  occ = (feat[:, :, 0] > 0)
+  print("grid %s, occupied %d of %d pillars (%.1f%%)"
+        % (feat.shape[:2], occ.sum(), occ.size, 100 * occ.mean()))
+  print("tallest pillar max-z %.2f m" % feat[:, :, 1].max())
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(0)
+  _cloud = synth_scene(_rng)
+  _f = pillarize(_cloud)
+
+  _W = int(round((X_RANGE[1] - X_RANGE[0]) / PILLAR))
+  _H = int(round((Y_RANGE[1] - Y_RANGE[0]) / PILLAR))
+  assert _f.shape == (_H, _W, 4), "expected shape (%d, %d, 4), got %s" % (_H, _W, str(_f.shape))
+
+  # Out-of-range points must be dropped, not clamped onto the border.
+  _in = ((_cloud[:, 0] >= X_RANGE[0]) & (_cloud[:, 0] < X_RANGE[1]) &
+         (_cloud[:, 1] >= Y_RANGE[0]) & (_cloud[:, 1] < Y_RANGE[1]))
+  assert abs(_f[:, :, 0].sum() - _in.sum()) < 0.5, "counts sum to %d but %d points are in range — out-of-range points must be dropped, not clamped to the edge pillars" % (_f[:, :, 0].sum(), _in.sum())
+  _border = np.concatenate([_f[0, :, 0], _f[-1, :, 0], _f[:, 0, 0], _f[:, -1, 0]])
+  assert _border.max() < 5 * np.median(_f[:, :, 0][_f[:, :, 0] > 0]), "the border pillars hold far more points than a typical pillar — that is the signature of clamping instead of dropping"
+
+  # Most pillars are empty; that sparsity is the point of the design.
+  _occ = _f[:, :, 0] > 0
+  assert 0.02 < _occ.mean() < 0.85, "occupancy %.2f looks wrong for this scene" % _occ.mean()
+
+  # A hand-checked single pillar.
+  _probe = np.array([[0.1, -15.9, 0.5], [0.2, -15.8, 1.5], [0.3, -15.7, 1.0]])
+  _p = pillarize(_probe)
+  assert _p[0, 0, 0] == 3, "all three probe points fall in pillar (0,0); count is %g" % _p[0, 0, 0]
+  assert abs(_p[0, 0, 1] - 1.5) < 1e-9, "max z should be 1.5, got %g" % _p[0, 0, 1]
+  assert abs(_p[0, 0, 2] - 1.0) < 1e-9, "mean z should be 1.0, got %g" % _p[0, 0, 2]
+  assert abs(_p[0, 0, 3] - 1.0) < 1e-9, "z range should be 1.0, got %g" % _p[0, 0, 3]
+  assert _p[:, :, 0].sum() == 3, "no other pillar should be occupied"
+
+  # Permutation invariance.
+  _shuf = pillarize(_cloud[np.random.default_rng(3).permutation(len(_cloud))])
+  assert np.allclose(_shuf, _f, atol=1e-9), "shuffling the input changed the output — every pillar feature must be a symmetric function of its points"
+
+  # The upright objects must stand out from the ground in max-z.
+  assert _f[:, :, 1].max() > 1.5, "the objects reach 1.7 m; max-z should reflect that"
+hints:
+  - "Mask first: keep only points inside both ranges, then compute indices from the survivors. Doing it the other way round and clipping is exactly the bug the border check looks for."
+  - "Flatten the 2D pillar index to a single integer (`i * W + j`) so you can use np.bincount for counts and sums, and np.maximum.at / np.minimum.at for the extremes."
+  - "Initialise the max/min accumulators to -inf/+inf, then write zeros back into the empty pillars at the end so untouched cells stay all-zero."
+solution: |
+  import numpy as np
+
+  def pillarize(points, x_range=X_RANGE, y_range=Y_RANGE, pillar=PILLAR):
+      pts = np.atleast_2d(np.asarray(points, dtype=float))
+      W = int(round((x_range[1] - x_range[0]) / pillar))
+      H = int(round((y_range[1] - y_range[0]) / pillar))
+
+      # Drop, don't clamp: clamping invents a wall of points at the border.
+      inside = ((pts[:, 0] >= x_range[0]) & (pts[:, 0] < x_range[1]) &
+                (pts[:, 1] >= y_range[0]) & (pts[:, 1] < y_range[1]))
+      pts = pts[inside]
+
+      out = np.zeros((H, W, 4))
+      if not len(pts):
+          return out
+
+      j = np.floor((pts[:, 0] - x_range[0]) / pillar).astype(np.int64)
+      i = np.floor((pts[:, 1] - y_range[0]) / pillar).astype(np.int64)
+      flat = i * W + j
+      z = pts[:, 2]
+
+      counts = np.bincount(flat, minlength=H * W).astype(float)
+      sums = np.bincount(flat, weights=z, minlength=H * W)
+      zmax = np.full(H * W, -np.inf)
+      zmin = np.full(H * W, np.inf)
+      np.maximum.at(zmax, flat, z)
+      np.minimum.at(zmin, flat, z)
+
+      occ = counts > 0
+      out[:, :, 0] = counts.reshape(H, W)
+      feat_max = np.where(occ, zmax, 0.0)
+      feat_mean = np.where(occ, sums / np.maximum(counts, 1.0), 0.0)
+      feat_rng = np.where(occ, zmax - zmin, 0.0)
+      out[:, :, 1] = feat_max.reshape(H, W)
+      out[:, :, 2] = feat_mean.reshape(H, W)
+      out[:, :, 3] = feat_rng.reshape(H, W)
+      return out
+
+  rng = np.random.default_rng(0)
+  cloud = synth_scene(rng)
+  feat = pillarize(cloud)
+  occ = (feat[:, :, 0] > 0)
+  print("grid %s, occupied %d of %d pillars (%.1f%%)"
+        % (feat.shape[:2], occ.sum(), occ.size, 100 * occ.mean()))
+  print("tallest pillar max-z %.2f m" % feat[:, :, 1].max())
