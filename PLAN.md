@@ -150,6 +150,91 @@ Three changes to the original ten-module outline, each justified by [docs/fronti
 2. **Module 6 (ROS 2) becomes a parallel track, not a sequential gate.** Everything through the capstone runs in pure Python; gating learners behind a WSL2/Docker install mid-curriculum creates a drop-off cliff for no pedagogical gain. Evidence it isn't universal: ROS 2 is mandatory at Agility/Boston Dynamics/Amazon and absent from frontier VLA-lab postings. Also unblocks the launch critical path.
 3. **The diagnostic lab becomes a standard module element.** Lessons 1.6 and 3.6 are the most distinctive pages on the site; the pattern was accidental. Module 4 (SLAM failure gallery) and Module 5 (planner pathologies) labs are queued.
 
+## 5c. Restructure v2 (2026-08-02) — four courses, uniform module shape
+
+Two decisions, taken together.
+
+**(1) Every module gets a lab and a mini-project.** Right now the rungs are
+uneven: 70 in-browser exercises cover all nine live modules, but only two
+modules have a graded mini-project and two have no lab. The ladder is meant to
+read *exercise → lab → mini-project → capstone* — build it, debug it, integrate
+it, own it — and the middle rungs are missing in most modules.
+
+Current state:
+
+| Module | Lessons | Lab | Mini-project |
+|---|---:|---|---|
+| 0 · From ML to robotics | 4 | — | — |
+| 1 · Geometry | 6 | ✅ 1.6 | ✅ `frame_transforms_mini` |
+| 2 · Kinematics & control | 6 | — | — |
+| 3 · State estimation | 6 | ✅ 3.6 | ✅ `localization` |
+| 4 · Mapping & SLAM | 5 | ✅ 4.5 | — |
+| 5 · Planning | 6 | ✅ 5.6 | — |
+| 6 · ROS 2 | 0 | — | — |
+| 9 · Robot learning | 7 | ✅ 9.7 | — |
+| 10 · Evaluation & data | 7 | ✅ 10.7 | — |
+| 11 · Deployment & safety | 6 | ✅ 11.6 | — |
+
+A mini-project is the `frame_transforms_mini` shape: `README.md` +
+`student.py` with a documented spec + `grader/` with a `--reference` mode CI
+runs. Autograded, local, no backend.
+
+**(2) Course III splits into III and IV.** Courses I and II are the classical
+stack, and that material is well covered elsewhere (OMSCS CS 7638 *Robotics:
+AI Techniques* covers particle filters, A*, PID, SLAM, kinematics). They should
+be *complete and polished*, not expanded. The differentiated half of this
+curriculum is everything after Module 6, and one course cannot carry five
+modules and two capstones.
+
+| | Modules | Capstone |
+|---|---|---|
+| **Course I** — Foundations of Embodied AI ✅ | 0, 1, 2, 3 | — (2 mini-projects + exam) |
+| **Course II** — Robot Autonomy ✅ | 4, 5 | **Capstone II** · autonomous 2D robot (v0–v4) |
+| **Course III** — Perception & Embodied Learning | 7, 8, 9 | **Capstone III** · see it, grasp it |
+| **Course IV** — Production Robot Systems | 10, 11, 12 | **Capstone IV** · ship a learned policy |
+
+Module 6 (ROS 2) stays a parallel track, listed under Course IV as the
+industrial-integration path.
+
+Module numbers do **not** change — only the course grouping — so no lesson
+link, exercise id, or nav path needs rewriting. The one rename is the existing
+"Capstone II · Ship a Learned Policy" → **Capstone IV**, and the nav capstone
+picks up the explicit "Capstone II" label it already implies.
+
+### New content this implies
+
+- **Module 7 · Robotic perception** — camera models, stereo & depth, point
+  clouds, registration, 3D detection, BEV, sensor fusion. Lab + mini-project.
+- **Module 8 · Manipulation** — manipulator kinematics, IK, grasp synthesis,
+  configuration-space planning, visual servoing. Lab + mini-project.
+- **Module 12 · Robot data infrastructure** — logging schemas, bag/episode
+  storage, indexing and search over fleet data, replay determinism, dataset
+  versioning and lineage. This is the content behind the roles the
+  [frontier research](docs/frontier.md) identified as least crowded, and
+  Module 10 currently gestures at it without covering it.
+- **Capstone III · "see it, grasp it"** — a planar manipulator with a simulated
+  depth sensor. Perceive objects from range data, synthesize a grasp, plan in
+  configuration space, execute under Jacobian control. Deliberately a *second
+  robot*: everything so far has been one differential-drive base, and a
+  portfolio with two distinct embodiments argues something a fifth nav stack
+  cannot. Pure NumPy, same published-rubric treatment as Capstone II.
+
+## 5d. Build order (agreed 2026-08-02)
+
+Plan first, then close Courses I–II before opening Courses III–IV. The point is
+not to leave a half-finished classical half behind while chasing the
+interesting material.
+
+| Phase | Work | Exit criterion |
+|---|---|---|
+| **A — Close Courses I–II** | Module 2 lab + mini-project; Module 4 mini-project; Module 5 mini-project; Module 0 lab. Every Course I–II module has all four rungs | Each of Modules 0–5 has lessons, quiz bank, exercises, a lab and a graded mini-project; all gates green |
+| **B — Polish Courses I–II** | Consistency pass: lesson-schema drift, cross-links, exam coverage against the new projects, stale claims | A reader can complete Courses I–II end to end with no dead ends |
+| **C — Course III** | Modules 7 and 8 (lessons, banks, exercises, labs, mini-projects); Module 9 mini-project; Capstone III | Course III complete, capstone CI-gated on a published rubric |
+| **D — Course IV** | Module 12; mini-projects for 10 and 11; Capstone IV stages 2–5; rename Capstone II→IV | Course IV complete; four courses, four capstones |
+
+Deferred and explicitly not blocking: Module 6 (ROS 2) content, capstone v5
+(loop closure), the ROS 2 environment decision.
+
 ## 6. Resolved questions (decided 2026-08-01)
 
 1. **Numeric-entry questions** — ✅ in scope: Tier-2 schema gets `type: numeric` with `answer`, `tolerance` (absolute or relative), and unit hint in the prompt.

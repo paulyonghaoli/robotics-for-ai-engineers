@@ -90,6 +90,7 @@ nav:
       - "2.4 Trajectory tracking: pure pursuit": modules/02-control/04-trajectory-tracking.md
       - "2.5 Dynamics & gravity compensation": modules/02-control/05-dynamics.md
       - "2.6 MPC: a first look": modules/02-control/06-mpc.md
+      - "Mini-project: Control": modules/02-control/project-control.md
   - "Module 3 · State Estimation":
       - Overview: modules/03-estimation/index.md
       - "3.1 The Kalman filter": modules/03-estimation/01-kalman.md
