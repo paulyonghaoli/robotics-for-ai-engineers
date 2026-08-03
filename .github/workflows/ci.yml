@@ -55,6 +55,9 @@ jobs:
       - name: Capstone II stage 2 (regression gate runs)
         run: python solutions/gate.py --episodes 24
         working-directory: projects/capstone_ship
+      - name: Capstone II stage 3 (data engine runs)
+        run: python solutions/data_engine.py --rounds 1 --train-episodes 10 --mine-episodes 6 --eval-episodes 6 --coreset 400
+        working-directory: projects/capstone_ship
       - name: Capstone III self-check (grasp pipeline passes its rubric)
         run: python -m eval run --episodes 12 --seed 0
         working-directory: projects/capstone_grasp

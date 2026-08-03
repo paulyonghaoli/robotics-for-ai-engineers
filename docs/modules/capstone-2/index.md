@@ -1,6 +1,6 @@
 # Capstone IV · Ship a Learned Policy
 
-**Status:** stages 0–2 live at `projects/capstone_ship/`, CI-gated; stages 3–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
+**Status:** stages 0–3 live at `projects/capstone_ship/`, CI-gated; stages 4–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
 
 ---
 
@@ -72,6 +72,32 @@ Two results worth carrying:
 **The order of the checks is the design.** A first draft reported INCONCLUSIVE on a 0.542 regression because the minimum detectable effect (0.298) exceeded the tolerance. That is backwards. If the interval already excludes the tolerance, the design was evidently powerful enough for *this* effect. Power gates only the reassuring verdict: "no regression detected" means nothing unless you could have detected one. So `BLOCK` is checked first, then `INCONCLUSIVE`, then `PASS`.
 
 The minimum detectable effect itself depends on the **discordant** pairs — episodes where exactly one stack succeeded. Concordant pairs carry no information about the difference, which is why a scenario suite everything passes tells you nothing however long you run it.
+
+## What stage 3 found, and why it is the most useful stage
+
+Stage 3 is the data engine: mine the failures, curate a coreset, relabel at the learner's own states, retrain. It is DAgger, and the expected outcome is that success climbs.
+
+It did not. Across three rounds, on 48 held-out episodes:
+
+| round | dataset | val MSE | success |
+|---|---:|---:|---:|
+| 0 (plain BC) | 8,957 | 0.051 | 0.396 |
+| 1 | 10,457 | 0.068 | 0.354 |
+| 2 | 11,957 | 0.073 | 0.333 |
+| 3 | 13,457 | 0.077 | 0.292 |
+
+Success fell monotonically and validation loss *rose* monotonically as data was added — reproduced on two independent evaluation pools.
+
+The diagnostic explains it. `aliasing()` measures how much expert action variance survives *within a neighbourhood of near-identical observations*: **0.227**. Nearly a quarter of what the expert does is not a function of anything the policy can see, because the expert plans A* over a map the policy was never given. No amount of data makes a function of the observation reproduce that.
+
+So the two failure modes really are different things, and the distinction is not academic:
+
+- **Compounding error** is a problem with the state *distribution*. DAgger fixes it by labelling where the learner goes.
+- **An unrealizable expert** is a problem with *observability*. On-policy labels then add contradiction rather than coverage — which is exactly why validation loss rose, and it is [lesson 9.2's](../09-robot-learning/02-multimodality.md) mode averaging arriving as a measured effect rather than a warning.
+
+The engineering conclusion is to **change the observation, not the dataset size** — give the policy the map, or a global plan, or history. The value of the aliasing measurement is that it says so *before* you spend three rounds of compute making the fit worse.
+
+This is the stage most worth doing carefully, because "collect more data" is the default response to a weak policy and here it was the wrong one, provably.
 
 ## Doing it yourself
 
