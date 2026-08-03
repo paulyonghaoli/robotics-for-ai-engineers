@@ -1,0 +1,115 @@
+id: per-l1-project
+title: "Project and unproject: a pixel is a ray"
+lesson: modules/07-perception/01-camera-models
+description: >-
+  Implement the pinhole projection and its inverse. The round-trip test is
+  the point: `unproject` cannot return a point, because the projection threw
+  away depth — it returns a direction, and any positive multiple of it lands
+  on the same pixel.
+setup_code: |
+  import numpy as np
+
+  K = np.array([[600.0,   0.0, 320.0],
+                [  0.0, 600.0, 240.0],
+                [  0.0,   0.0,   1.0]])
+
+  def look_at(eye, target, up=(0.0, 0.0, 1.0)):
+      """Camera extrinsics (R, t) mapping world points into the camera frame,
+      with the camera at `eye` looking toward `target` down its +Z axis."""
+      eye = np.asarray(eye, dtype=float)
+      fwd = np.asarray(target, dtype=float) - eye
+      fwd = fwd / np.linalg.norm(fwd)
+      right = np.cross(fwd, np.asarray(up, dtype=float))
+      right = right / np.linalg.norm(right)
+      down = np.cross(fwd, right)
+      R = np.stack([right, down, fwd])       # world -> camera
+      return R, -R @ eye
+starter_code: |
+  import numpy as np
+  # Provided: K (3x3 intrinsics), look_at(eye, target) -> (R, t)
+
+  def project(points_world, K, R, t):
+      """(N,3) world points -> (N,2) pixels.
+
+      Transform into the camera frame with X_cam = R @ X_world + t, then
+      apply the pinhole division. Points with Z_cam <= 0 are BEHIND the
+      camera — return np.nan for those rather than a pixel, because the
+      division silently maps them to a plausible-looking location in front.
+      """
+      # TODO
+      return np.zeros((len(points_world), 2))
+
+  def unproject(pixels, K):
+      """(N,2) pixels -> (N,3) unit ray directions in the CAMERA frame.
+
+      There is no depth to return. Build the homogeneous pixel vector,
+      multiply by inv(K), and normalise to unit length.
+      """
+      # TODO
+      return np.zeros((len(pixels), 3))
+
+  R, t = look_at([0.0, 0.0, 1.5], [5.0, 0.0, 1.5])
+  pts = np.array([[5.0, 0.0, 1.5], [5.0, 1.0, 1.5], [10.0, 0.0, 2.5]])
+  px = project(pts, K, R, t)
+  print("pixels:\n", np.round(px, 2))
+  print("rays:\n", np.round(unproject(px, K), 3))
+tests: |
+  import numpy as np
+  _R, _t = look_at([0.0, 0.0, 1.5], [5.0, 0.0, 1.5])
+
+  # A point dead ahead lands on the principal point.
+  _c = project(np.array([[5.0, 0.0, 1.5]]), K, _R, _t)
+  assert np.allclose(_c[0], [320.0, 240.0], atol=1e-6), "a point on the optical axis must project to (cx, cy), got %s" % np.round(_c[0], 2)
+
+  # Doubling the distance halves the offset from the principal point.
+  _near = project(np.array([[5.0, 1.0, 1.5]]), K, _R, _t)[0]
+  _far = project(np.array([[10.0, 1.0, 1.5]]), K, _R, _t)[0]
+  assert abs((_near[0] - 320.0) - 2.0 * (_far[0] - 320.0)) < 1e-6, "offset from the principal point must scale as 1/Z"
+
+  # Behind the camera must be NaN, not a plausible pixel.
+  _behind = project(np.array([[-5.0, 0.0, 1.5]]), K, _R, _t)
+  assert np.all(np.isnan(_behind)), "points behind the camera must give NaN; dividing by a negative Z produces a pixel that looks perfectly reasonable and is entirely wrong"
+
+  # Rays are unit length.
+  _rays = unproject(np.array([[320.0, 240.0], [500.0, 100.0], [0.0, 0.0]]), K)
+  assert _rays.shape == (3, 3), "unproject must return (N,3), got %s" % str(_rays.shape)
+  assert np.allclose(np.linalg.norm(_rays, axis=1), 1.0, atol=1e-9), "ray directions must be unit length"
+  assert np.allclose(_rays[0], [0.0, 0.0, 1.0], atol=1e-9), "the principal point must unproject to the optical axis"
+
+  # The round trip: ANY positive depth along the ray returns the same pixel.
+  _rng = np.random.default_rng(0)
+  _px = np.stack([_rng.uniform(20, 620, 40), _rng.uniform(20, 460, 40)], axis=1)
+  _d = unproject(_px, K)
+  for _s in (0.5, 3.0, 25.0):
+      _cam = _d * _s
+      _world = _R.T @ (_cam - _t).T
+      _back = project(_world.T, K, _R, _t)
+      assert np.allclose(_back, _px, atol=1e-6), "round trip failed at depth %.1f: a pixel constrains the world to a ray, so every point along it must project back to that same pixel" % _s
+hints:
+  - "Camera frame first: `cam = points_world @ R.T + t`. Then the pinhole division `cam[:, :2] / cam[:, 2:3]`, then scale by fx, fy and add cx, cy — which is exactly `cam @ K.T` followed by dividing through by the third column."
+  - "For the behind-the-camera case, mask on `cam[:, 2] <= 0` and write np.nan into those rows. Do not clip Z to a small positive number: that turns a point behind you into a point far in front of you."
+  - "unproject: build `[u, v, 1]`, multiply by `np.linalg.inv(K)` (as `hom @ inv(K).T`), then divide each row by its norm."
+solution: |
+  import numpy as np
+
+  def project(points_world, K, R, t):
+      pts = np.asarray(points_world, dtype=float)
+      cam = pts @ R.T + t                       # world -> camera
+      z = cam[:, 2]
+      hom = cam @ K.T
+      out = np.full((len(pts), 2), np.nan)
+      front = z > 0                             # behind the camera has no image
+      out[front] = hom[front, :2] / hom[front, 2:3]
+      return out
+
+  def unproject(pixels, K):
+      px = np.asarray(pixels, dtype=float)
+      hom = np.concatenate([px, np.ones((len(px), 1))], axis=1)
+      dirs = hom @ np.linalg.inv(K).T
+      return dirs / np.linalg.norm(dirs, axis=1, keepdims=True)
+
+  R, t = look_at([0.0, 0.0, 1.5], [5.0, 0.0, 1.5])
+  pts = np.array([[5.0, 0.0, 1.5], [5.0, 1.0, 1.5], [10.0, 0.0, 2.5]])
+  px = project(pts, K, R, t)
+  print("pixels:\n", np.round(px, 2))
+  print("rays:\n", np.round(unproject(px, K), 3))

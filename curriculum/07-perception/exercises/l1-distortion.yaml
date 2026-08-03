@@ -1,0 +1,117 @@
+id: per-l1-distortion
+title: "The lens that is only wrong at the edges"
+lesson: modules/07-perception/01-camera-models
+description: >-
+  Radial distortion grows as r², so a model that ignores it is *nearly
+  perfect* in the middle of the image — which is why the bug survives
+  testing and then mislocates the obstacle that appears at the frame edge.
+  Implement the forward model and its inverse, then measure what ignoring it
+  costs in metres.
+setup_code: |
+  import numpy as np
+
+  K = np.array([[600.0,   0.0, 320.0],
+                [  0.0, 600.0, 240.0],
+                [  0.0,   0.0,   1.0]])
+  K1, K2 = -0.28, 0.09          # a fairly ordinary wide-angle lens
+  WIDTH, HEIGHT = 640, 480
+
+  def to_normalized(px, K):
+      """Pixels -> normalized image plane (x = X/Z, y = Y/Z)."""
+      px = np.atleast_2d(np.asarray(px, dtype=float))
+      return np.stack([(px[:, 0] - K[0, 2]) / K[0, 0],
+                       (px[:, 1] - K[1, 2]) / K[1, 1]], axis=1)
+
+  def to_pixels(xy, K):
+      """Normalized image plane -> pixels."""
+      xy = np.atleast_2d(np.asarray(xy, dtype=float))
+      return np.stack([xy[:, 0] * K[0, 0] + K[0, 2],
+                       xy[:, 1] * K[1, 1] + K[1, 2]], axis=1)
+starter_code: |
+  import numpy as np
+  # Provided: K, K1, K2, WIDTH, HEIGHT, to_normalized(px, K), to_pixels(xy, K)
+
+  def distort(xy, k1, k2):
+      """(N,2) ideal normalized coords -> (N,2) distorted normalized coords.
+
+          r2 = x^2 + y^2
+          factor = 1 + k1*r2 + k2*r2^2
+          (x_d, y_d) = factor * (x, y)
+
+      This is the forward model: where a ray ACTUALLY lands on the sensor.
+      """
+      # TODO
+      return np.asarray(xy, dtype=float)
+
+  def undistort(xy_d, k1, k2, iters=20):
+      """(N,2) distorted -> (N,2) ideal. The inverse has no closed form.
+
+      Fixed-point iteration: start with x = x_d, then repeatedly set
+          x = x_d / (1 + k1*r2(x) + k2*r2(x)^2)
+      recomputing r2 from the CURRENT estimate each time. It converges
+      quickly for sane coefficients.
+      """
+      # TODO
+      return np.asarray(xy_d, dtype=float)
+
+  # Probe: how far off is a detection if you ignore distortion?
+  for name, px in (("centre", [340.0, 250.0]), ("edge", [620.0, 460.0])):
+      ideal = to_normalized([px], K)
+      landed = to_pixels(distort(ideal, K1, K2), K)[0]
+      print("%-7s ideal %s -> lands at %s  (%.1f px off)"
+            % (name, np.round(px, 1), np.round(landed, 1),
+               np.linalg.norm(landed - np.array(px))))
+tests: |
+  import numpy as np
+  # The optical axis is not distorted at all.
+  assert np.allclose(distort(np.array([[0.0, 0.0]]), K1, K2), [[0.0, 0.0]], atol=1e-12), "the image centre must be undistorted"
+
+  # Distortion grows with radius: negligible near the centre, large at the edge.
+  _c = to_normalized([[330.0, 245.0]], K)
+  _e = to_normalized([[630.0, 470.0]], K)
+  _dc = np.linalg.norm(to_pixels(distort(_c, K1, K2), K) - np.array([[330.0, 245.0]]))
+  _de = np.linalg.norm(to_pixels(distort(_e, K1, K2), K) - np.array([[630.0, 470.0]]))
+  assert _dc < 0.5, "near the centre the shift should be under half a pixel, got %.2f" % _dc
+  assert _de > 15.0, "at the corner the shift should be tens of pixels, got %.2f — check that the factor uses r^2, not r" % _de
+
+  # undistort must invert distort across the whole frame.
+  _rng = np.random.default_rng(0)
+  _px = np.stack([_rng.uniform(0, WIDTH, 300), _rng.uniform(0, HEIGHT, 300)], axis=1)
+  _ideal = to_normalized(_px, K)
+  _round = undistort(distort(_ideal, K1, K2), K1, K2)
+  _err = np.linalg.norm(to_pixels(_round, K) - to_pixels(_ideal, K), axis=1)
+  assert _err.max() < 0.01, "round trip is off by up to %.4f px; the fixed-point iteration must recompute r2 from the CURRENT estimate each pass, not from the distorted input" % _err.max()
+
+  # And it must be the actual inverse, not the identity.
+  _same = np.linalg.norm(to_pixels(undistort(_ideal, K1, K2), K) - to_pixels(_ideal, K), axis=1)
+  assert _same.max() > 5.0, "undistort appears to return its input unchanged"
+hints:
+  - "distort: compute r2 = x**2 + y**2 per row, form the scalar factor, multiply both columns by it. Keep it vectorised — `xy * factor[:, None]`."
+  - "undistort: the trap is computing r2 once from the distorted point and reusing it. Each iteration must recompute r2 from the current estimate, or you get an approximation that is fine near the centre and wrong exactly where distortion matters."
+  - "Sanity check while debugging: `undistort(distort(p)) == p` to within a small fraction of a pixel, for points at the frame corners as well as the centre."
+solution: |
+  import numpy as np
+
+  def distort(xy, k1, k2):
+      xy = np.atleast_2d(np.asarray(xy, dtype=float))
+      r2 = (xy ** 2).sum(axis=1)
+      factor = 1.0 + k1 * r2 + k2 * r2 ** 2
+      return xy * factor[:, None]
+
+  def undistort(xy_d, k1, k2, iters=20):
+      xy_d = np.atleast_2d(np.asarray(xy_d, dtype=float))
+      xy = xy_d.copy()
+      for _ in range(iters):
+          # r2 from the CURRENT estimate — using the distorted point's radius
+          # gives something that looks right near the axis and drifts at the edge.
+          r2 = (xy ** 2).sum(axis=1)
+          factor = 1.0 + k1 * r2 + k2 * r2 ** 2
+          xy = xy_d / factor[:, None]
+      return xy
+
+  for name, px in (("centre", [340.0, 250.0]), ("edge", [620.0, 460.0])):
+      ideal = to_normalized([px], K)
+      landed = to_pixels(distort(ideal, K1, K2), K)[0]
+      print("%-7s ideal %s -> lands at %s  (%.1f px off)"
+            % (name, np.round(px, 1), np.round(landed, 1),
+               np.linalg.norm(landed - np.array(px))))

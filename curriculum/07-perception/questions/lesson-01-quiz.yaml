@@ -1,0 +1,83 @@
+id: per-l1-quiz
+title: "Quiz — camera models"
+lesson: modules/07-perception/01-camera-models
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What does a single pixel tell you about where a thing is in the world?"
+    options:
+      - text: "That it lies somewhere along a ray through the camera centre — the depth is gone and cannot be recovered from that pixel alone"
+        correct: true
+        explanation: "The projection divides by Z. That division is exactly known and not invertible, which is why every 3D perception method is an argument about how to get Z back."
+      - text: "Its 3D position, once you apply the inverse of K"
+        explanation: "inv(K) gives you a direction, not a position. Any positive multiple of it projects to the same pixel."
+      - text: "Its bearing and its range"
+        explanation: "Bearing yes, range no."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Your perception error changes depending on where the robot is standing. Intrinsics or extrinsics?"
+    options:
+      - text: "Extrinsics — intrinsics are a property of the camera and don't change when you move it"
+        correct: true
+        explanation: "The dependence on robot pose is the tell. An intrinsics error travels with the camera and shows the same signature everywhere."
+      - text: "Intrinsics — focal length varies with viewing geometry"
+        explanation: "Focal length is a property of the lens, not of where you point it."
+      - text: "Neither; that's a detector problem"
+        explanation: "A detector error wouldn't correlate with robot pose in a structured way."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You downsample your images by 2× to hit a latency budget, and every depth estimate is now wrong by 2×. Why?"
+    options:
+      - text: "K scales with resolution — fx, fy, cx and cy all halve, and the un-rescaled K claims the camera has twice the focal length it has"
+        correct: true
+        explanation: "One of the most common silent bugs in a perception pipeline, precisely because the images still look correct."
+      - text: "Downsampling loses high-frequency detail the depth model needed"
+        explanation: "That would degrade quality gradually, not produce a clean factor-of-two error."
+      - text: "Interpolation shifts the principal point"
+        explanation: "It scales it; the point is that all four parameters must be scaled together."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A model that ignores radial distortion is accurate in the middle of the image and wrong at the edges. Why is that the dangerous ordering?"
+    options:
+      - text: "Because the correction grows as r², so it is invisible where you test and largest at the frame boundary — where obstacles first appear"
+        correct: true
+        explanation: "The failure hides in exactly the region that gets checked and shows up in exactly the region that matters for reacting in time."
+      - text: "Because edge pixels have lower signal-to-noise"
+        explanation: "True of most lenses, but unrelated to the geometric distortion model."
+      - text: "It isn't dangerous — edge detections are usually discarded"
+        explanation: "Discarding them throws away the earliest warning you get about anything entering your path."
+  - id: q5
+    type: numeric
+    difficulty: core
+    prompt: "fx = 600 px. A point 10 m ahead sits 1.0 m to the side. How many pixels from the principal point does it land? (px)"
+    answer: 60
+    tolerance: 1
+    explanation: "u - cx = fx · X/Z = 600 × 1.0/10 = 60 px. Note the 1/Z: the same 1 m offset at 20 m is only 30 px, which is why bearing precision degrades with range even with a perfect detector."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Your calibration was done at 0.5 m on a checkerboard and reports 0.2 px mean reprojection error. You use the camera at 15 m. What is the concern?"
+    options:
+      - text: "The residual only covers the range it was measured over; the distortion and focal estimates are being extrapolated, and the error at 15 m is unmeasured"
+        correct: true
+        explanation: "A calibration residual is a statement about the data it was fit to. Calibrate at the working distance, and report error per-region rather than only as a mean."
+      - text: "0.2 px is too high; aim for 0.05 px"
+        explanation: "Chasing the number on the wrong data doesn't help; the issue is which data it was computed on."
+      - text: "No concern — reprojection error is scale-invariant"
+        explanation: "It isn't. Parameters fit at one depth need not hold at thirty times that depth."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "A robot turns at 1 rad/s. Its rolling-shutter camera reads out over 20 ms. What does that do to a single frame?"
+    options:
+      - text: "The top and bottom rows are captured about 1.1° apart in world orientation, so the frame is not a single instant and straight vertical edges shear"
+        correct: true
+        explanation: "1 rad/s × 0.02 s = 0.02 rad ≈ 1.1°. Treating that frame as a global-shutter snapshot injects an orientation error that scales with turn rate — a pure-rotation artifact that looks like a calibration problem."
+      - text: "Nothing measurable at that readout speed"
+        explanation: "At 15 m, 1.1° is about 29 cm of lateral error."
+      - text: "It blurs the image uniformly"
+        explanation: "Rolling shutter shears and skews rather than blurring uniformly; motion blur is a separate effect."

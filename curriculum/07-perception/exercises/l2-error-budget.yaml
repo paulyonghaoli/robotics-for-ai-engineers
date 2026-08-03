@@ -1,0 +1,112 @@
+id: per-l2-error-budget
+title: "The operating envelope, and the filter that didn't know about it"
+lesson: modules/07-perception/02-stereo-depth
+description: >-
+  Two consequences of sigma_Z growing as Z². First, your sensor has a maximum
+  honest operating range, which is computable rather than discovered in the
+  field. Second, a filter fed a constant measurement variance is
+  *overconfident exactly where the measurement is weakest* — and that is the
+  most common downstream bug in a stereo pipeline.
+setup_code: |
+  import numpy as np
+
+  FX = 600.0
+  SIGMA_D = 0.25                # pixels of disparity uncertainty
+
+  def sigma_z(Z, baseline, fx=FX, sigma_d=SIGMA_D):
+      Z = np.asarray(Z, dtype=float)
+      return Z ** 2 * sigma_d / (fx * baseline)
+
+  def observe(true_Z, baseline, rng, n=1):
+      """n noisy depth readings of a target at true_Z, with the correct
+      range-dependent noise actually applied."""
+      return true_Z + rng.normal(0.0, sigma_z(true_Z, baseline), size=n)
+starter_code: |
+  import numpy as np
+  # Provided: FX, SIGMA_D, sigma_z(Z, baseline), observe(true_Z, baseline, rng, n)
+
+  def max_range(tolerance, baseline, fx=FX, sigma_d=SIGMA_D):
+      """Largest Z at which sigma_Z is still within `tolerance` metres.
+
+      Invert sigma_Z = Z^2 * sigma_d / (fx * B). This is the number that
+      belongs in your operating envelope, and almost nobody writes it down.
+      """
+      # TODO
+      return 0.0
+
+  def fuse(readings, ranges, baseline, use_range_dependent=True):
+      """Combine independent depth readings into (estimate, claimed_sigma).
+
+      Inverse-variance weighting:
+          w_i = 1 / sigma_i^2
+          estimate = sum(w_i * z_i) / sum(w_i)
+          claimed_sigma = sqrt(1 / sum(w_i))
+
+      When `use_range_dependent` is False, use a single constant sigma for
+      every reading (the naive pipeline: one number from the datasheet).
+      Use `ranges[i]` as the range at which reading i was taken.
+      """
+      # TODO
+      return 0.0, 1.0
+
+  for B in (0.06, 0.12, 0.50):
+      print("baseline %.2f m -> honest range at +-0.25 m: %5.1f m"
+            % (B, max_range(0.25, B)))
+tests: |
+  import numpy as np
+  # Closed form, and the linear dependence on baseline.
+  _r = max_range(0.25, 0.12)
+  assert abs(_r - np.sqrt(0.25 * FX * 0.12 / SIGMA_D)) < 1e-9, "max_range should invert sigma_Z = Z^2*sigma_d/(fx*B); got %.3f" % _r
+  assert abs(sigma_z(_r, 0.12) - 0.25) < 1e-9, "at max_range the uncertainty should equal the tolerance exactly"
+  _wide, _narrow = max_range(0.25, 0.48), max_range(0.25, 0.12)
+  assert abs(_wide / _narrow - 2.0) < 1e-6, "4x the baseline should double the honest range (sqrt), got %.2fx" % (_wide / _narrow)
+
+  # Range-dependent weighting must beat a constant sigma, and must be HONEST
+  # about its own uncertainty. Readings: one close and accurate, three far
+  # and poor.
+  _B = 0.12
+  _ranges = np.array([3.0, 18.0, 18.0, 18.0])
+  _errs_w, _errs_c, _claims_w, _claims_c = [], [], [], []
+  for _s in range(400):
+      _rng = np.random.default_rng(_s)
+      _obs = np.array([observe(z, _B, _rng)[0] for z in _ranges])
+      _ew, _cw = fuse(_obs, _ranges, _B, True)
+      _ec, _cc = fuse(_obs, _ranges, _B, False)
+      _errs_w.append(_ew - _ranges[0]); _errs_c.append(_ec - _ranges[0])
+      _claims_w.append(_cw); _claims_c.append(_cc)
+  _rmse_w = float(np.sqrt(np.mean(np.square(_errs_w))))
+  _rmse_c = float(np.sqrt(np.mean(np.square(_errs_c))))
+  assert _rmse_w < 0.5 * _rmse_c, "range-dependent weighting should be far more accurate (got %.3f vs %.3f m). With a constant sigma every reading counts equally, so three bad long-range readings drown out the good close one." % (_rmse_w, _rmse_c)
+
+  # Consistency: the sigma you CLAIM should match the error you actually make.
+  _ratio_w = _rmse_w / float(np.mean(_claims_w))
+  _ratio_c = _rmse_c / float(np.mean(_claims_c))
+  assert 0.6 < _ratio_w < 1.6, "the range-aware estimator's claimed sigma should roughly match its actual error (ratio %.2f)" % _ratio_w
+  assert _ratio_c > 2.5, "the constant-sigma estimator should be measurably OVERCONFIDENT — actual error far larger than claimed (ratio %.2f). That is the bug: it is most certain exactly where the measurement is worst." % _ratio_c
+hints:
+  - "max_range: solve tolerance = Z^2*sigma_d/(fx*B) for Z. It is a square root, which is why quadrupling the baseline only doubles the useful range."
+  - "fuse: build the per-reading sigmas first — `sigma_z(ranges, baseline)` for the range-aware case, or `np.full_like(ranges, some_constant)` for the naive one. A reasonable constant is the sigma at a mid-range value; the point is that it is one number."
+  - "Weights are 1/sigma^2. The claimed sigma of the fused estimate is sqrt(1/sum(w)) — note this shrinks with more readings whether or not those readings were any good, which is precisely how the constant-sigma version talks itself into confidence it has not earned."
+solution: |
+  import numpy as np
+
+  def max_range(tolerance, baseline, fx=FX, sigma_d=SIGMA_D):
+      # sigma_Z = Z^2 * sigma_d / (fx * B)  ->  Z = sqrt(tol * fx * B / sigma_d)
+      return float(np.sqrt(tolerance * fx * baseline / sigma_d))
+
+  def fuse(readings, ranges, baseline, use_range_dependent=True):
+      readings = np.asarray(readings, dtype=float)
+      ranges = np.asarray(ranges, dtype=float)
+      if use_range_dependent:
+          sig = sigma_z(ranges, baseline)
+      else:
+          # One number for every reading, as if depth error didn't depend on
+          # depth. Take the sigma at a typical mid-range distance.
+          sig = np.full_like(ranges, float(sigma_z(10.0, baseline)))
+      w = 1.0 / sig ** 2
+      est = float(np.sum(w * readings) / np.sum(w))
+      return est, float(np.sqrt(1.0 / np.sum(w)))
+
+  for B in (0.06, 0.12, 0.50):
+      print("baseline %.2f m -> honest range at +-0.25 m: %5.1f m"
+            % (B, max_range(0.25, B)))

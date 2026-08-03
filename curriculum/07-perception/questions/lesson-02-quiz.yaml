@@ -1,0 +1,83 @@
+id: per-l2-quiz
+title: "Quiz — stereo and depth"
+lesson: modules/07-perception/02-stereo-depth
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Stereo depth error grows as Z². What does that follow from?"
+    options:
+      - text: "Z = fB/d is reciprocal in disparity, so a fixed disparity uncertainty maps to a depth uncertainty scaled by dZ/dd = Z²/(fB)"
+        correct: true
+        explanation: "It is a consequence of the geometry, not of the matcher. Better matching lowers sigma_d, which is a linear improvement against a quadratic problem."
+      - text: "Sensor noise grows with distance"
+        explanation: "Disparity uncertainty is roughly constant in pixels across range; the quadratic behaviour comes entirely from the reciprocal relationship."
+      - text: "Atmospheric effects at long range"
+        explanation: "Real but unrelated, and far smaller at the ranges in question."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A stereo rig has σ_Z = 5 cm at 4 m. What is σ_Z at 12 m, in centimetres?"
+    answer: 45
+    tolerance: 2
+    explanation: "Tripling the range multiplies sigma by 3² = 9, so 5 cm becomes 45 cm. This is the arithmetic that decides whether your obstacle threshold means anything at range."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You need ±0.25 m depth accuracy and your current rig manages it out to 8.5 m. You quadruple the baseline. What is the new honest range?"
+    options:
+      - text: "About 17 m — range goes as the square root of the baseline"
+        correct: true
+        explanation: "sigma_Z is linear in 1/B, so Z_max = sqrt(tol·f·B/sigma_d) grows as sqrt(B). Quadrupling B doubles the range, and costs you field-of-view overlap and a larger near-field blind zone."
+      - text: "About 34 m — range is linear in baseline"
+        explanation: "sigma_Z is linear in B, but you are solving for Z with Z² on the other side."
+      - text: "Unchanged; baseline only affects the near field"
+        explanation: "Baseline enters the depth error directly and is the main design lever you have."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A stereo matcher reports a smooth, confident depth plane across a blank white wall. What is happening?"
+    options:
+      - text: "There is no texture to match, so disparity is undefined — and the matcher is filling it in rather than reporting nothing"
+        correct: true
+        explanation: "Check the confidence channel and propagate 'unknown' rather than a value. Treating missing data as a measurement is how a robot drives into a featureless surface."
+      - text: "The wall genuinely is a smooth plane, so this is correct"
+        explanation: "It may well be a plane, but the matcher has no evidence of where it is."
+      - text: "The cameras are decalibrated"
+        explanation: "Decalibration would bias depth everywhere, not specifically on texture-less regions."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Your stereo pipeline feeds a Kalman filter with a constant measurement variance R. What goes wrong?"
+    options:
+      - text: "The filter is overconfident exactly where the measurement is worst — at long range — so it trusts bad readings and its innovations stop being consistent"
+        correct: true
+        explanation: "R should be a function of the measured range. Lesson 3.6's NIS check catches this immediately: the filter's claimed uncertainty and its actual errors diverge with distance."
+      - text: "The filter becomes too conservative and ignores good measurements"
+        explanation: "That's the failure if R is set to the long-range value; the usual choice of a mid-range constant produces overconfidence at distance."
+      - text: "Nothing, provided R is set to the worst case"
+        explanation: "Then you throw away the precision you actually have up close, which is where the measurement is good."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "At 20 m, a rig with f = 600 px and B = 0.12 m sees a disparity of 3.6 px. Why is that number itself the warning?"
+    options:
+      - text: "Sub-pixel matching error is a large fraction of the whole signal at that point, so there is almost nothing left to measure and the estimate is dominated by noise"
+        correct: true
+        explanation: "A quarter-pixel uncertainty against 3.6 px of signal is roughly 7% — hence the 1.4 m of depth uncertainty. Publishing the range at which disparity falls below a few pixels is a better operating limit than any spec-sheet number."
+      - text: "3.6 px is fine; matchers routinely achieve 0.01 px"
+        explanation: "Not on real imagery with real texture, and certainly not reliably."
+      - text: "It indicates the cameras are misaligned"
+        explanation: "It's exactly what the geometry predicts for that range and baseline."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Why might a time-of-flight sensor beat stereo at long range despite worse close-up accuracy?"
+    options:
+      - text: "ToF error is roughly constant with range rather than quadratic, so the curves cross — and past the crossing the cheaper sensor is the better one"
+        correct: true
+        explanation: "Different error models, not merely different quality. Which sensor is 'better' is a question about your working range, and answering it requires both curves rather than two headline numbers."
+      - text: "ToF has higher resolution"
+        explanation: "Usually the opposite; ToF sensors tend to be lower resolution than stereo pairs."
+      - text: "ToF doesn't need calibration"
+        explanation: "It does, and it has its own failure modes — multipath, ambient IR, reflective surfaces."

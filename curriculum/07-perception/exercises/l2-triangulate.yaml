@@ -1,0 +1,103 @@
+id: per-l2-triangulate
+title: "Triangulate, and admit what you cannot see"
+lesson: modules/07-perception/02-stereo-depth
+description: >-
+  Recover depth from a rectified stereo pair, and handle the two cases that
+  matter more than the arithmetic: disparity at or below zero (the point is
+  at or beyond infinity) and the occluded band where one camera sees nothing.
+  A matcher that returns a number for those is worse than one that returns
+  nothing.
+setup_code: |
+  import numpy as np
+
+  FX, FY = 600.0, 600.0
+  CX, CY = 320.0, 240.0
+  BASELINE = 0.12               # metres between the two optical centres
+  MIN_DISPARITY = 0.5           # below this there is nothing left to measure
+
+  def synth_pair(points_cam):
+      """(N,3) camera-frame points -> (left_px, right_px), rectified pair."""
+      pts = np.asarray(points_cam, dtype=float)
+      z = pts[:, 2]
+      uL = FX * pts[:, 0] / z + CX
+      uR = FX * (pts[:, 0] - BASELINE) / z + CX
+      v = FY * pts[:, 1] / z + CY
+      return np.stack([uL, v], axis=1), np.stack([uR, v], axis=1)
+starter_code: |
+  import numpy as np
+  # Provided: FX, FY, CX, CY, BASELINE, MIN_DISPARITY, synth_pair(points_cam)
+
+  def triangulate(left_px, right_px):
+      """(N,2) left + (N,2) right pixels -> (N,3) camera-frame points.
+
+          d = uL - uR ;  Z = FX * BASELINE / d
+          X = (uL - CX) * Z / FX ;  Y = (v - CY) * Z / FY
+
+      Rows whose disparity is below MIN_DISPARITY must be np.nan, not a huge
+      finite depth. As d -> 0 the depth blows up, and a matcher that emits
+      1/0.01 px of disparity is reporting 7 km with total confidence.
+      """
+      # TODO
+      return np.zeros((len(left_px), 3))
+
+  def depth_sigma(Z, sigma_d=0.25):
+      """1-sigma depth uncertainty at range Z, from sigma_d pixels of
+      disparity uncertainty.  sigma_Z = Z^2 * sigma_d / (FX * BASELINE)."""
+      # TODO
+      return np.zeros_like(np.asarray(Z, dtype=float))
+
+  pts = np.array([[0.0, 0.0, 2.0], [0.3, -0.2, 5.0], [0.0, 0.0, 20.0]])
+  L, R = synth_pair(pts)
+  print("recovered:\n", np.round(triangulate(L, R), 3))
+  for z in (2.0, 5.0, 10.0, 20.0):
+      print("Z=%5.1f m  disparity %5.2f px  sigma_Z %6.3f m"
+            % (z, FX * BASELINE / z, depth_sigma(z)))
+tests: |
+  import numpy as np
+  _pts = np.array([[0.0, 0.0, 2.0], [0.3, -0.2, 5.0], [-0.8, 0.4, 12.0]])
+  _L, _R = synth_pair(_pts)
+  _got = triangulate(_L, _R)
+  assert _got.shape == (3, 3), "must return (N,3), got %s" % str(_got.shape)
+  assert np.allclose(_got, _pts, atol=1e-6), "triangulation does not recover the input points:\n%s\nvs\n%s" % (np.round(_got, 3), _pts)
+
+  # Zero and negative disparity must be NaN, not an enormous depth.
+  _bad = triangulate(np.array([[320.0, 240.0], [300.0, 240.0]]),
+                     np.array([[320.0, 240.0], [320.0, 240.0]]))
+  assert np.all(np.isnan(_bad)), "disparity <= MIN_DISPARITY must give NaN; as d -> 0 the depth diverges and the matcher reports kilometres with total confidence"
+
+  # The error model: quadratic in range, and matching the closed form.
+  _z = np.array([2.0, 5.0, 10.0, 20.0])
+  _s = np.asarray(depth_sigma(_z))
+  _expect = _z ** 2 * 0.25 / (FX * BASELINE)
+  assert np.allclose(_s, _expect, rtol=1e-9), "sigma_Z should be Z^2 * sigma_d / (fx * B); got %s, expected %s" % (np.round(_s, 4), np.round(_expect, 4))
+  _ratio = _s[3] / _s[1]
+  assert abs(_ratio - 16.0) < 1e-6, "doubling range twice must multiply sigma by 16 (2^2 squared), got %.2f — the relationship is quadratic, not linear" % _ratio
+hints:
+  - "Disparity is uL - uR. Compute it first, build a validity mask `d >= MIN_DISPARITY`, and write np.nan into the invalid rows before doing anything else."
+  - "Use the LEFT pixel for X and Y — the reconstruction is expressed in the left camera's frame, which is why the right camera's u appears only through the disparity."
+  - "depth_sigma is one line, but check the exponent: sigma_Z at 20 m should be 16x its value at 10 m, not 2x."
+solution: |
+  import numpy as np
+
+  def triangulate(left_px, right_px):
+      L = np.atleast_2d(np.asarray(left_px, dtype=float))
+      R = np.atleast_2d(np.asarray(right_px, dtype=float))
+      d = L[:, 0] - R[:, 0]
+      out = np.full((len(L), 3), np.nan)
+      ok = d >= MIN_DISPARITY          # below this there is no signal left
+      Z = FX * BASELINE / d[ok]
+      out[ok, 2] = Z
+      out[ok, 0] = (L[ok, 0] - CX) * Z / FX
+      out[ok, 1] = (L[ok, 1] - CY) * Z / FY
+      return out
+
+  def depth_sigma(Z, sigma_d=0.25):
+      Z = np.asarray(Z, dtype=float)
+      return Z ** 2 * sigma_d / (FX * BASELINE)
+
+  pts = np.array([[0.0, 0.0, 2.0], [0.3, -0.2, 5.0], [0.0, 0.0, 20.0]])
+  L, R = synth_pair(pts)
+  print("recovered:\n", np.round(triangulate(L, R), 3))
+  for z in (2.0, 5.0, 10.0, 20.0):
+      print("Z=%5.1f m  disparity %5.2f px  sigma_Z %6.3f m"
+            % (z, FX * BASELINE / z, depth_sigma(z)))

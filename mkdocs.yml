@@ -135,6 +135,11 @@ nav:
   - "Capstone · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: thirteen bugs": capstone-log.md
+  - "Module 7 · Robotic Perception":
+      - Overview: modules/07-perception/index.md
+      - "7.1 Camera models: pixels are rays": modules/07-perception/01-camera-models.md
+      - "7.2 Stereo and depth": modules/07-perception/02-stereo-depth.md
+      - "Mini-project: Perception geometry": modules/07-perception/project-perception.md
   - "Module 9 · Robot Learning":
       - Overview: modules/09-robot-learning/index.md
       - "9.1 Behavior cloning": modules/09-robot-learning/01-behavior-cloning.md
