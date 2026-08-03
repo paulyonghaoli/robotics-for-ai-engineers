@@ -28,14 +28,14 @@ Courses I and II are the classical stack, which is well covered elsewhere — th
 
 **Module 6 is a parallel track, not a prerequisite.** Everything through the capstone runs in pure Python — you never need a ROS installation to complete Courses I–II. Take ROS 2 whenever you want the industrial integration skills (and note from the [frontier research](frontier.md) that it's mandatory at Agility, Boston Dynamics, and Amazon, but conspicuously absent from frontier VLA-lab job postings).
 
-## Course III — Perception & Embodied Learning 🔨
+## Course III — Perception & Embodied Learning ✅
 
 | Module | Contents | Status |
 |---|---|---|
 | [**7 · Robotic perception**](modules/07-perception/index.md) | Camera models, stereo & depth, point clouds, registration, 3D detection, BEV, fusion | ✅ 6 lessons + lab + [autograded project](modules/07-perception/project-perception.md) |
 | [**8 · Manipulation**](modules/08-manipulation/index.md) | Manipulator kinematics, IK, grasp synthesis, configuration-space planning, visual servoing | ✅ 6 lessons + lab |
 | [**9 · Robot learning & embodied AI**](modules/09-robot-learning/index.md) | Imitation (ACT, diffusion policy), the data engine & human-in-the-loop, RL, sim-to-real, world models, VLA evaluation | ✅ 7 lessons + lab |
-| [**Capstone III · see it, grasp it**](modules/capstone-3/index.md) | A planar manipulator with a depth sensor: perceive, synthesize a grasp, plan in configuration space, execute under Jacobian control | 🔨 brief live |
+| [**Capstone III · see it, grasp it**](modules/capstone-3/index.md) | A planar manipulator with a depth sensor: perceive, synthesize a grasp, plan in configuration space, execute under Jacobian control | ✅ live, CI-gated |
 
 Capstone III is deliberately a **second robot**. Everything so far has been one differential-drive base, and a portfolio with two distinct embodiments argues something a fifth navigation stack cannot.
 

@@ -46,6 +46,8 @@ GATES = [
      ROOT / "projects" / "capstone_nav"),
     ("capstone2:suite", [PY, "solutions/evaluate.py", "--episodes", "20", "--check"],
      ROOT / "projects" / "capstone_ship"),
+    ("capstone3:grasp", [PY, "-m", "eval", "run", "--episodes", "12", "--seed", "0"],
+     ROOT / "projects" / "capstone_grasp"),
 ]
 
 

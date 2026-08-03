@@ -1,6 +1,6 @@
 # Capstone III · See It, Grasp It
 
-**Status:** Brief live; implementation planned · **Prereqs:** Modules 7 and 8 · **Time:** ~20 h
+**Status:** Live at `projects/capstone_grasp/`, CI-gated · **Prereqs:** Modules 7 and 8 · **Time:** ~20 h
 
 ---
 
@@ -22,19 +22,29 @@ That difference is the point. **A portfolio with two distinct embodiments argues
 | **Execute** | Damped IK with null-space posture control along the path | [8.1](../08-manipulation/01-kinematics.md), [8.2](../08-manipulation/02-inverse-kinematics.md) |
 | **Verify** | A published rubric, scored across randomized scenes | [10.1](../10-evaluation/01-statistical-rigor.md) |
 
-## The rubric (draft)
+## The rubric
 
-Scored the same way as the navigation capstone — a published bar, randomized scenes, and an operating envelope reported rather than tuned away.
+Scored the same way as the navigation capstone — a published bar, randomized scenes, and results reported rather than tuned away.
 
-| Metric | Draft bar |
-|---|---|
-| Grasp success rate | ≥ 0.80 |
-| Collision-free rate | ≥ 0.95 |
-| Mean planning time | ≤ 200 ms |
-| Joint-limit violations | 0 |
-| Manipulability along executed paths | > 0.05 throughout |
+| Metric | Bar | Reference stack (30 episodes) |
+|---|---|---|
+| Grasp success rate | ≥ 0.80 | **1.000** |
+| Collision-free rate | ≥ 0.95 | **1.000** |
+| Joint-limit violations | 0 | **0** |
+| Mean planning time | ≤ 200 ms | **17 ms** |
+| Worst manipulability on the executed path | ≥ 0.05 | **0.164** |
+
+**This is an assignment.** `projects/capstone_grasp/student_stack.py` is the starter — it carries the contract, the four-stage build order, and which contacts the grader permits. `python -m eval run --stack student_stack` is the autograder.
 
 That last one is unusual and deliberate. A stack can hit every other number while routing through configurations where the arm is one modelling error from being uncontrollable — and [8.1's](../08-manipulation/01-kinematics.md) exercise measured what that costs: a hundredfold drop in conditioning demands a hundredfold rise in joint speed, and no motor delivers it. Publishing the *worst conditioning along the executed path* makes that visible instead of leaving it to luck.
+
+## What it cost to build
+
+Worth recording, because it is the same lesson the curriculum keeps arriving at from different directions.
+
+The first end-to-end run scored **2/8**, and almost every failure reported "no reachable grasp" — which pointed at planning. Planning was fine. Perception was silently dropping objects: the reference skipped [7.3's](../07-perception/03-point-clouds.md) ground removal, and because the table is *continuous*, its returns bridged the gaps between objects. Single-link clustering merged each object with the floor either side of it, the circle fit saw an arc plus a straight line, and the group was rejected. Three of four objects perceived, the missing one the target in half the scenes, and no error anywhere.
+
+One line of ground removal took it from 2/8 to 12/12. The stage that looked like housekeeping was load-bearing, and the stage that looked broken was not — which is why the [debugging method](../../capstone-log.md#the-method-before-the-bugs) starts by isolating the layer rather than by fixing the thing the symptom names.
 
 ## Why a planar arm
 

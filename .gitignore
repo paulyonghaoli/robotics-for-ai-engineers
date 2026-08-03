@@ -33,3 +33,4 @@ Thumbs.db
 
 # Local editor/agent config
 .claude/
+projects/capstone_grasp/results.json
