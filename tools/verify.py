@@ -52,6 +52,8 @@ GATES = [
                           "--train-episodes", "10", "--mine-episodes", "6",
                           "--eval-episodes", "6", "--coreset", "400"],
      ROOT / "projects" / "capstone_ship"),
+    ("capstone2:rollout", [PY, "solutions/rollout.py", "--episodes", "6"],
+     ROOT / "projects" / "capstone_ship"),
     ("capstone3:grasp", [PY, "-m", "eval", "run", "--episodes", "12", "--seed", "0"],
      ROOT / "projects" / "capstone_grasp"),
 ]

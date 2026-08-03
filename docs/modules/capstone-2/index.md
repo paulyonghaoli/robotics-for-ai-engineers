@@ -1,6 +1,6 @@
 # Capstone IV · Ship a Learned Policy
 
-**Status:** stages 0–3 live at `projects/capstone_ship/`, CI-gated; stages 4–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
+**Status:** stages 0–4 live at `projects/capstone_ship/`, CI-gated; stage 5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
 
 ---
 
@@ -98,6 +98,29 @@ So the two failure modes really are different things, and the distinction is not
 The engineering conclusion is to **change the observation, not the dataset size** — give the policy the map, or a global plan, or history. The value of the aliasing measurement is that it says so *before* you spend three rounds of compute making the fit worse.
 
 This is the stage most worth doing carefully, because "collect more data" is the default response to a weak policy and here it was the wrong one, provably.
+
+## What stage 4 found
+
+The rollout machinery: canary sizing, drift detection, and a safety monitor. Each reports a number rather than an intention.
+
+**Canary sizing.** Halving the regression you want to catch roughly quadruples the canary — 60 episodes for 0.20, 240 for 0.10, 950 for 0.05, **5,890 for 0.02**. Quoting that number is what stops a canary being installed as a formality.
+
+**Drift detection latency.** A CUSUM on one crude scalar per episode catches a +20% range shift in 5 episodes, +10% in 17, +5% in 22, and +2% in 72. Small persistent drifts are exactly what a per-episode threshold cannot see, which is why the detector is cumulative.
+
+**The safety monitor produced three results, and only one is the textbook one.**
+
+| margin | fallback = classical stack | | fallback = stop & rotate | |
+|---|---|---|---|---|
+| | collision-free | success | collision-free | success |
+| 0.00 | 0.500 | 0.625 | 0.500 | 0.688 |
+| 0.10 | 0.875 | 0.875 | 1.000 | 0.812 |
+| 1.00 | 1.000 | 1.000 | 1.000 | 0.500 |
+
+1. **The safety/liveness tradeoff is real only with a null fallback.** Stopping and rotating takes collision-free from 0.50 to 1.00 and success from 0.69 down to 0.50. Safe and useless is a genuine operating point, and a monitor scored only on violations calls it the best one.
+
+2. **With a good fallback there is no tradeoff — and that is bad news.** Success *rises* with margin, 0.62 → 1.00, because every veto hands control to a controller simply better than the thing being guarded. At the widest margin the monitor is running the robot. That is not a safety result; it is a verdict on the candidate. **If the fallback dominates the primary everywhere, ship the fallback.**
+
+3. **The trusted fallback is not always available.** At margin 0.00 the classical controller could not produce an action in **31%** of episodes — the primary had already driven the robot into a pocket the planner could not route out of. A simplex architecture is only as good as the region its safety controller covers, and that region must be checked against the states the *primary* can reach, not the ones you designed for. Intervening earlier is what keeps the recovery set reachable: from margin 0.10 upward it never failed.
 
 ## Doing it yourself
 
