@@ -1,0 +1,88 @@
+id: man-l4-quiz
+title: "Quiz — configuration-space planning"
+lesson: modules/08-manipulation/04-cspace-planning
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why can't you inflate obstacles for an arm the way you do for a mobile base?"
+    options:
+      - text: "A base is a point in the space it plans in; an arm occupies a region that changes shape with configuration, so a convex box becomes a curved, possibly disconnected set in joint space"
+        correct: true
+        explanation: "There is no shape to inflate. That is the whole reason sampling planners dominate manipulation — the obstacle cannot be represented, only tested against."
+      - text: "Because arms move too fast"
+        explanation: "Speed is unrelated to the representation problem."
+      - text: "You can, with a large enough margin"
+        explanation: "There is nothing in joint space to apply a margin to; the mapping from world obstacle to configuration obstacle is not a dilation."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "What is the most common serious bug in a hand-rolled motion planner?"
+    options:
+      - text: "Checking only the waypoints and not the edges between them — so a verified path sweeps the arm through an obstacle"
+        correct: true
+        explanation: "Two collision-free configurations can have a straight-line edge that passes right through something. The bug is invisible until hardware runs the path."
+      - text: "Using the wrong distance metric"
+        explanation: "It affects path quality rather than correctness."
+      - text: "Too few samples"
+        explanation: "That makes the planner fail to find a path, which is loud and safe."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You check edges, but with a resolution coarser than your smallest obstacle. What happens?"
+    options:
+      - text: "Exactly the same failure, now with a plausible-looking parameter to hide behind — the arm can step over a small obstacle between checks"
+        correct: true
+        explanation: "The resolution must be small enough that the arm cannot move further than the smallest obstacle between samples. Half-checking is not partial safety."
+      - text: "Planning gets slower but stays correct"
+        explanation: "Coarser is faster, and it is the fast direction that is unsafe."
+      - text: "The planner reports failure more often"
+        explanation: "It reports success more often, wrongly."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why not interpolate the tool along a straight line in task space and solve IK at each waypoint?"
+    options:
+      - text: "Three separate hazards: intermediate configurations may collide, the IK solver may jump branches, and the path may cross a singularity where required joint speed diverges"
+        correct: true
+        explanation: "Planning in joint space avoids all three by construction, because the thing being interpolated is the thing being checked."
+      - text: "Task-space paths are always longer"
+        explanation: "They are usually shorter in the workspace — that is what makes them tempting."
+      - text: "IK is too slow to run per waypoint"
+        explanation: "It is fast enough; correctness is the objection."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Your planner reports 'no path found' between two collision-free configurations. Give a reason this might be correct rather than a bug."
+    options:
+      - text: "Elbow-up and elbow-down can lie in genuinely disconnected components of the free configuration space, with no collision-free path between them"
+        correct: true
+        explanation: "Connectivity is a property of the C-space obstacle, and it has no obligation to be connected. 'No path' is sometimes the right answer."
+      - text: "Sampling planners are not complete"
+        explanation: "They are probabilistically complete — given enough time they find a path if one exists, which is why the disconnection explanation matters."
+      - text: "The goal must be unreachable"
+        explanation: "The goal configuration is collision-free by assumption; reachability is not the issue."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Where does planning time actually go in a production manipulation stack?"
+    options:
+      - text: "Collision checking — typically around 90% — so a faster correct broad-phase buys more than a cleverer algorithm"
+        correct: true
+        explanation: "Which also explains why learned planners bias *where* you sample rather than replacing the checker: the checker is the expensive part and the trustworthy part."
+      - text: "Nearest-neighbour queries in the tree"
+        explanation: "Real, and a distant second; KD-trees make it cheap."
+      - text: "Path smoothing"
+        explanation: "Cheap relative to the search, and worth every millisecond."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "What is the right relationship between a learned motion planner and a collision checker?"
+    options:
+      - text: "The checker is ground truth and is not learned — whatever proposes motions, something verifiable must approve them"
+        correct: true
+        explanation: "A learned planner whose output is not collision-checked is not a planner, it is a suggestion. The same runtime-assurance argument as 11.5."
+      - text: "The learned planner replaces the checker once accurate enough"
+        explanation: "Accuracy on a distribution is not a guarantee on an instance, and the instance is what the arm executes."
+      - text: "They are alternatives; use whichever is faster"
+        explanation: "They do different jobs — one proposes, one verifies."

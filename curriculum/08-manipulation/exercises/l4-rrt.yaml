@@ -1,0 +1,165 @@
+id: man-l4-rrt
+title: "RRT in joint space"
+lesson: modules/08-manipulation/04-cspace-planning
+description: >-
+  The same algorithm as lesson 5.3, with the metric changed from metres to
+  radians — which is the whole point: the planner never needed to know what a
+  configuration meant. What it does need is an edge check, and the grader
+  verifies every edge of the path you return rather than taking your word for
+  the waypoints.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+  LINK_RADIUS = 0.04
+  Q_MIN = np.array([-np.pi, -2.4, -2.4])
+  Q_MAX = np.array([ np.pi,  2.4,  2.4])
+
+  # A wall of obstacles between the start pose and the goal pose.
+  OBSTACLES = np.array([[1.35,  0.55, 0.30],
+                        [1.35, -0.55, 0.30],
+                        [1.35,  0.00, 0.22]])
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+
+  def _pt_seg(c, a, b):
+      ab = b - a
+      den = float(ab @ ab)
+      if den < 1e-15:
+          return float(np.linalg.norm(c - a))
+      t = float(np.clip((c - a) @ ab / den, 0.0, 1.0))
+      return float(np.linalg.norm(c - (a + t * ab)))
+
+  def collides(q, obstacles=OBSTACLES):
+      pts = joint_positions(q)
+      for a, b in zip(pts[:-1], pts[1:]):
+          for ox, oy, orad in np.atleast_2d(obstacles):
+              if _pt_seg(np.array([ox, oy]), a, b) < orad + LINK_RADIUS:
+                  return True
+      return False
+
+  def edge_collides(q1, q2, obstacles=OBSTACLES, resolution=0.05):
+      q1 = np.asarray(q1, dtype=float); q2 = np.asarray(q2, dtype=float)
+      n = max(2, int(np.ceil(float(np.max(np.abs(q2 - q1))) / resolution)))
+      for t in np.linspace(0.0, 1.0, n + 1):
+          if collides(q1 + t * (q2 - q1), obstacles):
+              return True
+      return False
+
+  START = np.array([0.9, 0.5, 0.3])
+  GOAL = np.array([-0.9, -0.5, -0.3])
+starter_code: |
+  import numpy as np
+  # Provided: Q_MIN, Q_MAX, OBSTACLES, collides(q), edge_collides(q1, q2),
+  #           START, GOAL, joint_positions(q)
+
+  def rrt(start, goal, iters=4000, step=0.35, goal_bias=0.10, seed=0):
+      """Plan in JOINT space. Return a list of configurations, or None.
+
+      Grow a tree from `start`: sample a random configuration inside
+      [Q_MIN, Q_MAX] (with probability `goal_bias`, sample the goal instead),
+      find the nearest node, step `step` radians toward the sample, and keep
+      the new node only if `edge_collides` says the connecting edge is clear.
+
+      When a new node is within `step` of the goal and that edge is clear,
+      connect and walk parents back to the start.
+
+      Check the EDGE, not the endpoint. Two collision-free configurations can
+      have an edge that sweeps the arm straight through an obstacle, and a
+      planner that only checks nodes returns verified paths that collide.
+
+      Use np.random.default_rng(seed) so runs are reproducible.
+      """
+      # TODO
+      return None
+
+  path = rrt(START, GOAL)
+  if path is None:
+      print("no path found")
+  else:
+      print("path with %d waypoints" % len(path))
+      print("tool start %s -> end %s"
+            % (np.round(joint_positions(path[0])[-1], 3),
+               np.round(joint_positions(path[-1])[-1], 3)))
+tests: |
+  import numpy as np
+  assert not collides(START) and not collides(GOAL), "sanity: both endpoints are collision-free"
+  assert edge_collides(START, GOAL), "sanity: the direct edge is blocked, so this task genuinely needs a planner"
+
+  _p = rrt(START, GOAL, seed=1)
+  assert _p is not None, "no path found — the goal bias is what makes this finish; without it the tree explores the whole space and reaches the goal only by luck"
+  _p = [np.asarray(c, dtype=float) for c in _p]
+  assert np.allclose(_p[0], START, atol=1e-9), "the path must start at START"
+  assert np.allclose(_p[-1], GOAL, atol=1e-9), "the path must end at GOAL"
+
+  # Every waypoint is valid...
+  for _i, _c in enumerate(_p):
+      assert not collides(_c), "waypoint %d collides" % _i
+      assert np.all(_c >= Q_MIN - 1e-9) and np.all(_c <= Q_MAX + 1e-9), "waypoint %d is outside the joint limits" % _i
+
+  # ...and so is every EDGE between them, which is the part that gets skipped.
+  for _i in range(len(_p) - 1):
+      assert not edge_collides(_p[_i], _p[_i + 1]), "the edge from waypoint %d to %d sweeps the arm through an obstacle. Collision-check the edge you return, not just its endpoints." % (_i, _i + 1)
+
+  # Reproducible.
+  _a = rrt(START, GOAL, seed=7)
+  _b = rrt(START, GOAL, seed=7)
+  assert _a is not None and _b is not None
+  assert len(_a) == len(_b) and all(np.allclose(x, y) for x, y in zip(_a, _b, strict=True)), "the same seed must produce the same tree — use np.random.default_rng(seed), not the global random state"
+
+  # Works from several seeds, not just a lucky one.
+  for _s in (2, 3, 4):
+      assert rrt(START, GOAL, seed=_s) is not None, "seed %d found no path" % _s
+hints:
+  - "Store nodes as a list of configurations and a parallel dict of parent indices, exactly as in lesson 5.3's RRT — only the sampling bounds and the collision check differ."
+  - "Nearest node: `np.argmin(np.linalg.norm(np.array(nodes) - sample, axis=1))`. Joint space uses the same Euclidean metric; the units are just radians."
+  - "Step toward the sample: `new = near + (sample - near) / norm * min(step, norm)`, then clip to [Q_MIN, Q_MAX], then reject if `edge_collides(near, new)`."
+solution: |
+  import numpy as np
+
+  def rrt(start, goal, iters=4000, step=0.35, goal_bias=0.10, seed=0):
+      rng = np.random.default_rng(seed)
+      start = np.asarray(start, dtype=float)
+      goal = np.asarray(goal, dtype=float)
+      nodes = [start]
+      parent = {0: None}
+
+      for _ in range(iters):
+          sample = goal if rng.random() < goal_bias else rng.uniform(Q_MIN, Q_MAX)
+          arr = np.array(nodes)
+          i = int(np.argmin(np.linalg.norm(arr - sample, axis=1)))
+          near = nodes[i]
+          delta = sample - near
+          dist = float(np.linalg.norm(delta))
+          if dist < 1e-9:
+              continue
+          new = np.clip(near + delta / dist * min(step, dist), Q_MIN, Q_MAX)
+          # The edge, not the endpoint. Two free configurations can have an
+          # edge that sweeps the arm straight through an obstacle.
+          if edge_collides(near, new):
+              continue
+          nodes.append(new)
+          parent[len(nodes) - 1] = i
+
+          if np.linalg.norm(new - goal) <= step and not edge_collides(new, goal):
+              nodes.append(goal)
+              parent[len(nodes) - 1] = len(nodes) - 2
+              path, k = [], len(nodes) - 1
+              while k is not None:
+                  path.append(nodes[k])
+                  k = parent[k]
+              return path[::-1]
+      return None
+
+  path = rrt(START, GOAL)
+  if path is None:
+      print("no path found")
+  else:
+      print("path with %d waypoints" % len(path))
+      print("tool start %s -> end %s"
+            % (np.round(joint_positions(path[0])[-1], 3),
+               np.round(joint_positions(path[-1])[-1], 3)))

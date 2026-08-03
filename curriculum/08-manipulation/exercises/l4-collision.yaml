@@ -1,0 +1,136 @@
+id: man-l4-collision
+title: "Collision checking, and the edge nobody checked"
+lesson: modules/08-manipulation/04-cspace-planning
+description: >-
+  Two functions. The first asks whether a configuration collides; the second
+  asks whether the straight line between two collision-free configurations
+  does. The second is the one that matters — checking only the endpoints of a
+  path is the most common serious bug in a hand-rolled motion planner, and it
+  produces verified paths that collide.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+  LINK_RADIUS = 0.04
+
+  # Circular obstacles: (x, y, radius)
+  OBSTACLES = np.array([[1.10, 0.90, 0.28],
+                        [1.60, -0.70, 0.22]])
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+starter_code: |
+  import numpy as np
+  # Provided: LINKS, LINK_RADIUS, OBSTACLES (N,3), joint_positions(q)
+
+  def point_segment_distance(c, a, b):
+      """Distance from point c to the SEGMENT ab (not the infinite line).
+
+      Project c onto the line, CLAMP the parameter to [0, 1], and measure to
+      that point. Without the clamp you report collisions with obstacles that
+      are nowhere near the arm — off the end of the link, behind the base.
+      """
+      # TODO
+      return 0.0
+
+  def collides(q, obstacles=OBSTACLES):
+      """True if any link of the arm at configuration q touches any obstacle.
+
+      A link is a capsule: the segment between consecutive joints, thickened
+      by LINK_RADIUS. Contact when the distance is below
+      obstacle_radius + LINK_RADIUS.
+      """
+      # TODO
+      return False
+
+  def edge_collides(q1, q2, obstacles=OBSTACLES, resolution=0.05):
+      """True if ANY configuration on the straight line from q1 to q2 collides.
+
+      Subdivide the segment finely enough that no joint moves more than
+      `resolution` radians between checks, and test each sample. Endpoints
+      included.
+      """
+      # TODO
+      return False
+
+  free_a = np.array([0.2, 0.3, 0.1])
+  free_b = np.array([-0.9, 0.4, 0.2])
+  print("A collides:", collides(free_a), " B collides:", collides(free_b))
+  print("edge A->B collides:", edge_collides(free_a, free_b))
+tests: |
+  import numpy as np
+  # Point-to-segment, with the clamp.
+  assert abs(point_segment_distance(np.array([0.5, 1.0]), np.array([0.0, 0.0]), np.array([1.0, 0.0])) - 1.0) < 1e-9, "perpendicular distance to the middle of the segment"
+  assert abs(point_segment_distance(np.array([5.0, 0.0]), np.array([0.0, 0.0]), np.array([1.0, 0.0])) - 4.0) < 1e-9, "a point beyond the end must measure to the ENDPOINT (4.0), not to the infinite line (0.0) — that is the clamp"
+  assert abs(point_segment_distance(np.array([-3.0, 0.0]), np.array([0.0, 0.0]), np.array([1.0, 0.0])) - 3.0) < 1e-9, "...and the same behind the start"
+  assert abs(point_segment_distance(np.array([0.3, 0.0]), np.array([0.0, 0.0]), np.array([1.0, 0.0]))) < 1e-9, "a point on the segment is at distance 0"
+
+  # Configuration-level checks against a known obstacle.
+  _obs = np.array([[1.5, 0.0, 0.20]])
+  assert collides(np.zeros(3), _obs), "the straight arm along +x passes through an obstacle at (1.5, 0)"
+  assert not collides(np.array([np.pi / 2, 0.0, 0.0]), _obs), "the same arm pointing along +y is clear of it"
+  # The obstacle radius plus link radius must both count.
+  _near = np.array([[1.5, 0.235, 0.20]])
+  assert collides(np.zeros(3), _near), "an obstacle 0.235 m from the link axis touches a 0.20 m circle plus a 0.04 m link radius"
+  _clear = np.array([[1.5, 0.30, 0.20]])
+  assert not collides(np.zeros(3), _clear), "at 0.30 m it does not"
+
+  # THE POINT: an edge whose endpoints are both free, and whose middle is not.
+  _wall = np.array([[1.2, 0.0, 0.25]])
+  _up = np.array([1.2, 0.0, 0.0])
+  _down = np.array([-1.2, 0.0, 0.0])
+  assert not collides(_up, _wall) and not collides(_down, _wall), "both endpoints must be collision-free for this test to mean anything"
+  assert edge_collides(_up, _down, _wall), "the straight line between two free configurations sweeps the arm through the obstacle at (1.2, 0). Checking only the endpoints is how a planner returns a verified path that collides."
+
+  # A genuinely clear edge must not be rejected.
+  assert not edge_collides(np.array([1.2, 0.0, 0.0]), np.array([1.4, 0.1, 0.0]), _wall), "a short move well clear of the obstacle should pass"
+
+  # Resolution must actually be honoured: a coarse resolution may miss it,
+  # a fine one must not.
+  assert edge_collides(_up, _down, _wall, resolution=0.01), "at fine resolution the collision must be found"
+hints:
+  - "point_segment_distance: `t = dot(c - a, b - a) / dot(b - a, b - a)`, then `t = np.clip(t, 0, 1)`, then the distance to `a + t * (b - a)`. Guard the degenerate case where a == b."
+  - "collides: get the joint positions, loop over consecutive pairs as segments, and over obstacles. Compare against `obstacle[2] + LINK_RADIUS`."
+  - "edge_collides: `n = max(2, int(ceil(max(abs(q2 - q1)) / resolution)))`, then check `collides` at each of `np.linspace(0, 1, n + 1)` interpolated configurations."
+solution: |
+  import numpy as np
+
+  def point_segment_distance(c, a, b):
+      c = np.asarray(c, dtype=float)
+      a = np.asarray(a, dtype=float)
+      b = np.asarray(b, dtype=float)
+      ab = b - a
+      denom = float(ab @ ab)
+      if denom < 1e-15:
+          return float(np.linalg.norm(c - a))
+      # The clamp is what makes this a segment; without it, obstacles off the
+      # end of the link report as collisions.
+      t = float(np.clip((c - a) @ ab / denom, 0.0, 1.0))
+      return float(np.linalg.norm(c - (a + t * ab)))
+
+  def collides(q, obstacles=OBSTACLES):
+      pts = joint_positions(q)
+      obstacles = np.atleast_2d(np.asarray(obstacles, dtype=float))
+      for a, b in zip(pts[:-1], pts[1:], strict=True):
+          for ox, oy, orad in obstacles:
+              if point_segment_distance(np.array([ox, oy]), a, b) < orad + LINK_RADIUS:
+                  return True
+      return False
+
+  def edge_collides(q1, q2, obstacles=OBSTACLES, resolution=0.05):
+      q1 = np.asarray(q1, dtype=float)
+      q2 = np.asarray(q2, dtype=float)
+      # Subdivide so no joint moves more than `resolution` between checks.
+      n = max(2, int(np.ceil(float(np.max(np.abs(q2 - q1))) / resolution)))
+      for t in np.linspace(0.0, 1.0, n + 1):
+          if collides(q1 + t * (q2 - q1), obstacles):
+              return True
+      return False
+
+  free_a = np.array([0.2, 0.3, 0.1])
+  free_b = np.array([-0.9, 0.4, 0.2])
+  print("A collides:", collides(free_a), " B collides:", collides(free_b))
+  print("edge A->B collides:", edge_collides(free_a, free_b))
