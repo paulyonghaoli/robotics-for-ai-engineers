@@ -18,6 +18,14 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 
+# The reference stacks live in solutions/ so they don't sit next to the
+# assignment. Putting that directory on the path keeps every command that
+# names one ("--stack pf_stack") working exactly as before.
+_SOLUTIONS = Path(__file__).resolve().parent / "solutions"
+if str(_SOLUTIONS) not in sys.path:
+    sys.path.insert(0, str(_SOLUTIONS))
+
+
 matplotlib.use("Agg")
 import matplotlib.patches as mpatches  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402

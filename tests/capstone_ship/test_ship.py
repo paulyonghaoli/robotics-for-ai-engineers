@@ -16,11 +16,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SHIP = ROOT / "projects" / "capstone_ship"
 NAV = ROOT / "projects" / "capstone_nav"
-for p in (SHIP, NAV):
+for p in (SHIP, SHIP / "solutions", NAV, NAV / "solutions"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from evaluate import wilson  # noqa: E402
+from evaluate import wilson  # noqa: E402  (solutions/evaluate.py)
 from policy import ACT_DIM, OBS_DIM, MLPPolicy, featurize  # noqa: E402
 
 

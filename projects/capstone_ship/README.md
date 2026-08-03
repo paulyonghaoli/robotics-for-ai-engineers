@@ -7,6 +7,11 @@ behavior-cloning policy trained to imitate its classical stack.
 The question is not "is the policy good." It is **"what apparatus would let you
 say so, and be right?"**
 
+**This is an assignment.** Start in [`student_evaluate.py`](student_evaluate.py).
+The candidate, its training pipeline, and the trained weights are *given* — they
+are the system under test, not the exercise. What you build is the machinery
+that judges them.
+
 ## Run it
 
 ```bash
@@ -17,15 +22,15 @@ Gathers expert demonstrations, trains the candidate, writes `policy.npz` and
 `training_report.json`.
 
 ```bash
-python evaluate.py --episodes 48
+python student_evaluate.py --episodes 48
 ```
 
-Scores candidate and incumbent on held-out worlds, stratified by corridor
-clearance and route length, with Wilson intervals per stratum. Writes
-`suite_results.json`.
+Your suite. Scores candidate and incumbent on held-out worlds, stratified by
+corridor clearance and route length, with Wilson intervals per stratum.
+The reference version is `solutions/evaluate.py` — attempt yours first.
 
 ```bash
-python evaluate.py --episodes 20 --check
+python solutions/evaluate.py --episodes 20 --check
 ```
 
 The CI gate. Exits nonzero unless the incumbent stays above 0.85, the candidate
@@ -39,7 +44,8 @@ to resolve the gap fails rather than reporting a difference it hasn't earned.
 | `policy.py` | 0 | NumPy MLP + body-frame featurizer. No torch, so CI trains it in seconds |
 | `collect.py` | 0 | Expert rollouts → dataset → trained `policy.npz` |
 | `bc_stack.py` | 0 | Wraps the policy in `capstone_nav`'s stack contract, so the same harness scores both |
-| `evaluate.py` | 1 | Stratified scenario suite, Wilson intervals, the `--check` gate |
+| `student_evaluate.py` | 1 | **START HERE** — five TODOs: `wilson`, `world_properties`, `build_suite`, `summarize`, `check` |
+| `solutions/evaluate.py` | 1 | Reference stratified suite, Wilson intervals, the `--check` gate |
 
 ## Current results
 

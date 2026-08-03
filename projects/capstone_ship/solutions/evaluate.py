@@ -31,9 +31,11 @@ from pathlib import Path
 
 import numpy as np
 
-CAPSTONE_NAV = Path(__file__).resolve().parent.parent / "capstone_nav"
+CAPSTONE_NAV = Path(__file__).resolve().parent.parent.parent / "capstone_nav"
 sys.path.insert(0, str(CAPSTONE_NAV))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+SOLUTIONS = CAPSTONE_NAV / "solutions"
+sys.path.insert(0, str(SOLUTIONS))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import eval.__main__ as harness  # noqa: E402
 from pf_stack import distance_field  # noqa: E402
@@ -41,7 +43,7 @@ from sim import INFLATE_CELLS, RESOLUTION, Simulator, cell_to_world, world_to_ce
 
 from robotics_ai.planning import astar_grid, inflate_grid  # noqa: E402
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:

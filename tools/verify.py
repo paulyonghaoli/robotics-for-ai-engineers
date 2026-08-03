@@ -36,7 +36,7 @@ GATES = [
     ("capstone:v4", [PY, "-m", "eval", "run", "--episodes", "24", "--seed", "0",
                      "--stack", "slam_stack", "--rubric", "slam"],
      ROOT / "projects" / "capstone_nav"),
-    ("capstone2:suite", [PY, "evaluate.py", "--episodes", "20", "--check"],
+    ("capstone2:suite", [PY, "solutions/evaluate.py", "--episodes", "20", "--check"],
      ROOT / "projects" / "capstone_ship"),
 ]
 

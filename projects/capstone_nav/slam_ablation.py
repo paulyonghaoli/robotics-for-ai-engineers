@@ -31,14 +31,23 @@ by what odometry hands it".
 """
 
 import sys
+from pathlib import Path
 
 import numpy as np
-import reference_stack
-from pf_stack import distance_field
-from sim import DT, GRID_N, MAX_RANGE, N_RAYS, RESOLUTION, Simulator
 
-from robotics_ai.geometry import wrap_angle
-from robotics_ai.mapping import OccupancyGridMap
+# The reference stacks live in solutions/ so they don't sit next to the
+# assignment. Putting that directory on the path keeps every command that
+# names one ("--stack pf_stack") working exactly as before.
+_SOLUTIONS = Path(__file__).resolve().parent / "solutions"
+if str(_SOLUTIONS) not in sys.path:
+    sys.path.insert(0, str(_SOLUTIONS))
+
+import reference_stack  # noqa: E402
+from pf_stack import distance_field  # noqa: E402
+from sim import DT, GRID_N, MAX_RANGE, N_RAYS, RESOLUTION, Simulator  # noqa: E402
+
+from robotics_ai.geometry import wrap_angle  # noqa: E402
+from robotics_ai.mapping import OccupancyGridMap  # noqa: E402
 
 MISS = 0.25
 BEARINGS = np.arange(N_RAYS) * (2 * np.pi / N_RAYS)

@@ -21,6 +21,14 @@
 </figure>
 </div>
 
+**This is an assignment, not a demo.** `projects/capstone_nav/student_stack.py`
+is the starter — it carries the stack contract, the build order, and which
+version is allowed to look at what. `python -m eval run --stack student_stack`
+is the autograder. The five reference stacks live in `solutions/`; reading them
+is not cheating, but attempt each version first, because the
+[engineering log](../../capstone-log.md) only means something to someone who
+has been stuck.
+
 These are rendered from **real evaluation episodes** (`python render.py all`) — the same code path `python -m eval run` scores. Whatever the robot does here is what it does when it's being graded.
 
 | Stack | What it assumes | Result |

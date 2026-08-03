@@ -61,6 +61,19 @@ Three things fall out, and none of them are visible in the validation loss:
 
 The CI gate asserts the *relationship*, not the numbers: the incumbent stays above 0.85, the candidate stays below 0.70, and their intervals must not overlap. That last clause is the interesting one — if the sample is too small to resolve the gap, the gate fails rather than reporting a difference it hasn't earned.
 
+## Doing it yourself
+
+`projects/capstone_ship/student_evaluate.py` is the starter: five TODOs —
+`wilson`, `world_properties`, `build_suite`, `summarize`, `check` — with the
+contract and the reasoning documented, and the harness plumbing given.
+
+The candidate policy, its training pipeline and its trained weights are handed
+to you. They are the *system under test*, not the exercise. Reference
+implementations live in `solutions/`, and reading them is not cheating — but
+attempt yours first, because the point of the `check` function only lands once
+you have written a gate and watched it refuse to call a difference it hadn't
+earned.
+
 ## The deliverable
 
 A **ship / no-ship decision report**. Not a model, not a notebook — a document that a skeptical staff engineer would sign off on, containing:

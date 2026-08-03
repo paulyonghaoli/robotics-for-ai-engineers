@@ -27,6 +27,8 @@ import numpy as np
 
 CAPSTONE_NAV = Path(__file__).resolve().parent.parent / "capstone_nav"
 sys.path.insert(0, str(CAPSTONE_NAV))
+SOLUTIONS = CAPSTONE_NAV / "solutions"
+sys.path.insert(0, str(SOLUTIONS))
 
 import reference_stack  # noqa: E402
 from policy import MLPPolicy, featurize  # noqa: E402

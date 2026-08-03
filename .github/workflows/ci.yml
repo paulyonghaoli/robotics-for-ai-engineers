@@ -38,7 +38,7 @@ jobs:
         run: python -m eval run --episodes 24 --seed 0 --stack slam_stack --rubric slam
         working-directory: projects/capstone_nav
       - name: Capstone II self-check (candidate still loses to the incumbent)
-        run: python evaluate.py --episodes 20 --check
+        run: python solutions/evaluate.py --episodes 20 --check
         working-directory: projects/capstone_ship
       - name: Site build
         run: mkdocs build --strict

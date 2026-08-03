@@ -14,11 +14,20 @@ import importlib
 import json
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
-from sim import DT, INFLATE_CELLS, RESOLUTION, Simulator, world_to_cell
 
-from robotics_ai.planning import astar_grid, inflate_grid, path_length
+# The reference stacks live in solutions/ so they don't sit next to the
+# assignment. Putting that directory on the path keeps every command that
+# names one ("--stack pf_stack") working exactly as before.
+_SOLUTIONS = Path(__file__).resolve().parent.parent / "solutions"
+if str(_SOLUTIONS) not in sys.path:
+    sys.path.insert(0, str(_SOLUTIONS))
+
+from sim import DT, INFLATE_CELLS, RESOLUTION, Simulator, world_to_cell  # noqa: E402
+
+from robotics_ai.planning import astar_grid, inflate_grid, path_length  # noqa: E402
 
 RUBRIC = {
     "success_rate": (">=", 0.85),
