@@ -1,0 +1,95 @@
+id: per-l3-quiz
+title: "Quiz — point clouds"
+lesson: modules/07-perception/03-point-clouds
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What does a point cloud carry that an image does not?"
+    options:
+      - text: "Certified free space — a ray that travelled 12 m before returning proves everything along the way was empty"
+        correct: true
+        explanation: "A pixel reports what sits at the end of a ray and says nothing about the journey. That free-space evidence is what occupancy mapping in Module 4 is built on."
+      - text: "Colour information"
+        explanation: "Usually the opposite — most lidar returns carry intensity at best."
+      - text: "Higher resolution"
+        explanation: "Far lower, typically, especially at range."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why does a naive pipeline spend most of its compute on the least informative part of the frame?"
+    options:
+      - text: "Returns per unit area fall off as 1/Z², so nearby ground dominates the point count while a distant object may have a handful of returns"
+        correct: true
+        explanation: "The floor two metres away can out-number every object in the scene. Voxel downsampling exists to decouple cost from proximity."
+      - text: "Because distant points are noisier and need more filtering"
+        explanation: "They are noisier, but that is not what drives the point count."
+      - text: "It doesn't — lidar returns are uniformly distributed"
+        explanation: "Angular resolution is uniform; density on surfaces is not."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your voxel downsampler keeps the first point encountered in each voxel. What breaks?"
+    options:
+      - text: "The output depends on input ordering, so the same scene serialised differently gives a different cloud — and regression tests stop being reproducible"
+        correct: true
+        explanation: "Keeping the centroid is both order-independent and unbiased, and it averages away a little range noise for free."
+      - text: "Nothing — any representative is equally good"
+        explanation: "Equally good geometrically, not equally good operationally."
+      - text: "The point count becomes wrong"
+        explanation: "The count is right; it's which points, and in what order, that varies."
+  - id: q4
+    type: numeric
+    difficulty: core
+    prompt: "RANSAC with 3-point samples and an inlier ratio of 0.5. How many iterations for 99% confidence of one all-inlier sample? (round to nearest integer)"
+    answer: 35
+    tolerance: 2
+    explanation: "N = log(1-0.99)/log(1-0.5³) = log(0.01)/log(0.875) ≈ 34.5, so 35. RANSAC is cheap; the expensive mistake is running too few iterations and silently accepting a bad hypothesis."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "In a corridor, unconstrained RANSAC returns a wall rather than the floor. Why, and what is the fix?"
+    options:
+      - text: "The walls hold more points, so inlier count alone prefers them — gate hypotheses on the normal's angle from 'up' before scoring"
+        correct: true
+        explanation: "You know roughly which way is up. Declining to use that prior makes the algorithm solve a harder problem than the one you actually have."
+      - text: "The threshold τ is too large; shrink it"
+        explanation: "A tighter threshold shrinks both counts; the wall still wins."
+      - text: "Run more iterations"
+        explanation: "More iterations find the wall more reliably — it genuinely is the best hypothesis under that scoring function."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "Why should ground removal come before voxel downsampling rather than after?"
+    options:
+      - text: "The ground dominates voxel occupancy, so downsampling first spends your point budget on the floor and then deletes it"
+        correct: true
+        explanation: "Ordering the preprocessing stages is a real design decision, and this one costs you resolution on exactly the objects you are trying to detect."
+      - text: "Downsampling makes plane fitting impossible"
+        explanation: "RANSAC works fine on a downsampled cloud; the issue is what you throw away first."
+      - text: "It doesn't matter — the operations commute"
+        explanation: "They don't, because downsampling has a fixed output budget that the ground consumes."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "A single global ground plane is fitted on a site that slopes gently. What is the failure signature?"
+    options:
+      - text: "Residual error grows with distance from wherever the fit was anchored, so the far field is systematically misclassified in one direction"
+        correct: true
+        explanation: "Which is why production stacks fit per-sector planes or a grid of local height estimates. The tell is that errors are structured by position rather than scattered."
+      - text: "Random misclassification spread evenly across the scene"
+        explanation: "A systematic model error produces systematic residuals, not scattered ones."
+      - text: "The fit fails to converge"
+        explanation: "It converges happily — to the best single plane, which is wrong almost everywhere."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Coming from image work, what instinct should you most actively unlearn with point clouds?"
+    options:
+      - text: "Normalising coordinates to the scene extent — it destroys the metric scale, which is the property that makes the data useful"
+        correct: true
+        explanation: "A 1.8 m object is 1.8 m at any range. Normalisation throws that away, along with the ability to reason about physical size at all."
+      - text: "Using max-pooling for aggregation"
+        explanation: "Permutation-invariant aggregation is exactly right here — that's the PointNet insight."
+      - text: "Batching inputs together"
+        explanation: "Batching is fine; variable point counts just need padding or ragged handling."

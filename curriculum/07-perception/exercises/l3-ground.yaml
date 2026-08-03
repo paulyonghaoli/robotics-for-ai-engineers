@@ -1,0 +1,147 @@
+id: per-l3-ground
+title: "RANSAC ground removal, and the wall it wants to find instead"
+lesson: modules/07-perception/03-point-clouds
+description: >-
+  Fit a ground plane with RANSAC and remove it. The scene is a corridor, so
+  the largest planar structure in the cloud is a **wall**, not the floor —
+  and unconstrained RANSAC will happily return it, deleting everything
+  standing on the ground while leaving the ground itself. Constrain the
+  hypothesis with what you already know: roughly where "up" is.
+setup_code: |
+  import numpy as np
+
+  UP = np.array([0.0, 0.0, 1.0])
+
+  def synth_corridor(rng):
+      """Ground, two tall walls (more points than the floor), two objects.
+      Returns (points, is_ground) with is_ground as ground truth."""
+      n_g, n_w, n_o = 2500, 3000, 400
+      ground = np.stack([rng.uniform(-8, 8, n_g), rng.uniform(-3, 3, n_g),
+                         rng.normal(0.0, 0.015, n_g)], axis=1)
+      wall_a = np.stack([rng.uniform(-8, 8, n_w), np.full(n_w, 3.0) + rng.normal(0, 0.015, n_w),
+                         rng.uniform(0.0, 3.0, n_w)], axis=1)
+      wall_b = np.stack([rng.uniform(-8, 8, n_w), np.full(n_w, -3.0) + rng.normal(0, 0.015, n_w),
+                         rng.uniform(0.0, 3.0, n_w)], axis=1)
+      obj = np.stack([rng.uniform(1.0, 1.6, n_o), rng.uniform(-0.4, 0.4, n_o),
+                      rng.uniform(0.05, 1.7, n_o)], axis=1)
+      pts = np.vstack([ground, wall_a, wall_b, obj])
+      is_ground = np.concatenate([np.ones(n_g, bool), np.zeros(2 * n_w + n_o, bool)])
+      order = rng.permutation(len(pts))
+      return pts[order], is_ground[order]
+
+  def plane_from_3(p):
+      """Unit normal and offset d for the plane through 3 points."""
+      n = np.cross(p[1] - p[0], p[2] - p[0])
+      norm = np.linalg.norm(n)
+      if norm < 1e-9:
+          return None, None
+      n = n / norm
+      return n, -float(n @ p[0])
+starter_code: |
+  import numpy as np
+  # Provided: UP, synth_corridor(rng), plane_from_3(three_points)
+
+  def fit_ground(points, rng, tau=0.08, iters=200, max_tilt_deg=20.0):
+      """RANSAC a ground plane. Return (normal, d, inlier_mask).
+
+      Each iteration: sample 3 points, build a plane, count points within
+      `tau` of it, keep the best.
+
+      The corridor's walls contain MORE points than the floor, so scoring on
+      inlier count alone returns a wall. Reject any hypothesis whose normal
+      is more than `max_tilt_deg` from UP before you score it — you know
+      roughly which way is up, and refusing to use that is throwing away a
+      prior you were given for free.
+
+      Refit on the winning inliers at the end (a least-squares plane through
+      them) rather than shipping the 3-point hypothesis. A plane normal is
+      only defined up to sign — return the up-facing one.
+      """
+      # TODO
+      return UP.copy(), 0.0, np.zeros(len(points), bool)
+
+  rng = np.random.default_rng(0)
+  pts, truth = synth_corridor(rng)
+  n, d, mask = fit_ground(pts, np.random.default_rng(1))
+  print("normal %s  d %.3f" % (np.round(n, 3), d))
+  print("kept as ground: %d, true ground: %d" % (mask.sum(), truth.sum()))
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(0)
+  _pts, _truth = synth_corridor(_rng)
+  _n, _d, _mask = fit_ground(_pts, np.random.default_rng(1))
+
+  _n = np.asarray(_n, dtype=float)
+  assert abs(np.linalg.norm(_n) - 1.0) < 1e-6, "the normal must be unit length"
+  assert np.asarray(_mask).dtype == bool and len(_mask) == len(_pts), "return a boolean mask over all input points"
+
+  # It must find the FLOOR, not a wall.
+  _tilt = np.degrees(np.arccos(abs(float(_n @ UP))))
+  assert _tilt < 10.0, "the fitted plane is tilted %.1f deg from vertical-up — that is a wall, not the floor. The walls hold more points than the ground, so inlier count alone picks them." % _tilt
+  assert abs(_d) < 0.15, "the plane is offset %.2f m from z=0; the ground sits at z~0 here" % abs(_d)
+
+  # Segmentation quality against ground truth.
+  _tp = int((_mask & _truth).sum()); _fp = int((_mask & ~_truth).sum())
+  _fn = int((~_mask & _truth).sum())
+  _prec = _tp / max(_tp + _fp, 1); _rec = _tp / max(_tp + _fn, 1)
+  assert _rec > 0.95, "recall %.2f — most of the ground should be removed" % _rec
+  assert _prec > 0.90, "precision %.2f — %d non-ground points were deleted as ground" % (_prec, _fp)
+
+  # The object must survive. Deleting what stands on the floor is the whole
+  # failure this step exists to avoid.
+  _obj = (~_truth) & (_pts[:, 2] > 0.1) & (np.abs(_pts[:, 1]) < 1.0)
+  _survived = int((_obj & ~_mask).sum())
+  assert _survived > 0.9 * int(_obj.sum()), "only %d of %d object points survived ground removal" % (_survived, int(_obj.sum()))
+
+  # Different RNG streams must still converge to the same plane.
+  for _s in (2, 3, 4):
+      _n2, _d2, _ = fit_ground(_pts, np.random.default_rng(_s))
+      assert np.degrees(np.arccos(abs(float(np.asarray(_n2) @ UP)))) < 10.0, "seed %d found a wall" % _s
+hints:
+  - "Score only hypotheses that pass the tilt gate: compute `abs(n @ UP)` and skip the hypothesis if it is below `cos(radians(max_tilt_deg))`. Do the gate before counting inliers, not after."
+  - "Distance from a point to the plane is `abs(points @ n + d)`. Inliers are the points where that is below tau — one vectorised expression over the whole cloud."
+  - "For the final refit: take the inliers, subtract their centroid, and use the smallest right-singular vector of the centred matrix as the normal (`np.linalg.svd`). Then d = -(n @ centroid)."
+solution: |
+  import numpy as np
+
+  def fit_ground(points, rng, tau=0.08, iters=200, max_tilt_deg=20.0):
+      pts = np.asarray(points, dtype=float)
+      cos_gate = np.cos(np.radians(max_tilt_deg))
+      best_n, best_d, best_count = UP.copy(), 0.0, -1
+
+      for _ in range(iters):
+          idx = rng.choice(len(pts), size=3, replace=False)
+          n, d = plane_from_3(pts[idx])
+          if n is None:
+              continue
+          # Gate BEFORE scoring: the walls out-vote the floor on count alone.
+          if abs(float(n @ UP)) < cos_gate:
+              continue
+          count = int((np.abs(pts @ n + d) < tau).sum())
+          if count > best_count:
+              best_n, best_d, best_count = n, d, count
+
+      mask = np.abs(pts @ best_n + best_d) < tau
+      # Refit on the inliers: the 3-point hypothesis is a seed, not an answer.
+      if mask.sum() >= 3:
+          inl = pts[mask]
+          centroid = inl.mean(axis=0)
+          _, _, vt = np.linalg.svd(inl - centroid, full_matrices=False)
+          n = vt[-1] / np.linalg.norm(vt[-1])
+          if n @ UP < 0:
+              n = -n
+          d = -float(n @ centroid)
+          new_mask = np.abs(pts @ n + d) < tau
+          if new_mask.sum() >= mask.sum():
+              best_n, best_d, mask = n, d, new_mask
+      # A plane's normal is only defined up to sign; report the up-facing one
+      # so downstream "is this point above the ground" tests read naturally.
+      if best_n @ UP < 0:
+          best_n, best_d = -best_n, -best_d
+      return best_n, float(best_d), mask
+
+  rng = np.random.default_rng(0)
+  pts, truth = synth_corridor(rng)
+  n, d, mask = fit_ground(pts, np.random.default_rng(1))
+  print("normal %s  d %.3f" % (np.round(n, 3), d))
+  print("kept as ground: %d, true ground: %d" % (mask.sum(), truth.sum()))

@@ -1,0 +1,102 @@
+id: per-l3-voxel
+title: "Voxel downsampling that doesn't depend on input order"
+lesson: modules/07-perception/03-point-clouds
+description: >-
+  Quantise a cloud to a voxel grid and keep one representative per occupied
+  cell. Two details decide whether this is usable downstream: the
+  representative must be the voxel **centroid** rather than whichever point
+  arrived first, and the output order must not depend on the input order.
+  Both are the difference between a reproducible pipeline and one that
+  changes when a driver reorders a frame.
+setup_code: |
+  import numpy as np
+
+  def synth_cloud(rng, n_ground=4000, n_object=300):
+      """A dense ground plane plus one small raised object."""
+      g = np.stack([rng.uniform(-10, 10, n_ground),
+                    rng.uniform(-10, 10, n_ground),
+                    rng.normal(0.0, 0.01, n_ground)], axis=1)
+      o = np.stack([rng.uniform(2.0, 2.4, n_object),
+                    rng.uniform(1.0, 1.4, n_object),
+                    rng.uniform(0.2, 1.8, n_object)], axis=1)
+      return np.vstack([g, o])
+starter_code: |
+  import numpy as np
+  # Provided: synth_cloud(rng)
+
+  def voxel_downsample(points, voxel):
+      """(N,3) -> (M,3), one CENTROID per occupied voxel of side `voxel`.
+
+      Quantise with floor((p - p.min(axis=0)) / voxel), group points sharing
+      a voxel key, and return the mean of each group.
+
+      The output must be sorted by voxel key, so that the same set of points
+      in a different order produces the identical array. Downstream code and
+      regression tests both depend on that, and "first point per voxel" —
+      the obvious shortcut — silently breaks it.
+      """
+      # TODO
+      return np.asarray(points, dtype=float)
+
+  rng = np.random.default_rng(0)
+  cloud = synth_cloud(rng)
+  for v in (0.05, 0.2, 0.5):
+      out = voxel_downsample(cloud, v)
+      tall = out[out[:, 2] > 0.15]
+      print("voxel %.2f m -> %5d points (%.1f%% kept), %3d on the object"
+            % (v, len(out), 100 * len(out) / len(cloud), len(tall)))
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(0)
+  _cloud = synth_cloud(_rng)
+
+  _out = voxel_downsample(_cloud, 0.2)
+  assert _out.ndim == 2 and _out.shape[1] == 3, "must return (M,3), got %s" % str(_out.shape)
+  assert len(_out) < len(_cloud), "downsampling should reduce the point count"
+
+  # One point per occupied voxel: no two outputs may share a voxel key.
+  _keys = np.floor((_out - _cloud.min(axis=0)) / 0.2).astype(np.int64)
+  _uniq = np.unique(_keys, axis=0)
+  assert len(_uniq) == len(_out), "%d points occupy only %d distinct voxels — you are keeping more than one representative per cell" % (len(_out), len(_uniq))
+
+  # The representative must be the centroid, not an arbitrary member. Two
+  # points in one voxel must produce their mean.
+  _pair = np.array([[0.10, 0.10, 0.10], [0.18, 0.14, 0.12]])
+  _c = voxel_downsample(_pair, 1.0)
+  assert len(_c) == 1, "both points are in one voxel, expected 1 output, got %d" % len(_c)
+  assert np.allclose(_c[0], _pair.mean(axis=0), atol=1e-9), "the representative must be the voxel centroid %s, got %s" % (np.round(_pair.mean(axis=0), 3), np.round(_c[0], 3))
+
+  # Permutation invariance: shuffling the input must not change the output.
+  _perm = np.random.default_rng(7).permutation(len(_cloud))
+  _shuf = voxel_downsample(_cloud[_perm], 0.2)
+  assert _shuf.shape == _out.shape, "shuffling the input changed the output SIZE (%s vs %s)" % (str(_shuf.shape), str(_out.shape))
+  assert np.allclose(_shuf, _out, atol=1e-9), "shuffling the input changed the output ORDER or values — sort by voxel key so the result is reproducible"
+
+  # Finer voxels keep more points.
+  assert len(voxel_downsample(_cloud, 0.05)) > len(voxel_downsample(_cloud, 0.4)), "a smaller voxel must retain more points"
+hints:
+  - "Compute integer keys, then use `np.unique(keys, axis=0, return_inverse=True)`. The inverse array tells you which output row each input point belongs to."
+  - "Sum coordinates per group with `np.add.at(sums, inv, points)` (or `np.bincount` per column) and divide by the per-group counts from `np.bincount(inv)`."
+  - "`np.unique(..., axis=0)` already returns keys in sorted order, so building your output in that order gives you permutation invariance for free."
+solution: |
+  import numpy as np
+
+  def voxel_downsample(points, voxel):
+      pts = np.asarray(points, dtype=float)
+      keys = np.floor((pts - pts.min(axis=0)) / voxel).astype(np.int64)
+      # unique(axis=0) returns keys sorted, so the output order depends only
+      # on geometry — never on how the frame happened to be serialised.
+      _, inv = np.unique(keys, axis=0, return_inverse=True)
+      inv = inv.ravel()
+      counts = np.bincount(inv)
+      sums = np.zeros((len(counts), 3))
+      np.add.at(sums, inv, pts)
+      return sums / counts[:, None]
+
+  rng = np.random.default_rng(0)
+  cloud = synth_cloud(rng)
+  for v in (0.05, 0.2, 0.5):
+      out = voxel_downsample(cloud, v)
+      tall = out[out[:, 2] > 0.15]
+      print("voxel %.2f m -> %5d points (%.1f%% kept), %3d on the object"
+            % (v, len(out), 100 * len(out) / len(cloud), len(tall)))
