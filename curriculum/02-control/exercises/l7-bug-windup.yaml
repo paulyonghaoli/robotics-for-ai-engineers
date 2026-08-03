@@ -1,0 +1,98 @@
+id: ctl-l7-bug-windup
+title: "Bug 1: the controller that ignores a new order"
+lesson: modules/02-control/07-lab-control-pathologies
+description: >-
+  **Symptom:** an operator asks for 12 m/s, the cart tops out at 3.75, and
+  ten seconds later they change their mind and ask for 1 m/s. The cart keeps
+  accelerating for another four seconds before it responds at all. The gains
+  were tuned and re-tuned; nothing helped. Diagnose from the probe, then fix.
+setup_code: |
+  import numpy as np
+
+  DT, U_MAX, GAIN, DRAG = 0.05, 1.0, 3.0, 0.8
+  V_REACHABLE = GAIN * U_MAX / DRAG      # 3.75 m/s, and no more
+
+  class Cart:
+      """dv/dt = GAIN*u - DRAG*v, with the actuator hard-clipped to +-U_MAX."""
+      def __init__(self): self.v = 0.0
+      def step(self, u):
+          self.v += DT * (GAIN * float(np.clip(u, -U_MAX, U_MAX)) - DRAG * self.v)
+          return self.v
+
+  def run(controller, steps=400, switch=200):
+      """Chase an unreachable setpoint, then a reachable one."""
+      cart, v, trace = Cart(), 0.0, []
+      for k in range(steps):
+          setpoint = 12.0 if k < switch else 1.0
+          v = cart.step(controller.step(v, setpoint, DT))
+          trace.append(v)
+      return np.array(trace)
+starter_code: |
+  import numpy as np
+  # Provided: DT, U_MAX, V_REACHABLE (=3.75), Cart, run(controller)
+
+  class PID:
+      def __init__(self, kp, ki, kd, limits=(-U_MAX, U_MAX)):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.lo, self.hi = limits
+          self.integral = 0.0
+          self.prev_error = None
+
+      def step(self, measurement, setpoint, dt):
+          error = setpoint - measurement
+          self.integral += error * dt                      # <-- suspicious
+          derivative = 0.0 if self.prev_error is None else (error - self.prev_error) / dt
+          self.prev_error = error
+          out = self.kp * error + self.ki * self.integral + self.kd * derivative
+          return float(np.clip(out, self.lo, self.hi))
+
+  # Probe: how long after the switch does the cart reach the new setpoint?
+  trace = run(PID(1.0, 2.0, 0.05))
+  after = trace[200:]
+  reached = np.nonzero(after <= 1.1)[0]
+  print("speed at switch     %.2f m/s" % after[0])
+  print("steps to reach 1.0  %s" % (reached[0] if len(reached) else "never"))
+tests: |
+  import numpy as np
+  _trace = run(PID(1.0, 2.0, 0.05))
+  _after = _trace[200:]
+  _reached = np.nonzero(_after <= 1.1)[0]
+  assert len(_reached), "ten seconds after the setpoint dropped to 1.0 the cart is still at %.2f m/s — it is still paying off integral it accumulated while pinned at the actuator limit" % _after[-1]
+  assert int(_reached[0]) < 60, "took %d steps (%.1f s) to obey the new setpoint" % (int(_reached[0]), int(_reached[0]) * DT)
+  assert abs(_after[-40:].mean() - 1.0) < 0.15, "never settles at 1.0 (mean %.2f)" % _after[-40:].mean()
+  assert _after.min() > 0.4, "undershoots to %.2f — overcorrected" % _after.min()
+  # And it must still work when nothing ever saturates.
+  _easy = run(PID(1.0, 2.0, 0.05), steps=200, switch=100)
+  assert abs(_easy[-30:].mean() - 1.0) < 0.15, "broke the ordinary case: with a reachable setpoint throughout it must still converge (mean %.2f)" % _easy[-30:].mean()
+hints:
+  - "Print `controller.integral` at the moment of the switch. The setpoint was unreachable for 200 steps and the error averaged ~9 m/s, so how large is it?"
+  - "While the output is clamped, the actuator is already doing everything it can. Extra integral buys no authority now — it only has to be unwound later, and until it is, the controller commands full throttle in the wrong direction."
+  - "Only keep an integration step if it wasn't discarded by the clamp: compute the unclamped output first, clamp it, and if the two differ, roll the integral back."
+solution: |
+  import numpy as np
+
+  class PID:
+      def __init__(self, kp, ki, kd, limits=(-U_MAX, U_MAX)):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.lo, self.hi = limits
+          self.integral = 0.0
+          self.prev_error = None
+
+      def step(self, measurement, setpoint, dt):
+          error = setpoint - measurement
+          derivative = 0.0 if self.prev_error is None else (error - self.prev_error) / dt
+          self.prev_error = error
+
+          # Integrate tentatively, then keep it only if the clamp didn't bite.
+          candidate = self.integral + error * dt
+          unclamped = self.kp * error + self.ki * candidate + self.kd * derivative
+          out = float(np.clip(unclamped, self.lo, self.hi))
+          if out == unclamped:
+              self.integral = candidate
+          return out
+
+  trace = run(PID(1.0, 2.0, 0.05))
+  after = trace[200:]
+  reached = np.nonzero(after <= 1.1)[0]
+  print("speed at switch     %.2f m/s" % after[0])
+  print("steps to reach 1.0  %s" % (reached[0] if len(reached) else "never"))

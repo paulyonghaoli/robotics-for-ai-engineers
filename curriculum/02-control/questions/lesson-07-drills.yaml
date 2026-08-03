@@ -1,0 +1,88 @@
+id: ctl-l7-drills
+title: "Diagnosis drills — control pathologies"
+lesson: modules/02-control/07-lab-control-pathologies
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** a speed controller overshoots badly, but *only* after being asked for something the actuator cannot deliver. With reachable setpoints it is well behaved. Diagnosis?"
+    options:
+      - text: "Integral windup — while saturated the integrator kept accumulating authority the actuator did not have, and that has to be unwound before anything else happens"
+        correct: true
+        explanation: "The tell is the conditional: it misbehaves only after saturation. Gains that are correct in one regime and wrong in another are usually not the problem."
+      - text: "kp is too high"
+        explanation: "A high kp overshoots everywhere, not only after an unreachable request."
+      - text: "The plant model is wrong"
+        explanation: "The plant behaves identically in both regimes; only the controller's internal state differs."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "You add anti-windup by clamping the integral to a fixed range, and the controller now has a permanent steady-state error on hard setpoints. What happened?"
+    options:
+      - text: "The clamp is tighter than the integral needed to hold the steady-state command, so it can no longer cancel the standing error"
+        correct: true
+        explanation: "A fixed clamp must be at least the integral required at the operating point. Conditional integration — stop integrating only when the *output* saturates — avoids having to pick that number at all."
+      - text: "Anti-windup always causes steady-state error"
+        explanation: "Conditional integration has no such cost; this is an artifact of the fixed-clamp variant specifically."
+      - text: "ki became too small"
+        explanation: "ki is unchanged — it's the integral's range that was capped."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** a smooth measurement, but the command spikes for exactly one tick whenever an operator enters a new target. Two teams have replaced the encoder. Diagnosis?"
+    options:
+      - text: "Derivative kick — d(error)/dt contains d(setpoint)/dt, and a setpoint step is an impulse"
+        correct: true
+        explanation: "The measurement was smooth, so nothing physical produced that edge. The only discontinuous signal in the loop was the operator's input."
+      - text: "Encoder quantization noise"
+        explanation: "Then the spikes would correlate with motion, not with operator input, and would not be one tick wide."
+      - text: "The setpoint should be filtered"
+        explanation: "That's a workaround which also delays legitimate commands. Differentiating the measurement instead costs nothing."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "Why is differentiating the measurement and negating it equivalent to differentiating the error, whenever the setpoint is constant?"
+    options:
+      - text: "d(error)/dt = d(setpoint)/dt − d(measurement)/dt, and the first term is zero for a constant setpoint"
+        correct: true
+        explanation: "So the two agree exactly during tracking, and differ only at the instant a setpoint changes — which is precisely where you want them to differ."
+      - text: "They aren't equivalent; it's an approximation"
+        explanation: "It's an identity, not an approximation, whenever the setpoint is constant."
+      - text: "Because the measurement is smoother"
+        explanation: "True in practice, but not the reason the two are algebraically equal."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "A pure-pursuit follower with a fixed 0.5 m lookahead is stable at 0.5 m/s and 1.0 m/s, weaves 0.82 m at 2.0 m/s, and diverges at 3.0 m/s. The code is identical in every run. What changed?"
+    options:
+      - text: "The distance travelled during the 0.20 s actuation delay grew until it was comparable to the lookahead, so the robot steers toward where it has already been"
+        correct: true
+        explanation: "Lookahead is a distance; delay is a time. Their ratio is what governs stability, and speed converts one into the other."
+      - text: "The plant became nonlinear at speed"
+        explanation: "The kinematics are identical at every speed here."
+      - text: "Numerical integration error grows with speed"
+        explanation: "The integrator is exact-arc and the timestep is unchanged."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "Given that, what is the right form for the lookahead — and why does it need a floor?"
+    options:
+      - text: "`L = max(L_min, k·v)` — a preview *horizon* in seconds, floored so it doesn't collapse to zero as the robot slows"
+        correct: true
+        explanation: "Without the floor, curvature 2y/L² explodes as L → 0 at low speed: you'd trade an instability at high speed for a different one at low speed."
+      - text: "`L = k·v` with no floor — simpler and dimensionally correct"
+        explanation: "Dimensionally fine, and it diverges at low speed. The floor is what makes it usable across the whole range."
+      - text: "Keep L fixed but reduce the maximum speed"
+        explanation: "That works and gives up the capability. Scaling keeps both."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "What do all three bugs in this lab have in common?"
+    options:
+      - text: "Each controller is correct at its nominal operating point and fails at a boundary — saturation, a setpoint change, a higher speed — that the bench test never visited"
+        correct: true
+        explanation: "Which is the argument for testing the edges of the envelope rather than the middle of it, and for publishing the envelope you actually tested."
+      - text: "They're all sign errors"
+        explanation: "None of them is; every sign in all three is correct."
+      - text: "They all come from discretization"
+        explanation: "Only the third involves timing at all, and there the cause is delay rather than the timestep."

@@ -1,0 +1,102 @@
+id: ctl-l7-bug-kick
+title: "Bug 2: the actuator that flinches"
+lesson: modules/02-control/07-lab-control-pathologies
+description: >-
+  **Symptom:** the joint tracks smoothly for hours, but every time an
+  operator types a new target the motor makes an audible bang and the
+  current trace shows a one-tick spike to the limit. Maintenance replaced
+  the encoder twice. The encoder is fine. Diagnose from the probe, then fix.
+setup_code: |
+  import numpy as np
+
+  DT, U_MAX = 0.02, 8.0
+
+  def run(controller, steps=300, switch=150):
+      """Measurement is a smooth ramp; the SETPOINT steps at `switch`."""
+      cmds, meas = [], []
+      for k in range(steps):
+          m = 0.4 * (k * DT)                     # the plant moves smoothly
+          setpoint = 1.0 if k < switch else 4.0  # the operator does not
+          cmds.append(controller.step(m, setpoint, DT))
+          meas.append(m)
+      return np.array(cmds), np.array(meas)
+starter_code: |
+  import numpy as np
+  # Provided: DT, U_MAX = 8.0, run(controller) -> (commands, measurements)
+
+  class PID:
+      def __init__(self, kp, ki, kd, limits=(-U_MAX, U_MAX)):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.lo, self.hi = limits
+          self.integral = 0.0
+          self.prev_error = None
+
+      def step(self, measurement, setpoint, dt):
+          error = setpoint - measurement
+          candidate = self.integral + error * dt
+          derivative = 0.0 if self.prev_error is None else (error - self.prev_error) / dt
+          self.prev_error = error                          # <-- suspicious
+          unclamped = self.kp * error + self.ki * candidate + self.kd * derivative
+          out = float(np.clip(unclamped, self.lo, self.hi))
+          if out == unclamped:
+              self.integral = candidate
+          return out
+
+  cmds, meas = run(PID(1.0, 0.0, 0.5))
+  jump = abs(cmds[150] - cmds[149])
+  print("command just before switch %.3f" % cmds[149])
+  print("command at the switch      %.3f" % cmds[150])
+  print("one-tick jump              %.3f" % jump)
+tests: |
+  import numpy as np
+  _cmds, _meas = run(PID(1.0, 0.0, 0.5))
+  _jump = abs(_cmds[150] - _cmds[149])
+  # kp * d(setpoint) = 1.0 * 3.0 = 3.0 is legitimate. A D-term spike is not.
+  assert _jump < 3.5, "the command jumped %.2f in one tick when only the setpoint moved; kp alone accounts for 3.0, so the rest is the derivative term differentiating the setpoint" % _jump
+  assert not np.any(np.abs(_cmds) >= U_MAX - 1e-9), "command saturated at the actuator limit on a setpoint change"
+  # It must still damp genuine measurement motion.
+  class _Still:
+      pass
+  _p = PID(0.0, 0.0, 1.0)
+  _p.step(0.0, 0.0, DT)
+  _resp = _p.step(0.3, 0.0, DT)
+  assert _resp < -1e-6, "a rising measurement must still produce a negative (damping) D output; got %.4f" % _resp
+  # ...and a constant setpoint must behave exactly as before.
+  _p2 = PID(1.0, 0.0, 0.5)
+  _flat = [_p2.step(0.4 * (k * DT), 1.0, DT) for k in range(50)]
+  assert np.all(np.isfinite(_flat)) and max(np.abs(np.diff(_flat))) < 0.5, "with a constant setpoint the output should stay smooth"
+hints:
+  - "Look at the probe: the measurement is a smooth ramp with no discontinuity, yet the command jumps. Whatever produced that jump saw something discontinuous."
+  - "d(error)/dt = d(setpoint)/dt - d(measurement)/dt. A setpoint step is instantaneous, so that first term is an impulse — and you are multiplying it by kd/dt."
+  - "Differentiate the measurement instead and negate it: -(m - m_prev)/dt. For a constant setpoint that is algebraically identical; for a changing one it is silent."
+solution: |
+  import numpy as np
+
+  class PID:
+      def __init__(self, kp, ki, kd, limits=(-U_MAX, U_MAX)):
+          self.kp, self.ki, self.kd = kp, ki, kd
+          self.lo, self.hi = limits
+          self.integral = 0.0
+          self.prev_measurement = None
+
+      def step(self, measurement, setpoint, dt):
+          error = setpoint - measurement
+          candidate = self.integral + error * dt
+          # Derivative on MEASUREMENT, negated — same value for a constant
+          # setpoint, no impulse when the operator changes their mind.
+          if self.prev_measurement is None:
+              derivative = 0.0
+          else:
+              derivative = -(measurement - self.prev_measurement) / dt
+          self.prev_measurement = measurement
+          unclamped = self.kp * error + self.ki * candidate + self.kd * derivative
+          out = float(np.clip(unclamped, self.lo, self.hi))
+          if out == unclamped:
+              self.integral = candidate
+          return out
+
+  cmds, meas = run(PID(1.0, 0.0, 0.5))
+  jump = abs(cmds[150] - cmds[149])
+  print("command just before switch %.3f" % cmds[149])
+  print("command at the switch      %.3f" % cmds[150])
+  print("one-tick jump              %.3f" % jump)

@@ -1,0 +1,110 @@
+id: ctl-l7-bug-lookahead
+title: "Bug 3: the tracker that only works slowly"
+lesson: modules/02-control/07-lab-control-pathologies
+description: >-
+  **Symptom:** the path follower is rock solid during testing at 0.5 m/s.
+  Deployed at 2.0 m/s it weaves down straight corridors, and the weave grows
+  until the robot is bouncing between walls. Nobody changed the controller
+  between the two runs, and the same code is running in both. The drivetrain
+  takes 0.20 s to act on a steering command — as every drivetrain does.
+  Diagnose from the probe, then fix.
+setup_code: |
+  import numpy as np
+
+  DT, W_MAX = 0.05, 2.5
+
+  def wrap(t):
+      return -(np.mod(-np.asarray(t, dtype=float) + np.pi, 2 * np.pi) - np.pi)
+
+  def step_pose(pose, v, w, dt):
+      x, y, th = pose
+      if abs(w) < 1e-9:
+          return np.array([x + v * np.cos(th) * dt, y + v * np.sin(th) * dt, th])
+      r = v / w
+      return np.array([x + r * (np.sin(th + w * dt) - np.sin(th)),
+                       y - r * (np.cos(th + w * dt) - np.cos(th)),
+                       float(wrap(th + w * dt))])
+
+  STRAIGHT = np.stack([np.linspace(0, 60, 1200), np.zeros(1200)], axis=1)
+
+  STEER_DELAY = 4          # ticks: 0.20 s from command to wheels. Real.
+
+  def run(v, steps=500, y0=0.35):
+      """Start slightly off a straight path and try to settle onto it.
+
+      The steering command reaches the wheels STEER_DELAY ticks late, which
+      is what every real drivetrain does and what a bench test never has.
+      """
+      from collections import deque
+      pose, queue, out = np.array([0.0, y0, 0.0]), deque([0.0] * STEER_DELAY), []
+      for _ in range(steps):
+          queue.append(float(np.clip(pure_pursuit(pose, STRAIGHT, v), -W_MAX, W_MAX)))
+          pose = step_pose(pose, v, queue.popleft(), DT)
+          out.append(pose.copy())
+      return np.array(out)
+starter_code: |
+  import numpy as np
+  # Provided: DT, W_MAX, wrap, step_pose, STRAIGHT, run(v) -> trajectory
+
+  LOOKAHEAD = 0.5          # <-- tuned at 0.5 m/s, never revisited
+
+  def pure_pursuit(pose, path, v):
+      """Steer toward a point LOOKAHEAD metres along the path."""
+      d = np.linalg.norm(path - pose[:2], axis=1)
+      near = int(np.argmin(d))
+      ahead = np.nonzero(d[near:] >= LOOKAHEAD)[0]
+      target = path[near + int(ahead[0])] if len(ahead) else path[-1]
+      dx, dy = target - pose[:2]
+      c, s = np.cos(-pose[2]), np.sin(-pose[2])
+      y_body = s * dx + c * dy
+      L = float(np.hypot(dx, dy))
+      return 0.0 if L < 1e-6 else v * (2.0 * y_body / (L * L))
+
+  # Probe: lateral error over time, slow versus fast.
+  for v in (0.5, 2.0):
+      ys = run(v)[:, 1]
+      tail = np.abs(ys[len(ys) // 2:])
+      print("v=%.1f  final |y|=%.3f  worst-half |y|=%.3f" % (v, abs(ys[-1]), tail.max()))
+tests: |
+  import numpy as np
+  for _v in (0.5, 1.0, 2.0, 3.0):
+      _ys = run(_v)[:, 1]
+      _tail = np.abs(_ys[len(_ys) // 2:])
+      assert _tail.max() < 0.08, "at v=%.1f the robot never settles: worst lateral error in the second half is %.3f m. A fixed lookahead is a fixed *distance*, but the time it buys you shrinks as speed rises." % (_v, _tail.max())
+      # Count crossings only among samples that are actually off the path;
+      # a converged run jitters around zero at 1e-9 and would otherwise
+      # register hundreds of meaningless "oscillations".
+      _big = _ys[len(_ys) // 2:][np.abs(_ys[len(_ys) // 2:]) > 0.02]
+      _sign_changes = int(np.sum(np.diff(np.sign(_big)) != 0)) if len(_big) else 0
+      assert _sign_changes < 8, "at v=%.1f the path error swings across the path %d times in the second half — that is a limit cycle, not convergence" % (_v, _sign_changes)
+  # Must not "fix" it by refusing to steer at all.
+  _far = run(1.0, y0=1.5)[:, 1]
+  assert abs(_far[-1]) < 0.1, "from a 1.5 m offset it must still converge (ended at %.2f m)" % _far[-1]
+hints:
+  - "Run the probe. The controller is identical in both runs and one is stable — so the instability is not in the code you can see, it is in the relationship between the code, the speed, and the 0.20 s of delay."
+  - "LOOKAHEAD is a distance; the delay is a time. At 0.5 m/s the robot travels 0.10 m while a command is in flight, against a 0.5 m lookahead. At 2.0 m/s it travels 0.40 m — nearly the whole lookahead — so it is steering at where it has already been."
+  - "Make the lookahead a *time*: LOOKAHEAD = base + gain * v, with a floor so it never collapses at low speed. Something like max(0.4, 0.9 * v) settles at every speed here."
+solution: |
+  import numpy as np
+
+  # A lookahead is only meaningful as a preview HORIZON, so scale it with
+  # speed and keep a floor so it stays sane as v -> 0.
+  def lookahead_for(v):
+      return max(0.4, 0.9 * v)
+
+  def pure_pursuit(pose, path, v):
+      L_target = lookahead_for(v)
+      d = np.linalg.norm(path - pose[:2], axis=1)
+      near = int(np.argmin(d))
+      ahead = np.nonzero(d[near:] >= L_target)[0]
+      target = path[near + int(ahead[0])] if len(ahead) else path[-1]
+      dx, dy = target - pose[:2]
+      c, s = np.cos(-pose[2]), np.sin(-pose[2])
+      y_body = s * dx + c * dy
+      L = float(np.hypot(dx, dy))
+      return 0.0 if L < 1e-6 else v * (2.0 * y_body / (L * L))
+
+  for v in (0.5, 2.0):
+      ys = run(v)[:, 1]
+      tail = np.abs(ys[len(ys) // 2:])
+      print("v=%.1f  final |y|=%.3f  worst-half |y|=%.3f" % (v, abs(ys[-1]), tail.max()))

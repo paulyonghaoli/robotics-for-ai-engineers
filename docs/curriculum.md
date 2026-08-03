@@ -10,7 +10,7 @@ Three courses, eleven modules. **Courses I and II are complete and live**, and s
 |---|---|---|
 | [**0 · From ML to Robotics**](modules/00-transition/index.md) | Embodiment, closed-loop behavior, the autonomy stack's anatomy, robotics roles, math diagnostic | ✅ 4 lessons |
 | [**1 · Geometry & robot motion**](modules/01-geometry/index.md) | Frames, quaternions, transform trees, twists, configuration space, frame-debugging lab | ✅ 6 lessons + [autograded project](modules/01-geometry/project-frames.md) |
-| [**2 · Kinematics & control**](modules/02-control/index.md) | FK/IK, PID, Jacobians, pure pursuit, dynamics & gravity compensation, MPC | ✅ 6 lessons + [autograded project](modules/02-control/project-control.md) |
+| [**2 · Kinematics & control**](modules/02-control/index.md) | FK/IK, PID, Jacobians, pure pursuit, dynamics & gravity compensation, MPC, control-pathologies lab | ✅ 7 lessons + [autograded project](modules/02-control/project-control.md) |
 | [**3 · State estimation**](modules/03-estimation/index.md) | Kalman, particle, and extended Kalman filters; sensor models; fusion architecture; consistency lab | ✅ 6 lessons + [autograded project](modules/03-estimation/project-localization.md) |
 | [**Course I exam**](course-1-exam.md) | 16 cross-module questions, closed-book | ✅ form A |
 
