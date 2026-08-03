@@ -1,6 +1,6 @@
-# Capstone II — Ship a Learned Policy
+# Capstone IV — Ship a Learned Policy
 
-Reference implementation for the [Course III capstone](../../docs/modules/capstone-2/index.md).
+Reference implementation for the [Course IV capstone](../../docs/modules/capstone-2/index.md).
 The system under test is [`../capstone_nav`](../capstone_nav); the candidate is a
 behavior-cloning policy trained to imitate its classical stack.
 

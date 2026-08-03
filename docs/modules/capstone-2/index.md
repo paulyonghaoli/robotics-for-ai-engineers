@@ -1,4 +1,4 @@
-# Capstone II · Ship a Learned Policy
+# Capstone IV · Ship a Learned Policy
 
 **Status:** stages 0–1 live at `projects/capstone_ship/`, CI-gated; stages 2–5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
 

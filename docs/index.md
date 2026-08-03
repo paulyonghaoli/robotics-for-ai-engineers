@@ -68,6 +68,7 @@ Courses I and II — the classical autonomy stack — are complete:
 - **49 coding exercises** and **35 question banks**, every reference solution executed against its own tests in CI
 - **Three graded artifacts**: two autograded projects (`python -m grader`, randomized scenarios) and the scenario-evaluated capstone
 - **The capstone** in five versions — known map, lidar-only localization, online mapping, navigation among unmapped moving obstacles, and full SLAM with neither a map nor a pose sensor — with an [engineering log](capstone-log.md) of the thirteen debugging campaigns behind them
+- **Every module carries the same four rungs** — in-browser exercises, a diagnostic lab where you're handed working-*looking* code with a real bug, an autograded mini-project, and a capstone. 55 lessons, 9 labs, 5 mini-projects, 76 exercises, 2 capstones, all CI-verified
 - A [Course I exam](course-1-exam.md) and a researched [frontier map](frontier.md) of where the field is heading
 
 Still to come: Course III (perception, manipulation, robot learning, evaluation & data systems, deployment) and the ROS 2 track.

@@ -153,5 +153,5 @@ nav:
       - "10.5 Drift monitoring": modules/10-evaluation/05-drift-monitoring.md
       - "10.6 Neural real-to-sim evaluation": modules/10-evaluation/06-neural-real-to-sim.md
       - "10.7 Lab: the benchmark that lied": modules/10-evaluation/07-lab-benchmark-lied.md
-  - "Capstone II · Ship a Learned Policy":
+  - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md
