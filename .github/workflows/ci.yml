@@ -31,6 +31,9 @@ jobs:
       - name: Grader self-check (control)
         run: python -m grader --reference --seed 1
         working-directory: projects/control_tuning
+      - name: Grader self-check (mapping)
+        run: python -m grader --reference --seed 1
+        working-directory: projects/mapping_mini
       - name: Capstone harness self-check (reference stack passes rubric)
         run: python -m eval run --episodes 4 --seed 7
         working-directory: projects/capstone_nav

@@ -18,7 +18,7 @@ Three courses, eleven modules. **Courses I and II are complete and live**, and s
 
 | Module | Contents | Status |
 |---|---|---|
-| [**4 · Mapping & SLAM**](modules/04-mapping/index.md) | Occupancy grids, ICP/scan matching, EKF-SLAM, pose graphs & loop closure | ✅ 4 lessons (visual odometry lands with Module 7) |
+| [**4 · Mapping & SLAM**](modules/04-mapping/index.md) | Occupancy grids, ICP/scan matching, EKF-SLAM, pose graphs & loop closure, SLAM-failures lab | ✅ 5 lessons + [autograded project](modules/04-mapping/project-mapping.md) |
 | [**5 · Planning & decision-making**](modules/05-planning/index.md) | A*, costmaps, RRT, dynamic-window local planning, planning under uncertainty | ✅ 5 lessons |
 | [**6 · ROS 2**](modules/06-ros2/index.md) *(parallel track)* | Nodes, topics, services, actions, TF2, URDF, launch, bags, QoS | ⬜ planned |
 | [**Capstone · autonomous 2D robot**](modules/capstone/index.md) | Scenario-evaluated navigation stack | ✅ v0–v4 live (v4 = SLAM) |

@@ -191,7 +191,7 @@ modules and two capstones.
 | **Course I** — Foundations of Embodied AI ✅ | 0, 1, 2, 3 | — (2 mini-projects + exam) |
 | **Course II** — Robot Autonomy ✅ | 4, 5 | **Capstone II** · autonomous 2D robot (v0–v4) |
 | **Course III** — Perception & Embodied Learning | 7, 8, 9 | **Capstone III** · see it, grasp it |
-| **Course IV** — Production Robot Systems | 10, 11, 12 | **Capstone IV** · ship a learned policy |
+| **Course IV** — Production Robot Systems | 10, 11, 12, 13 | **Capstone IV** · ship a learned policy |
 
 Module 6 (ROS 2) stays a parallel track, listed under Course IV as the
 industrial-integration path.
@@ -219,6 +219,51 @@ picks up the explicit "Capstone II" label it already implies.
   portfolio with two distinct embodiments argues something a fifth nav stack
   cannot. Pure NumPy, same published-rubric treatment as Capstone II.
 
+## 5c-bis. C++, GPU and edge (raised 2026-08-02)
+
+**Edge computing is already covered** and should not be rebuilt: [11.1](docs/modules/11-deployment/01-latency-budgets.md)
+does latency budgets and deadline cascades, [11.2](docs/modules/11-deployment/02-edge-inference.md)
+does quantization, TensorRT, Jetson/Orin, batch-1 inference and thermal
+throttling. The gap there is hardware depth, not coverage.
+
+**C++ is the largest real gap in the curriculum.** Production robotics is
+overwhelmingly C++ — ROS 2 nodes, real-time control loops, perception
+pipelines — and for an ML engineer transitioning in, "cannot write C++" is a
+hard filter on a large fraction of postings. It is also, usefully, *not*
+covered by the OMSCS course this curriculum is meant to complement.
+
+It becomes a **parallel track, like ROS 2** — a skill track rather than a
+topic module — built as *ports with parity checks* rather than as a language
+tutorial:
+
+- Re-implement components that already have a verified Python reference and a
+  published spec: the control loop (PID + pure pursuit) and A* with its
+  costmap. The grader checks **numerical parity against the Python reference**
+  on shared fixtures, which is exactly how a real port is validated, plus a
+  latency budget the Python version cannot meet.
+- Teach the subset that matters in a control loop: RAII, const-correctness,
+  references vs values, fixed-capacity containers, and **no allocation in the
+  hot path** — the discipline, not the language trivia.
+- Payoff is measurable rather than asserted: the same A*, same seeds, same
+  output, with p95 latency side by side. That plugs straight into
+  [11.1](docs/modules/11-deployment/01-latency-budgets.md)'s deadline argument.
+
+**GPU is worth one lesson pair, not a module, and not kernel authoring.** For
+this audience the valuable thing is the performance model — why a policy at
+200 fps on an A100 gives 12 fps on an Orin — which is memory bandwidth,
+kernel-launch overhead, host/device transfer, and batch-1 inference, none of
+which is fixed by writing a better kernel. Raw CUDA is comparatively niche in
+day-to-day robotics work.
+
+It also cannot be hands-on in the browser: Pyodide has no CUDA, and most
+learners have no Jetson. So the *analysis* is the graded exercise — roofline
+and bandwidth arithmetic, transfer-cost budgets, batch-1 versus batched — in
+pure Python, and actual kernel writing is an optional portfolio extension.
+
+Both land in Course IV as **Module 13 · Systems performance** (C++ track, GPU
+performance model, real-time constraints), which keeps Course III focused on
+perception and learning.
+
 ## 5d. Build order (agreed 2026-08-02)
 
 Plan first, then close Courses I–II before opening Courses III–IV. The point is
@@ -230,7 +275,7 @@ interesting material.
 | **A — Close Courses I–II** | Module 2 lab + mini-project; Module 4 mini-project; Module 5 mini-project; Module 0 lab. Every Course I–II module has all four rungs | Each of Modules 0–5 has lessons, quiz bank, exercises, a lab and a graded mini-project; all gates green |
 | **B — Polish Courses I–II** | Consistency pass: lesson-schema drift, cross-links, exam coverage against the new projects, stale claims | A reader can complete Courses I–II end to end with no dead ends |
 | **C — Course III** | Modules 7 and 8 (lessons, banks, exercises, labs, mini-projects); Module 9 mini-project; Capstone III | Course III complete, capstone CI-gated on a published rubric |
-| **D — Course IV** | Module 12; mini-projects for 10 and 11; Capstone IV stages 2–5; rename Capstone II→IV | Course IV complete; four courses, four capstones |
+| **D — Course IV** | Modules 12 and 13 (13 = C++ parity track + GPU performance model); mini-projects for 10 and 11; Capstone IV stages 2–5; rename Capstone II→IV | Course IV complete; four courses, four capstones |
 
 Deferred and explicitly not blocking: Module 6 (ROS 2) content, capstone v5
 (loop closure), the ROS 2 environment decision.

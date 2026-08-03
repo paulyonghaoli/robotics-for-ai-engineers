@@ -119,6 +119,7 @@ nav:
       - "4.3 EKF-SLAM": modules/04-mapping/03-ekf-slam.md
       - "4.4 Pose graphs and loop closure": modules/04-mapping/04-pose-graphs.md
       - "4.5 Lab: the SLAM failure gallery": modules/04-mapping/05-lab-slam-failures.md
+      - "Mini-project: Mapping & SLAM": modules/04-mapping/project-mapping.md
   - "Module 5 · Planning & Control":
       - Overview: modules/05-planning/index.md
       - "5.1 Graph search and A*": modules/05-planning/01-astar.md
