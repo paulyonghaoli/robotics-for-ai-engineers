@@ -1,0 +1,96 @@
+id: per-l6-bug-normalized
+title: "Bug 3: the preprocessing step that deleted the metre"
+lesson: modules/07-perception/06-lab-perception-lied
+description: >-
+  **Symptom:** a size-based classifier separates pedestrians from cars almost
+  perfectly on the validation set and behaves erratically in deployment,
+  flipping its answer depending on how much of the scene is visible. It is
+  most confident in cluttered scenes and hopeless in open ones. Someone
+  normalized the point cloud to zero mean and unit scale, because that is
+  what you do to inputs. Diagnose from the probe, then fix.
+setup_code: |
+  import numpy as np
+
+  def make_scene(rng, extent, with_pedestrian=True):
+      """A scene of the given extent (metres) containing one object.
+      The object's TRUE size never changes: 0.7 m for a pedestrian,
+      4.2 m for a car."""
+      size = 0.7 if with_pedestrian else 4.2
+      n_clutter = 600
+      clutter = rng.uniform(-extent / 2, extent / 2, size=(n_clutter, 3))
+      clutter[:, 2] = rng.uniform(0.0, 0.2, n_clutter)
+      obj = rng.uniform(-size / 2, size / 2, size=(200, 3)) + np.array([2.0, 1.0, 0.9])
+      return np.vstack([clutter, obj]), np.arange(n_clutter, n_clutter + 200)
+
+  def object_extent(points, idx):
+      """Largest side of the object's axis-aligned box, in whatever units
+      `points` happens to be expressed in."""
+      p = points[idx]
+      return float((p.max(axis=0) - p.min(axis=0))[:2].max())
+starter_code: |
+  import numpy as np
+  # Provided: make_scene(rng, extent, with_pedestrian), object_extent(points, idx)
+
+  def preprocess(points):
+      """Prepare a cloud for the classifier."""
+      p = np.asarray(points, dtype=float)
+      p = p - p.mean(axis=0)
+      return p / np.abs(p).max()               # <-- suspicious
+
+  def classify(points, idx, threshold=2.0):
+      """'pedestrian' or 'car', from the object's largest horizontal side."""
+      return "pedestrian" if object_extent(preprocess(points), idx) < threshold else "car"
+
+  rng = np.random.default_rng(0)
+  for extent in (12.0, 40.0):
+      pts, idx = make_scene(rng, extent, with_pedestrian=True)
+      print("scene extent %4.0f m -> object measures %.3f -> %s"
+            % (extent, object_extent(preprocess(pts), idx), classify(pts, idx)))
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(0)
+
+  # The same object in scenes of wildly different extent must measure the same.
+  _sizes = []
+  for _extent in (8.0, 20.0, 60.0):
+      _pts, _idx = make_scene(np.random.default_rng(1), _extent, with_pedestrian=True)
+      _sizes.append(object_extent(preprocess(_pts), _idx))
+  assert max(_sizes) - min(_sizes) < 0.15, "the SAME 0.7 m pedestrian measures %s in scenes of extent 8, 20 and 60 m. Normalising by the scene divides out the metre, so the object's size now depends on how much else is in view." % [round(s, 3) for s in _sizes]
+  assert 0.5 < np.mean(_sizes) < 0.95, "a 0.7 m pedestrian should still measure about 0.7 after preprocessing, got %.3f" % np.mean(_sizes)
+
+  # And the classifier must be right regardless of scene extent.
+  for _extent in (8.0, 20.0, 60.0):
+      for _ped in (True, False):
+          _pts, _idx = make_scene(np.random.default_rng(2), _extent, with_pedestrian=_ped)
+          _want = "pedestrian" if _ped else "car"
+          _got = classify(_pts, _idx)
+          assert _got == _want, "at extent %.0f m a %s was classified as %s" % (_extent, _want, _got)
+
+  # Centring is fine and often useful — it is the SCALING that destroys the
+  # information. Confirm the fix kept a translation-invariant pipeline.
+  _pts, _idx = make_scene(np.random.default_rng(3), 20.0, with_pedestrian=False)
+  _shifted = _pts + np.array([100.0, -50.0, 0.0])
+  assert abs(object_extent(preprocess(_pts), _idx) - object_extent(preprocess(_shifted), _idx)) < 1e-6, "moving the whole scene must not change the object's measured size"
+hints:
+  - "Run the probe. The same 0.7 m pedestrian measures one thing in a 12 m scene and something quite different in a 40 m one. Nothing about the pedestrian changed."
+  - "Dividing by the scene's own extent expresses every length as a fraction OF THAT SCENE. A 0.7 m object is 0.09 of an 8 m scene and 0.012 of a 60 m one — you have made the feature depend on the clutter around it."
+  - "Metric scale is the thing a point cloud gives you that an image cannot. Keep it: centre the cloud if you like (that is translation invariance, which is genuinely useful) but do not rescale."
+solution: |
+  import numpy as np
+
+  def preprocess(points):
+      # Centre, but do NOT rescale. Dividing by the scene extent expresses
+      # every length as a fraction of whatever happened to be in view, and
+      # metric scale is precisely what makes a point cloud worth having:
+      # a 1.8 m object is 1.8 m at any range, in any scene.
+      p = np.asarray(points, dtype=float)
+      return p - p.mean(axis=0)
+
+  def classify(points, idx, threshold=2.0):
+      return "pedestrian" if object_extent(preprocess(points), idx) < threshold else "car"
+
+  rng = np.random.default_rng(0)
+  for extent in (12.0, 40.0):
+      pts, idx = make_scene(rng, extent, with_pedestrian=True)
+      print("scene extent %4.0f m -> object measures %.3f -> %s"
+            % (extent, object_extent(preprocess(pts), idx), classify(pts, idx)))

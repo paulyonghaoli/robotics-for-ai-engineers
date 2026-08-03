@@ -1,0 +1,105 @@
+id: per-l6-bug-invalid-depth
+title: "Bug 2: the safe default that cleared a path through a wall"
+lesson: modules/07-perception/06-lab-perception-lied
+description: >-
+  **Symptom:** the robot plans straight through a blank white wall. The depth
+  camera is healthy, the planner is correct, and the occupancy map shows open
+  space exactly where the wall is. Someone, reasonably, decided that missing
+  depth should default to "far away" so the robot would not panic about
+  dropouts. Diagnose from the probe, then fix `to_occupancy`.
+setup_code: |
+  import numpy as np
+
+  MAX_RANGE = 10.0
+  N_BEAMS = 40
+
+  def sense(rng):
+      """Depth per beam, plus the sensor's own validity flag.
+
+      Beams 12..27 look at a blank white wall 3 m away: no texture, so the
+      matcher cannot find a correspondence and reports invalid. Everything
+      else is open space out to MAX_RANGE."""
+      depth = np.full(N_BEAMS, MAX_RANGE)
+      valid = np.ones(N_BEAMS, dtype=bool)
+      wall = slice(12, 28)
+      depth[wall] = 0.0            # no measurement produced
+      valid[wall] = False          # ...and the sensor says so
+      depth[valid] += rng.normal(0.0, 0.02, valid.sum())
+      return depth, valid
+
+  TRUE_WALL = slice(12, 28)        # ground truth, for scoring only
+starter_code: |
+  import numpy as np
+  # Provided: MAX_RANGE, N_BEAMS, sense(rng) -> (depth, valid), TRUE_WALL
+
+  def to_occupancy(depth, valid):
+      """Per beam, return one of: 'free', 'occupied', 'unknown'.
+
+      A beam that returned a real measurement shorter than MAX_RANGE hit
+      something. A beam that reached MAX_RANGE saw nothing.
+      """
+      out = []
+      for d, ok in zip(depth, valid):
+          if not ok:
+              d = MAX_RANGE          # <-- suspicious: a "safe" default
+          out.append("occupied" if d < MAX_RANGE - 0.1 else "free")
+      return out
+
+  rng = np.random.default_rng(0)
+  depth, valid = sense(rng)
+  cells = to_occupancy(depth, valid)
+  print("beams reported invalid by the sensor : %d" % (~valid).sum())
+  print("of those, labelled free              : %d"
+        % sum(1 for i in range(N_BEAMS) if not valid[i] and cells[i] == "free"))
+  print("labels across the wall (beams 12-27) : %s" % sorted(set(cells[TRUE_WALL])))
+tests: |
+  import numpy as np
+  _rng = np.random.default_rng(0)
+  _depth, _valid = sense(_rng)
+  _cells = to_occupancy(_depth, _valid)
+  assert len(_cells) == N_BEAMS, "one label per beam"
+  assert set(_cells) <= {"free", "occupied", "unknown"}, "labels must be free/occupied/unknown, got %s" % sorted(set(_cells))
+
+  # The wall must never be reported as traversable.
+  _wall_labels = [_cells[i] for i in range(N_BEAMS)][TRUE_WALL]
+  assert "free" not in _wall_labels, "%d beams looking at a wall 3 m away are labelled FREE. The sensor said it could not measure them; substituting MAX_RANGE turns 'I do not know' into 'I checked, and it is clear' — which is the least safe default available." % _wall_labels.count("free")
+  assert all(l == "unknown" for l in _wall_labels), "beams the sensor flagged invalid carry no evidence either way, so they are 'unknown', not 'occupied' — inventing an obstacle is a different lie with the same cause. Got %s" % sorted(set(_wall_labels))
+
+  # Genuine open space must still be usable, or the robot never moves.
+  _open = [i for i in range(N_BEAMS) if _valid[i]]
+  assert all(_cells[i] == "free" for i in _open), "beams with a valid max-range return are genuinely free space"
+  assert _cells.count("free") == len(_open), "expected %d free beams, got %d" % (len(_open), _cells.count("free"))
+
+  # A real short return is still an obstacle.
+  _d2 = np.full(N_BEAMS, MAX_RANGE); _d2[5] = 2.0
+  _v2 = np.ones(N_BEAMS, dtype=bool)
+  assert to_occupancy(_d2, _v2)[5] == "occupied", "a valid 2 m return is an obstacle"
+hints:
+  - "Read the probe: sixteen beams that the sensor explicitly flagged as invalid come back labelled 'free'. Ask what the substitution on the suspicious line is asserting."
+  - "There are three states, not two. 'The beam reached maximum range' is evidence of free space. 'The sensor could not measure' is evidence of nothing at all, and collapsing it into either of the other two invents information."
+  - "Return 'unknown' for invalid beams and let the consumer decide. A planner can treat unknown as blocked (cautious) or as free (exploratory) — but only if you preserve the distinction long enough for it to choose."
+solution: |
+  import numpy as np
+
+  def to_occupancy(depth, valid):
+      out = []
+      for d, ok in zip(depth, valid):
+          if not ok:
+              # No measurement is not a measurement. Substituting ANY number
+              # here — near or far — fabricates evidence the sensor refused
+              # to give, and "far" happens to be the fabrication that clears
+              # a path through whatever you could not see.
+              out.append("unknown")
+          elif d < MAX_RANGE - 0.1:
+              out.append("occupied")
+          else:
+              out.append("free")
+      return out
+
+  rng = np.random.default_rng(0)
+  depth, valid = sense(rng)
+  cells = to_occupancy(depth, valid)
+  print("beams reported invalid by the sensor : %d" % (~valid).sum())
+  print("of those, labelled free              : %d"
+        % sum(1 for i in range(N_BEAMS) if not valid[i] and cells[i] == "free"))
+  print("labels across the wall (beams 12-27) : %s" % sorted(set(cells[TRUE_WALL])))

@@ -142,6 +142,7 @@ nav:
       - "7.3 Point clouds": modules/07-perception/03-point-clouds.md
       - "7.4 3D detection": modules/07-perception/04-3d-detection.md
       - "7.5 BEV and fusion": modules/07-perception/05-bev-fusion.md
+      - "7.6 Lab: the perception stack that lied": modules/07-perception/06-lab-perception-lied.md
       - "Mini-project: Perception geometry": modules/07-perception/project-perception.md
   - "Module 9 · Robot Learning":
       - Overview: modules/09-robot-learning/index.md

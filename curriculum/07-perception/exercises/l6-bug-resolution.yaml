@@ -1,0 +1,80 @@
+id: per-l6-bug-resolution
+title: "Bug 1: the camera upgrade that broke depth"
+lesson: modules/07-perception/06-lab-perception-lied
+description: >-
+  **Symptom:** the team swapped a 640×480 camera for a 1280×960 one — same
+  lens, same mount, twice the pixels. Detection quality improved. Every
+  distance estimate is now exactly half what it should be, and the robot
+  brakes for objects that are twice as far away as it thinks. The obvious
+  suspects — the new sensor, the new driver, the detector retrained on
+  bigger images — are all innocent. Diagnose from the probe, then fix.
+setup_code: |
+  import numpy as np
+
+  # Calibration measured on the ORIGINAL 640x480 sensor.
+  K_CALIB = np.array([[600.0, 0.0, 320.0],
+                      [0.0, 600.0, 240.0],
+                      [0.0, 0.0, 1.0]])
+  CALIB_SIZE = (640, 480)
+  KNOWN_WIDTH = 1.8            # metres: the width of the object we range on
+
+  def observe(true_Z, image_size):
+      """Pixel width of a KNOWN_WIDTH object at true_Z, on a sensor of the
+      given size. Same lens and field of view; more pixels across it."""
+      scale = image_size[0] / CALIB_SIZE[0]
+      fx_actual = K_CALIB[0, 0] * scale
+      return fx_actual * KNOWN_WIDTH / true_Z
+starter_code: |
+  import numpy as np
+  # Provided: K_CALIB (measured at 640x480), CALIB_SIZE, KNOWN_WIDTH,
+  #           observe(true_Z, image_size) -> pixel width of the object
+
+  def range_from_width(pixel_width, image_size):
+      """Estimate distance from the object's apparent width in pixels.
+
+          Z = fx * KNOWN_WIDTH / pixel_width
+      """
+      fx = K_CALIB[0, 0]                       # <-- suspicious
+      return fx * KNOWN_WIDTH / pixel_width
+
+  for size in (CALIB_SIZE, (1280, 960)):
+      print("sensor %s:" % (size,))
+      for z in (5.0, 20.0):
+          px = observe(z, size)
+          print("   true %5.1f m  ->  measured %5.1f px  ->  estimated %5.1f m"
+                % (z, px, range_from_width(px, size)))
+tests: |
+  import numpy as np
+  # On the calibration sensor nothing should change.
+  for _z in (3.0, 10.0, 25.0):
+      _est = range_from_width(observe(_z, CALIB_SIZE), CALIB_SIZE)
+      assert abs(_est - _z) < 1e-6, "on the original 640x480 sensor the estimate must be exact: true %.1f, got %.3f" % (_z, _est)
+
+  # And on any other resolution, with the same lens.
+  for _size in ((1280, 960), (320, 240), (1920, 1440)):
+      for _z in (3.0, 10.0, 25.0):
+          _est = range_from_width(observe(_z, _size), _size)
+          assert abs(_est - _z) < 1e-6, "at %s a target at %.1f m is estimated at %.3f m. The lens did not change, so the field of view did not change — but fx is measured in PIXELS, and there are now a different number of them across the same angle." % (str(_size), _z, _est)
+
+  # The specific reported failure: 2x resolution halved every distance.
+  _err = range_from_width(observe(12.0, (1280, 960)), (1280, 960))
+  assert abs(_err - 12.0) < 1e-6, "the reported bug: at 1280x960 a 12 m target reads %.1f m" % _err
+hints:
+  - "Run the probe. On 640x480 the estimates are exact; on 1280x960 every one is halved. A factor of exactly two, appearing when the pixel count doubled, is not a sensor quality problem."
+  - "fx is not a property of the lens alone — it is a focal length expressed IN PIXELS. Same angle of view, twice as many pixels across it, twice the fx. The calibration you loaded describes a 640-pixel-wide sensor."
+  - "Scale the intrinsics to the image you actually received: `fx * (width / CALIB_SIZE[0])`. In a real pipeline the same factor applies to fy, cx and cy — all four move together, which is why resizing an image without rescaling K is such a reliable way to break a stack."
+solution: |
+  import numpy as np
+
+  def range_from_width(pixel_width, image_size):
+      # fx is in PIXELS, so it scales with the image you were handed. The
+      # stored calibration describes CALIB_SIZE; anything else must be scaled.
+      fx = K_CALIB[0, 0] * (image_size[0] / CALIB_SIZE[0])
+      return fx * KNOWN_WIDTH / pixel_width
+
+  for size in (CALIB_SIZE, (1280, 960)):
+      print("sensor %s:" % (size,))
+      for z in (5.0, 20.0):
+          px = observe(z, size)
+          print("   true %5.1f m  ->  measured %5.1f px  ->  estimated %5.1f m"
+                % (z, px, range_from_width(px, size)))

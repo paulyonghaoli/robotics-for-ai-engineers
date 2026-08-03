@@ -1,0 +1,88 @@
+id: per-l6-drills
+title: "Diagnosis drills — the perception stack that lied"
+lesson: modules/07-perception/06-lab-perception-lied
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** same lens, twice the pixels, and every range estimate is now exactly half. Diagnosis?"
+    options:
+      - text: "The stored calibration describes the old sensor — fx is in pixels, so doubling the resolution doubles it, and all four of fx, fy, cx, cy must be rescaled together"
+        correct: true
+        explanation: "A factor of exactly two appearing the day the pixel count doubled is an arithmetic relationship, not a quality difference. Quality problems do not produce clean integer factors."
+      - text: "The new sensor has worse depth accuracy at range"
+        explanation: "That would degrade gradually with distance, not halve everything uniformly."
+      - text: "The detector needs retraining on the larger images"
+        explanation: "The detector is measuring pixel widths correctly; it is the conversion to metres that is wrong."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "A stereo matcher reports invalid for beams looking at a blank wall. The pipeline substitutes MAX_RANGE 'so the robot doesn't panic'. What has that done?"
+    options:
+      - text: "Turned 'I could not see' into 'I looked, and it is clear' — the robot now plans through the one region it had no information about"
+        correct: true
+        explanation: "The substitution is indistinguishable from a genuine max-range return one function call later. Of all available defaults, 'far away' is the one that clears a path."
+      - text: "Made the system appropriately conservative"
+        explanation: "The opposite: it converts missing evidence into positive evidence of free space."
+      - text: "Nothing important — the planner will see the wall next frame"
+        explanation: "The wall is textureless every frame, so it is invisible every frame."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "Why is 'unknown' the right label for an invalid beam, rather than 'occupied'?"
+    options:
+      - text: "Because inventing an obstacle is the same fabrication with the opposite sign — preserve the distinction and let the consumer choose how to treat it"
+        correct: true
+        explanation: "A planner can treat unknown as blocked when being cautious or as free when exploring. It can only do that if the perception layer did not decide on its behalf."
+      - text: "Because obstacles are more expensive to plan around"
+        explanation: "True, and not a reason to misreport what the sensor said."
+      - text: "Because 'occupied' would be unsafe"
+        explanation: "It would be conservative rather than unsafe — the problem is that it is still a claim the sensor did not make."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "A size-based classifier flips its answer depending on how cluttered the scene is. The preprocessing does zero-mean, unit-scale. Diagnosis?"
+    options:
+      - text: "Dividing by the scene extent expresses every length as a fraction of that scene, so object size now depends on what else is in view"
+        correct: true
+        explanation: "A 0.7 m pedestrian measures 0.09 of a tight scene and 0.012 of an open one. The classifier is reading a ratio and being asked a question about metres."
+      - text: "The classifier is overfitting to the validation scenes"
+        explanation: "It generalises fine within a fixed scene extent; the feature itself is scene-dependent."
+      - text: "Point clouds are too sparse for size estimation"
+        explanation: "The object has 200 points here — sparsity is not the issue."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "Which normalisation IS safe on a point cloud, and why?"
+    options:
+      - text: "Centring — it buys translation invariance without touching the metric scale that makes the data useful"
+        correct: true
+        explanation: "The two operations get bundled together by habit, and only one of them destroys information you cannot recover."
+      - text: "Neither; leave the raw coordinates alone"
+        explanation: "Centring is genuinely useful and costs nothing."
+      - text: "Both, provided you store the scale factor"
+        explanation: "Storing it helps only if every downstream consumer remembers to apply it, which is a convention rather than a guarantee."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "The 'phantom max-range ring' in occupancy mapping, zero-depth pixels back-projected to the origin, and this lab's MAX_RANGE default are all the same bug. State it."
+    options:
+      - text: "The absence of a measurement must stay distinguishable from a measurement — any placeholder that shares a type with real data will eventually be read as real data"
+        correct: true
+        explanation: "It appears once per layer of the stack: in the sensor model, in the mapper, and at the perception/planning interface. That recurrence is why it is worth naming rather than fixing three times."
+      - text: "Sensors are unreliable at maximum range"
+        explanation: "The bug is in how non-detections are represented, not in sensor quality."
+      - text: "Floating-point comparisons need tolerances"
+        explanation: "A margin helps with the noise boundary, but it does not address a deliberate placeholder."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "What do all three bugs in this lab have in common?"
+    options:
+      - text: "Each keeps producing confident, well-formed, internally consistent output after an assumption beneath it stopped holding — nothing crashes and nothing looks wrong"
+        correct: true
+        explanation: "Which is why the probes matter more than the code review: all three are visible in seconds from a well-chosen measurement, and essentially invisible from reading."
+      - text: "They are all numerical precision problems"
+        explanation: "None involves precision at all."
+      - text: "They all require better sensors to fix"
+        explanation: "All three are fixed in software with no hardware change."

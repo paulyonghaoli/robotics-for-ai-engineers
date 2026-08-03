@@ -1,6 +1,6 @@
 # Module 7 · Robotic Perception
 
-**Status:** In progress · **Course III**
+**Status:** Complete · **Course III**
 
 You have spent years turning images into tensors. This module is about the part that comes before and after that: the **geometry** that says which ray of the world a pixel came from, and what to do with the resulting 3D structure once you have it.
 
@@ -13,7 +13,7 @@ That geometry is where the transition from ML to robotics actually bites. A dete
 3. [Point clouds: unordered, metric, and mostly empty](03-point-clouds.md) — **available**
 4. [3D detection: pillars, anchors and NMS](04-3d-detection.md) — **available**
 5. [BEV and fusion: two sensors, one frame, one clock](05-bev-fusion.md) — **available**
-6. Lab: the perception stack that lied — *planned*
+6. [Lab: the perception stack that lied](06-lab-perception-lied.md) — **available**
 
 ## What you'll build
 
