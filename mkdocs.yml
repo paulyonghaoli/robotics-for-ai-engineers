@@ -67,6 +67,7 @@ extra_javascript:
 nav:
   - Home: index.md
   - Curriculum map: curriculum.md
+  - "The frontier (living doc)": frontier.md
   - "Module 0 · From ML to Robotics":
       - Overview: modules/00-transition/index.md
       - "0.1 What changes": modules/00-transition/01-what-changes.md
@@ -103,16 +104,6 @@ nav:
       - "3.6 Lab: catching a lying filter": modules/03-estimation/06-consistency-lab.md
       - "Project: PF localization (autograded)": modules/03-estimation/project-localization.md
   - "Course I exam": course-1-exam.md
-  - "Course II exam": course-2-exam.md
-  - "Module 11 · Deployment, Fleet & Safety":
-      - Overview: modules/11-deployment/index.md
-      - "11.1 Latency budgets": modules/11-deployment/01-latency-budgets.md
-      - "11.2 Edge inference": modules/11-deployment/02-edge-inference.md
-      - "11.3 Rollout and rollback": modules/11-deployment/03-rollout-rollback.md
-      - "11.4 Telemetry and forensics": modules/11-deployment/04-telemetry-forensics.md
-      - "11.5 Safety cases": modules/11-deployment/05-safety-cases.md
-      - "11.6 Lab: the incident": modules/11-deployment/06-lab-the-incident.md
-  - "The frontier (living doc)": frontier.md
   - "Module 4 · Mapping & SLAM":
       - Overview: modules/04-mapping/index.md
       - "4.1 Occupancy grids": modules/04-mapping/01-occupancy-grids.md
@@ -132,9 +123,10 @@ nav:
       - "Mini-project: Planning": modules/05-planning/project-planning.md
   - "Module 6 · ROS 2":
       - Overview: modules/06-ros2/index.md
-  - "Capstone · Autonomous 2D Robot":
+  - "Capstone II · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: thirteen bugs": capstone-log.md
+  - "Course II exam": course-2-exam.md
   - "Module 7 · Robotic Perception":
       - Overview: modules/07-perception/index.md
       - "7.1 Camera models: pixels are rays": modules/07-perception/01-camera-models.md
@@ -144,6 +136,14 @@ nav:
       - "7.5 BEV and fusion": modules/07-perception/05-bev-fusion.md
       - "7.6 Lab: the perception stack that lied": modules/07-perception/06-lab-perception-lied.md
       - "Mini-project: Perception geometry": modules/07-perception/project-perception.md
+  - "Module 8 · Manipulation":
+      - Overview: modules/08-manipulation/index.md
+      - "8.1 Manipulator kinematics": modules/08-manipulation/01-kinematics.md
+      - "8.2 Inverse kinematics": modules/08-manipulation/02-inverse-kinematics.md
+      - "8.3 Grasp synthesis": modules/08-manipulation/03-grasping.md
+      - "8.4 Configuration-space planning": modules/08-manipulation/04-cspace-planning.md
+      - "8.5 Visual servoing": modules/08-manipulation/05-visual-servoing.md
+      - "8.6 Lab: the arm that worked in simulation": modules/08-manipulation/06-lab-arm-in-sim.md
   - "Module 9 · Robot Learning":
       - Overview: modules/09-robot-learning/index.md
       - "9.1 Behavior cloning": modules/09-robot-learning/01-behavior-cloning.md
@@ -153,6 +153,8 @@ nav:
       - "9.5 World models": modules/09-robot-learning/05-world-models.md
       - "9.6 VLA evaluation": modules/09-robot-learning/06-vla-evaluation.md
       - "9.7 Lab: the policy that memorized": modules/09-robot-learning/07-lab-policy-memorized.md
+  - "Capstone III · See It, Grasp It":
+      - Overview: modules/capstone-3/index.md
   - "Module 10 · Evaluation & Data Systems":
       - Overview: modules/10-evaluation/index.md
       - "10.1 Statistical rigor": modules/10-evaluation/01-statistical-rigor.md
@@ -162,15 +164,13 @@ nav:
       - "10.5 Drift monitoring": modules/10-evaluation/05-drift-monitoring.md
       - "10.6 Neural real-to-sim evaluation": modules/10-evaluation/06-neural-real-to-sim.md
       - "10.7 Lab: the benchmark that lied": modules/10-evaluation/07-lab-benchmark-lied.md
-  - "Module 8 · Manipulation":
-      - Overview: modules/08-manipulation/index.md
-      - "8.1 Manipulator kinematics": modules/08-manipulation/01-kinematics.md
-      - "8.2 Inverse kinematics": modules/08-manipulation/02-inverse-kinematics.md
-      - "8.3 Grasp synthesis": modules/08-manipulation/03-grasping.md
-      - "8.4 Configuration-space planning": modules/08-manipulation/04-cspace-planning.md
-      - "8.5 Visual servoing": modules/08-manipulation/05-visual-servoing.md
-      - "8.6 Lab: the arm that worked in simulation": modules/08-manipulation/06-lab-arm-in-sim.md
-  - "Capstone III · See It, Grasp It":
-      - Overview: modules/capstone-3/index.md
+  - "Module 11 · Deployment, Fleet & Safety":
+      - Overview: modules/11-deployment/index.md
+      - "11.1 Latency budgets": modules/11-deployment/01-latency-budgets.md
+      - "11.2 Edge inference": modules/11-deployment/02-edge-inference.md
+      - "11.3 Rollout and rollback": modules/11-deployment/03-rollout-rollback.md
+      - "11.4 Telemetry and forensics": modules/11-deployment/04-telemetry-forensics.md
+      - "11.5 Safety cases": modules/11-deployment/05-safety-cases.md
+      - "11.6 Lab: the incident": modules/11-deployment/06-lab-the-incident.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md
