@@ -1,6 +1,6 @@
 # Capstone IV · Ship a Learned Policy
 
-**Status:** stages 0–4 live at `projects/capstone_ship/`, CI-gated; stage 5 in progress · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
+**Status:** all five stages live at `projects/capstone_ship/`, CI-gated · **Prereqs:** Modules 9, 10, 11 and the [Course II capstone](../capstone/index.md) · **Time:** ~25 h
 
 ---
 
@@ -148,6 +148,20 @@ A **ship / no-ship decision report**. Not a model, not a notebook — a document
 - the conditions under which the decision would change
 
 "No, and here is the specific experiment that would change my mind" is a **passing** report. "Yes" with a point estimate and no interval is not.
+
+`solutions/report.py` generates exactly this document from the four earlier stages — `python solutions/report.py --episodes 32` writes `DECISION.md`. Its sections are the questions somebody actually asks in a review:
+
+| section | question it answers |
+|---|---|
+| Decision | what are we shipping, and on what evidence |
+| What the evidence is, and what it is not | what would this gate have missed |
+| Where it fails | which stratum, not just which number |
+| Is it fixable? | by more data, or only by a different observation |
+| If it shipped anyway | what the monitor would have to carry |
+| **What would change this decision** | the falsifier |
+| What this report does not establish | latency, out-of-distribution, small regressions |
+
+The last two sections are what separate an engineering document from an advocacy one. A recommendation with no stated falsifier is a preference, and a report that does not list what it failed to measure is inviting the reader to assume it measured everything.
 
 ## The rubric
 

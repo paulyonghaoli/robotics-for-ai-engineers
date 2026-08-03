@@ -61,6 +61,9 @@ jobs:
       - name: Capstone II stage 4 (rollout machinery runs)
         run: python solutions/rollout.py --episodes 6
         working-directory: projects/capstone_ship
+      - name: Capstone II stage 5 (decision report generates)
+        run: python solutions/report.py --episodes 8
+        working-directory: projects/capstone_ship
       - name: Capstone III self-check (grasp pipeline passes its rubric)
         run: python -m eval run --episodes 12 --seed 0
         working-directory: projects/capstone_grasp
