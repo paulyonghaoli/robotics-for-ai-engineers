@@ -15,6 +15,7 @@ docs/assets/generated/
 
 # Evaluation outputs
 projects/capstone_nav/results.json
+projects/capstone_ship/suite_results.json
 
 # Notebooks
 .ipynb_checkpoints/
