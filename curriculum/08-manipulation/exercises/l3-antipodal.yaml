@@ -1,0 +1,163 @@
+id: man-l3-antipodal
+title: "Antipodal grasps, and the gripper that only opens 9 cm"
+lesson: modules/08-manipulation/03-grasping
+description: >-
+  Find two-finger grasps on a 2D object outline. A grasp qualifies when the
+  line between the contacts lies inside BOTH friction cones — and when the
+  gripper can physically open that far, which is the constraint that turns a
+  page of sound mechanics into an unexecutable plan if you leave it out.
+setup_code: |
+  import numpy as np
+
+  MU = 0.5                       # friction coefficient -> cone half-angle 26.6 deg
+  W_MIN, W_MAX = 0.02, 0.09      # the gripper's stroke, metres
+
+  def box_outline(w=0.06, h=0.14, n=160):
+      """Contacts sampled around a rectangle, with outward normals."""
+      per = n // 4
+      pts, nrm = [], []
+      for (x0, y0), (x1, y1), nv in (
+              ((-w/2, -h/2), ( w/2, -h/2), (0.0, -1.0)),
+              (( w/2, -h/2), ( w/2,  h/2), (1.0,  0.0)),
+              (( w/2,  h/2), (-w/2,  h/2), (0.0,  1.0)),
+              ((-w/2,  h/2), (-w/2, -h/2), (-1.0, 0.0))):
+          t = np.linspace(0, 1, per, endpoint=False)
+          pts.append(np.stack([x0 + t*(x1-x0), y0 + t*(y1-y0)], axis=1))
+          nrm.append(np.tile(nv, (per, 1)))
+      return np.vstack(pts), np.vstack(nrm)
+
+  def disc_outline(r=0.055, n=160):
+      a = np.linspace(0, 2*np.pi, n, endpoint=False)
+      p = np.stack([r*np.cos(a), r*np.sin(a)], axis=1)
+      return p, p / r
+
+  COM = np.zeros(2)              # centre of mass, at the origin for both shapes
+starter_code: |
+  import numpy as np
+  # Provided: MU, W_MIN, W_MAX, box_outline(), disc_outline(), COM
+
+  def is_antipodal(p1, n1, p2, n2, mu=MU):
+      """True if the grip line lies inside BOTH friction cones.
+
+      g = unit vector from p1 to p2. The contact at p1 pushes along +g and
+      at p2 along -g, so require:
+          angle(g, -n1) <= atan(mu)   and   angle(-g, -n2) <= atan(mu)
+      """
+      # TODO
+      return False
+
+  def grasp_quality(p1, n1, p2, n2, mu=MU, scale=0.05):
+      """Score a candidate. Return 0.0 for anything unusable.
+
+      Zero if not antipodal, and zero if the opening ||p2 - p1|| falls
+      outside [W_MIN, W_MAX] — a grasp the gripper cannot physically make is
+      worth nothing, however good the mechanics look.
+
+      Otherwise:  min(cos theta_1, cos theta_2) * exp(-d_com / scale)
+      where theta_i is each contact's angle inside its cone and d_com is the
+      distance from the grip midpoint to COM.
+      """
+      # TODO
+      return 0.0
+
+  def best_grasp(points, normals, mu=MU):
+      """Return (i, j, score) for the highest-scoring pair, or (None, None, 0.0)."""
+      # TODO
+      return None, None, 0.0
+
+  for name, (P, N) in (("box", box_outline()), ("disc", disc_outline())):
+      i, j, s = best_grasp(P, N)
+      print("%-5s best score %.4f" % (name, s))
+tests: |
+  import numpy as np
+  _P, _N = box_outline()
+
+  # A clean grasp across the narrow faces of the box.
+  _left = np.array([-0.03, 0.0]);  _ln = np.array([-1.0, 0.0])
+  _right = np.array([0.03, 0.0]);  _rn = np.array([1.0, 0.0])
+  assert is_antipodal(_left, _ln, _right, _rn), "directly opposing flat faces must qualify"
+  assert grasp_quality(_left, _ln, _right, _rn) > 0.5, "an ideal centred grasp should score well, got %.3f" % grasp_quality(_left, _ln, _right, _rn)
+
+  # Perpendicular normals cannot be antipodal at mu=0.5.
+  assert not is_antipodal(_left, np.array([0.0, 1.0]), _right, _rn), "a contact whose normal is 90 deg from the grip line is far outside a 26.6 deg cone"
+
+  # The cone boundary: atan(0.5) = 26.57 deg.
+  for _deg, _want in ((20.0, True), (35.0, False)):
+      _a = np.radians(_deg)
+      _n1 = np.array([-np.cos(_a), np.sin(_a)])
+      assert is_antipodal(_left, _n1, _right, _rn) == _want, "at %.0f deg off the grip line the answer should be %s (cone half-angle is %.1f deg)" % (_deg, _want, np.degrees(np.arctan(MU)))
+
+  # THE ONE THAT MATTERS: the gripper's stroke.
+  _far_l = np.array([-0.30, 0.0]); _far_r = np.array([0.30, 0.0])
+  assert is_antipodal(_far_l, _ln, _far_r, _rn), "geometrically this is still a fine antipodal pair"
+  assert grasp_quality(_far_l, _ln, _far_r, _rn) == 0.0, "...but the opening is 0.60 m against a %.2f m maximum stroke, so it must score 0. Mechanically sound and physically unexecutable is still unexecutable." % W_MAX
+  _tiny_l = np.array([-0.005, 0.0]); _tiny_r = np.array([0.005, 0.0])
+  assert grasp_quality(_tiny_l, _ln, _tiny_r, _rn) == 0.0, "an opening below W_MIN must also score 0"
+
+  # Prefer grasps near the centre of mass.
+  _hi_l = np.array([-0.03, 0.06]); _hi_r = np.array([0.03, 0.06])
+  assert grasp_quality(_left, _ln, _right, _rn) > grasp_quality(_hi_l, _ln, _hi_r, _rn), "a centred grasp should outscore one far from the centre of mass"
+
+  # best_grasp finds something usable on the box.
+  _i, _j, _s = best_grasp(_P, _N)
+  assert _i is not None and _s > 0.4, "should find a good grasp on a box, got score %.3f" % _s
+  _w = np.linalg.norm(_P[_j] - _P[_i])
+  assert W_MIN <= _w <= W_MAX, "the winning grasp has an opening of %.3f m, outside the gripper's stroke" % _w
+  assert is_antipodal(_P[_i], _N[_i], _P[_j], _N[_j]), "the winning grasp must itself be antipodal"
+
+  # A disc of radius 0.055 is 0.110 m across — wider than the stroke — so
+  # every diametric grasp is unreachable and the planner must say so.
+  _dP, _dN = disc_outline()
+  _di, _dj, _ds = best_grasp(_dP, _dN)
+  assert _ds == 0.0, "the disc is 0.110 m across against a %.2f m stroke, so no grasp qualifies; got score %.3f" % (W_MAX, _ds)
+hints:
+  - "is_antipodal: build `g = (p2 - p1) / norm(p2 - p1)`, then compare `np.dot(g, -n1)` and `np.dot(-g, -n2)` against `cos(atan(mu))`. Both must clear it."
+  - "grasp_quality: return 0.0 early for the two rejection cases before computing anything else. The cosines you already computed in is_antipodal are the theta terms."
+  - "best_grasp: a double loop over pairs is fine at this size. Track the best score and its indices, and return (None, None, 0.0) when nothing qualifies — which is the correct answer for the disc."
+solution: |
+  import numpy as np
+
+  def _cosines(p1, n1, p2, n2):
+      d = np.asarray(p2, dtype=float) - np.asarray(p1, dtype=float)
+      w = float(np.linalg.norm(d))
+      if w < 1e-12:
+          return None, None, 0.0
+      g = d / w
+      # The contact at p1 pushes along +g, at p2 along -g; each must lie
+      # inside its own friction cone about the inward normal.
+      return float(np.dot(g, -np.asarray(n1))), float(np.dot(-g, -np.asarray(n2))), w
+
+  def is_antipodal(p1, n1, p2, n2, mu=MU):
+      c1, c2, w = _cosines(p1, n1, p2, n2)
+      if c1 is None:
+          return False
+      lim = np.cos(np.arctan(mu))
+      return bool(c1 >= lim and c2 >= lim)
+
+  def grasp_quality(p1, n1, p2, n2, mu=MU, scale=0.05):
+      c1, c2, w = _cosines(p1, n1, p2, n2)
+      if c1 is None:
+          return 0.0
+      lim = np.cos(np.arctan(mu))
+      if c1 < lim or c2 < lim:
+          return 0.0
+      # The constraint that turns sound mechanics into an executable plan.
+      if not (W_MIN <= w <= W_MAX):
+          return 0.0
+      mid = 0.5 * (np.asarray(p1, dtype=float) + np.asarray(p2, dtype=float))
+      d_com = float(np.linalg.norm(mid - COM))
+      return float(min(c1, c2) * np.exp(-d_com / scale))
+
+  def best_grasp(points, normals, mu=MU):
+      best = (None, None, 0.0)
+      n = len(points)
+      for i in range(n):
+          for j in range(i + 1, n):
+              s = grasp_quality(points[i], normals[i], points[j], normals[j], mu)
+              if s > best[2]:
+                  best = (i, j, s)
+      return best
+
+  for name, (P, N) in (("box", box_outline()), ("disc", disc_outline())):
+      i, j, s = best_grasp(P, N)
+      print("%-5s best score %.4f" % (name, s))

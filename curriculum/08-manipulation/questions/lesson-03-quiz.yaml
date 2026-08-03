@@ -1,0 +1,83 @@
+id: man-l3-quiz
+title: "Quiz — grasp synthesis"
+lesson: modules/08-manipulation/03-grasping
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What does 'force closure' claim about a grasp?"
+    options:
+      - text: "That for any disturbance the task might apply, the contacts can generate an opposing wrench — not merely that the fingers are touching"
+        correct: true
+        explanation: "It is the property that separates holding something from resting against it, and it is what an antipodal test approximates for two fingers."
+      - text: "That the fingers apply equal and opposite forces"
+        explanation: "Necessary but nowhere near sufficient — the directions must lie inside the friction cones."
+      - text: "That the object cannot rotate"
+        explanation: "Resisting rotation is part of it, and the claim is about arbitrary wrenches rather than rotation alone."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A contact has friction coefficient μ = 0.5. What is the friction cone's half-angle, in degrees?"
+    answer: 26.6
+    tolerance: 0.5
+    explanation: "atan(0.5) ≈ 26.6°. A much tighter budget than intuition suggests, and the reason smooth curved surfaces are genuinely hard rather than merely awkward."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your grasp planner returns mechanically perfect antipodal pairs and the robot fails on nearly all of them. What is the most likely omission?"
+    options:
+      - text: "The gripper's stroke — candidates whose opening falls outside [w_min, w_max] are physically unexecutable no matter how sound the mechanics"
+        correct: true
+        explanation: "The most common way a grasp pipeline wastes a week. In the exercise it is what makes every diametric grasp on a 0.11 m disc worthless to a 0.09 m gripper."
+      - text: "The friction coefficient is too low"
+        explanation: "That would reject candidates, not produce unexecutable ones."
+      - text: "The object segmentation is wrong"
+        explanation: "Possible, but it would not produce *mechanically perfect* candidates."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A learned grasp scorer keeps choosing the smooth curved side of a mug. What is the diagnosis?"
+    options:
+      - text: "It is optimising something that does not encode friction cones — a missing constraint, which more data does not supply"
+        correct: true
+        explanation: "The response is not more training but a mechanical filter downstream of the scorer: generate candidates however you like, then verify them against the physics."
+      - text: "It is undertrained and needs more examples of mugs"
+        explanation: "More examples of a constraint the model has no way to represent will not teach it the constraint."
+      - text: "The depth sensor is failing on the curved surface"
+        explanation: "A real possibility on shiny mugs, and a different failure with a different signature."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why penalise grasps far from the object's centre of mass, even when they pass the antipodal test?"
+    options:
+      - text: "The grasp holds but the object rotates in the fingers under its own weight, which presents as slipping"
+        correct: true
+        explanation: "Force closure at the contacts says nothing about the moment the object's weight applies about the grip line."
+      - text: "They are harder to reach"
+        explanation: "Sometimes true and unrelated to the mechanics."
+      - text: "They violate the friction cone"
+        explanation: "They can satisfy it perfectly and still let the object swing."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Sweeping μ from 0.1 to 0.8, the count of qualifying grasps rises sharply for a box and barely moves for a cylinder. Why?"
+    options:
+      - text: "On a box, opposing faces have exactly anti-parallel normals, so widening the cone admits many nearby pairs; on a cylinder only the true diameter is ever anti-parallel, and friction cannot manufacture more"
+        correct: true
+        explanation: "Which is the quantitative case for enveloping grasps or suction on round objects, rather than a better two-finger planner."
+      - text: "Cylinders have fewer sampled contact points"
+        explanation: "The sampling density is the same; it is the normal geometry that differs."
+      - text: "Friction does not apply to curved surfaces"
+        explanation: "It applies identically; there are simply far fewer anti-parallel pairs to help."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Why should published friction coefficients be treated as optimistic?"
+    options:
+      - text: "They are measured on clean, dry, specific material pairs — real surfaces are contaminated, so the margin inside the cone is your safety factor"
+        correct: true
+        explanation: "Assume less friction than you measured. The cost of being conservative is rejecting some viable grasps; the cost of being optimistic is dropping the object."
+      - text: "Friction coefficients are not measurable"
+        explanation: "They are, under controlled conditions — which is exactly the caveat."
+      - text: "They only apply to static contact"
+        explanation: "Static versus kinetic is a real distinction and not the main practical gap."

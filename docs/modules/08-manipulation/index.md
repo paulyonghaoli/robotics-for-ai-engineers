@@ -12,7 +12,7 @@ The payoff is that manipulation is where robotics stops being navigation. Graspi
 
 1. [Manipulator kinematics: from joints to a pose](01-kinematics.md) — **available**
 2. [Inverse kinematics and the singularities that eat it](02-inverse-kinematics.md) — **available**
-3. Grasp synthesis — *planned*
+3. [Grasp synthesis: where to put the fingers](03-grasping.md) — **available**
 4. Configuration-space planning — *planned*
 5. Visual servoing — *planned*
 6. Lab: the arm that worked in simulation — *planned*
