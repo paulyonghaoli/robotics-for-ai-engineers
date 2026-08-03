@@ -1,0 +1,88 @@
+id: man-l5-quiz
+title: "Quiz — visual servoing"
+lesson: modules/08-manipulation/05-visual-servoing
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What is the central advantage of driving image error to zero instead of pose error?"
+    options:
+      - text: "You no longer need the object's pose to be right — calibration, depth and hand-eye errors become disturbances the loop rejects rather than biases it inherits"
+        correct: true
+        explanation: "The same trade as closed-loop estimation generally: measure what you can actually observe and let feedback absorb the modelling error."
+      - text: "It is computationally cheaper"
+        explanation: "Comparable, and not the reason anyone chooses it."
+      - text: "It guarantees a straight-line path in the world"
+        explanation: "The opposite — IBVS world trajectories can be distinctly strange."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Depth appears in the interaction matrix. Where exactly, and why does that matter?"
+    options:
+      - text: "Only in the translation columns — so a wrong Z rescales part of the step rather than misdirecting it, and the loop still points downhill"
+        correct: true
+        explanation: "The rotation columns contain no Z at all. That structural fact is the whole reason IBVS tolerates a rough depth estimate."
+      - text: "In every column, so any depth error corrupts the whole step"
+        explanation: "Check the matrix: the last three columns have no Z in them."
+      - text: "Only in the rotation columns"
+        explanation: "Reversed."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Which direction of depth error is dangerous, and why?"
+    options:
+      - text: "Overestimating — it makes the translation columns too small, and inverting them amplifies the effective gain until the loop oscillates and stalls"
+        correct: true
+        explanation: "Underestimating shrinks the commanded translation, which is merely conservative. Measured: at gain 0.5, 3× over converges, 8× over stalls, and 5× *under* converges cleanly."
+      - text: "Underestimating — it makes the loop too slow to converge"
+        explanation: "Slow is safe. It still gets there."
+      - text: "Both are equally damaging"
+        explanation: "The asymmetry is the practical point of the lesson."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "An 8× depth overestimate stalls at gain 0.5 and converges perfectly at gain 0.2. What does that tell you?"
+    options:
+      - text: "It is the product of gain and depth error that must stay in the stable region, so the two cannot be tuned independently"
+        correct: true
+        explanation: "And the practical corollary: if you are unsure of Z, guess low, because a low guess costs speed while a high one costs stability."
+      - text: "The gain was simply too high to begin with"
+        explanation: "It was well tuned at the true depth — 0.5 converges monotonically there."
+      - text: "The depth estimate is irrelevant once the gain is low enough"
+        explanation: "Lowering the gain buys margin; it does not make the estimate free."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "IBVS is given a target rotated 180° about the optical axis and the camera retreats toward infinity. Is this an implementation bug?"
+    options:
+      - text: "No — the image error genuinely decreases along that trajectory. It shows that minimising image error and moving sensibly are different objectives"
+        correct: true
+        explanation: "The classic camera-retreat pathology, and the reason partitioned and hybrid schemes exist."
+      - text: "Yes, the interaction matrix sign is wrong"
+        explanation: "A sign error diverges immediately rather than executing a coherent, absurd trajectory."
+      - text: "Yes, the gain is too high"
+        explanation: "Lowering it makes the camera retreat more slowly."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "L is (2N, 6) with four features, so 8×6. Which damped pseudo-inverse is correct?"
+    options:
+      - text: "The left inverse, inv(LᵀL + λ²I) Lᵀ — L is tall, so LLᵀ is 8×8 and rank-deficient"
+        correct: true
+        explanation: "Using the right-inverse form on a tall matrix gives a singular system. The same trap appears wherever damped least squares is reused without checking the shape."
+      - text: "The right inverse, Lᵀ inv(LLᵀ + λ²I)"
+        explanation: "That is the form for a wide matrix — correct for the arm Jacobian in 8.1, wrong here."
+      - text: "Either; damping makes both well conditioned"
+        explanation: "Damping regularises, but the 8×8 product is still the wrong object to invert."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "What is the sensible division of labour between learning and classical control here?"
+    options:
+      - text: "Learn the features — which points to track and which stay stable under lighting and viewpoint — and keep the analytic control law"
+        correct: true
+        explanation: "Learning is strong at perception and the physics of the control law is already known exactly. Feature tracking is the hard part in practice; the control law is twenty lines."
+      - text: "Regress camera velocity end-to-end and discard the interaction matrix"
+        explanation: "It works, and it throws away a known-exact inductive bias for no gain."
+      - text: "Keep both classical; learning has no role"
+        explanation: "Reliable feature tracking across appearance change is exactly where learning earns its keep."

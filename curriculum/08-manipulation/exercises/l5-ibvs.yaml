@@ -1,0 +1,171 @@
+id: man-l5-ibvs
+title: "IBVS, and which direction of depth error is safe"
+lesson: modules/08-manipulation/05-visual-servoing
+description: >-
+  Build the interaction matrix and the image-based control law, then measure
+  how much depth error the loop tolerates. The answer is asymmetric and worth
+  knowing: **underestimating Z is always safe, overestimating it is not.**
+  Depth enters only the translation columns, so an overestimate makes those
+  entries too small — and inverting a too-small matrix amplifies the
+  effective gain until the loop oscillates and stalls.
+setup_code: |
+  import numpy as np
+
+  # A 4-point target in the camera frame (a square, 1.2 m in front).
+  TARGET_3D = np.array([[-0.10, -0.10, 1.20],
+                        [ 0.10, -0.10, 1.20],
+                        [ 0.10,  0.10, 1.20],
+                        [-0.10,  0.10, 1.20]])
+
+  def project(points_cam):
+      """Camera-frame points -> normalized image coords (x, y) = (X/Z, Y/Z)."""
+      p = np.atleast_2d(np.asarray(points_cam, dtype=float))
+      return np.stack([p[:, 0] / p[:, 2], p[:, 1] / p[:, 2]], axis=1)
+
+  def move_points(points_cam, v, dt=1.0):
+      """Apply a camera velocity for dt and return the points in the NEW
+      camera frame. v = (vx, vy, vz, wx, wy, wz)."""
+      p = np.atleast_2d(np.asarray(points_cam, dtype=float))
+      w = np.asarray(v[3:], dtype=float) * dt
+      th = float(np.linalg.norm(w))
+      if th < 1e-12:
+          R = np.eye(3)
+      else:
+          k = w / th
+          K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+          R = np.eye(3) + np.sin(th) * K + (1 - np.cos(th)) * (K @ K)
+      # Points move opposite to the camera.
+      return (p - np.asarray(v[:3], dtype=float) * dt) @ R
+starter_code: |
+  import numpy as np
+  # Provided: TARGET_3D, project(points_cam), move_points(points_cam, v, dt)
+
+  def interaction_matrix(features, depths):
+      """(N,2) normalized features + (N,) depths -> (2N, 6) interaction matrix.
+
+      For one feature (x, y) at depth Z, the 2x6 block is
+
+          [ -1/Z,    0,  x/Z,     x*y,  -(1+x*x),   y ]
+          [    0, -1/Z,  y/Z,  1+y*y,      -x*y,   -x ]
+
+      Stack the blocks vertically, one pair of rows per feature.
+      """
+      # TODO
+      return np.zeros((2 * len(features), 6))
+
+  def ibvs_step(features, target_features, depths, gain=0.5, damping=0.01):
+      """One control step. Return the camera velocity (6,).
+
+          v = -gain * L^+ (s - s*)
+      with L^+ the damped pseudo-inverse: L.T @ inv(L L.T + damping^2 I) is
+      wrong here because L is tall — use  inv(L.T L + damping^2 I) @ L.T.
+      """
+      # TODO
+      return np.zeros(6)
+
+  def servo(depth_guess_scale=1.0, steps=300, gain=0.5):
+      """Run the loop from a displaced start and return the error history.
+
+      `depth_guess_scale` multiplies the TRUE depth before it is handed to
+      the controller: 1.0 is perfect knowledge, 5.0 is a 5x overestimate.
+      """
+      target = project(TARGET_3D)
+      pts = move_points(TARGET_3D, np.array([0.25, -0.15, -0.30, 0.0, 0.0, 0.25]))
+      hist = []
+      for _ in range(steps):
+          s = project(pts)
+          hist.append(float(np.linalg.norm(s - target)))
+          v = ibvs_step(s, target, pts[:, 2] * depth_guess_scale, gain)
+          pts = move_points(pts, v, dt=1.0)
+      hist.append(float(np.linalg.norm(project(pts) - target)))
+      return np.array(hist)
+
+  for scale in (0.2, 1.0, 3.0, 8.0):
+      h = servo(scale)
+      print("depth x%.1f  error %.4f -> %.2e   %s"
+            % (scale, h[0], h[-1], "converged" if h[-1] < 1e-3 else "STALLED"))
+tests: |
+  import numpy as np
+  # Shape and structure of the interaction matrix.
+  _f = np.array([[0.1, -0.2], [0.0, 0.0]])
+  _z = np.array([1.5, 2.0])
+  _L = np.asarray(interaction_matrix(_f, _z))
+  assert _L.shape == (4, 6), "expected (2N, 6) = (4, 6), got %s" % str(_L.shape)
+  # The centre feature at (0,0), depth 2.0: row pair is fully determined.
+  assert np.allclose(_L[2], [-1/2.0, 0.0, 0.0, 0.0, -1.0, 0.0], atol=1e-12), "row for the centred feature is wrong: %s" % np.round(_L[2], 4)
+  assert np.allclose(_L[3], [0.0, -1/2.0, 0.0, 1.0, 0.0, 0.0], atol=1e-12), "second row for the centred feature is wrong: %s" % np.round(_L[3], 4)
+  # Depth only enters the translation columns.
+  _L2 = np.asarray(interaction_matrix(_f, _z * 3.0))
+  assert np.allclose(_L2[:, 3:], _L[:, 3:], atol=1e-12), "the rotation columns must not depend on depth"
+  assert not np.allclose(_L2[:, :3], _L[:, :3]), "the translation columns must scale with 1/Z"
+
+  # With perfect depth the loop converges.
+  _h = servo(1.0)
+  assert _h[-1] < 1e-3, "with the true depth the feature error should go to ~0, ended at %.5f" % _h[-1]
+  assert _h[-1] < 0.01 * _h[0], "error should fall by orders of magnitude, %.4f -> %.5f" % (_h[0], _h[-1])
+  assert np.all(np.diff(_h) <= 1e-9), "the error should decrease monotonically with a well-chosen gain"
+
+  # Underestimating Z is safe: it shrinks the commanded translation, so the
+  # loop is merely conservative.
+  for _scale in (0.1, 0.2, 0.5):
+      _hw = servo(_scale)
+      assert _hw[-1] < 1e-3, "underestimating depth by %.1fx should still converge cleanly, ended at %.2e" % (1/_scale, _hw[-1])
+
+  # Moderate overestimates are fine too.
+  for _scale in (2.0, 3.0):
+      _hw = servo(_scale)
+      assert _hw[-1] < 1e-3, "a %.1fx depth overestimate should still converge, ended at %.2e" % (_scale, _hw[-1])
+
+  # THE ASYMMETRY: a large overestimate destabilises the loop at this gain,
+  # because depth enters only the translation columns and inverting a
+  # too-small L amplifies the effective gain.
+  _big = servo(8.0)
+  assert _big[-1] > 1e-2, "an 8x depth OVERestimate should fail to converge at gain 0.5 — if it converges, the depth is not reaching the translation columns"
+
+  # ...and reducing the gain by the same factor restores it. It is the
+  # PRODUCT of gain and depth error that has to stay in the stable region.
+  _fixed = servo(8.0, steps=1200, gain=0.2)
+  assert _fixed[-1] < 1e-3, "the same 8x overestimate must converge once the gain is lowered (%.2e) — that is the fix, and it is why the two parameters cannot be tuned independently" % _fixed[-1]
+hints:
+  - "interaction_matrix: loop over features, build the 2x6 block from x, y and Z exactly as written, and `np.vstack` the blocks."
+  - "L is (2N, 6) with 2N > 6, so it is TALL. The damped left inverse is `inv(L.T @ L + damping**2 * np.eye(6)) @ L.T` — using the right-inverse form on a tall matrix gives a singular system."
+  - "The error vector is `(features - target_features).ravel()`, flattened in the same order the matrix rows were stacked. Getting that order wrong mixes x and y equations and the loop diverges immediately."
+solution: |
+  import numpy as np
+
+  def interaction_matrix(features, depths):
+      f = np.atleast_2d(np.asarray(features, dtype=float))
+      Z = np.asarray(depths, dtype=float)
+      rows = []
+      for (x, y), z in zip(f, Z, strict=True):
+          rows.append([-1.0 / z, 0.0, x / z, x * y, -(1.0 + x * x), y])
+          rows.append([0.0, -1.0 / z, y / z, 1.0 + y * y, -x * y, -x])
+      return np.array(rows)
+
+  def ibvs_step(features, target_features, depths, gain=0.5, damping=0.01):
+      L = interaction_matrix(features, depths)
+      e = (np.asarray(features, dtype=float)
+           - np.asarray(target_features, dtype=float)).ravel()
+      # L is tall (2N x 6), so the damped LEFT inverse is the right one.
+      Lp = np.linalg.inv(L.T @ L + (damping ** 2) * np.eye(6)) @ L.T
+      return -gain * (Lp @ e)
+
+  def servo(depth_guess_scale=1.0, steps=300, gain=0.5):
+      target = project(TARGET_3D)
+      pts = move_points(TARGET_3D, np.array([0.25, -0.15, -0.30, 0.0, 0.0, 0.25]))
+      hist = []
+      for _ in range(steps):
+          s = project(pts)
+          hist.append(float(np.linalg.norm(s - target)))
+          # The controller is handed a deliberately wrong depth. Because Z
+          # only enters the translation columns, the step is scaled rather
+          # than misdirected — so it still points downhill.
+          v = ibvs_step(s, target, pts[:, 2] * depth_guess_scale, gain)
+          pts = move_points(pts, v, dt=1.0)
+      hist.append(float(np.linalg.norm(project(pts) - target)))
+      return np.array(hist)
+
+  for scale in (0.2, 1.0, 3.0, 8.0):
+      h = servo(scale)
+      print("depth x%.1f  error %.4f -> %.2e   %s"
+            % (scale, h[0], h[-1], "converged" if h[-1] < 1e-3 else "STALLED"))
