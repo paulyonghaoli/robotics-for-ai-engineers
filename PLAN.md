@@ -274,7 +274,7 @@ interesting material.
 |---|---|---|
 | **A — Close Courses I–II** | Module 2 lab + mini-project; Module 4 mini-project; Module 5 mini-project; Module 0 lab. Every Course I–II module has all four rungs | Each of Modules 0–5 has lessons, quiz bank, exercises, a lab and a graded mini-project; all gates green |
 | **B — Polish Courses I–II** | Consistency pass: lesson-schema drift, cross-links, exam coverage against the new projects, stale claims | A reader can complete Courses I–II end to end with no dead ends |
-| **C — Course III** | Modules 7 and 8 (lessons, banks, exercises, labs, mini-projects); Module 9 mini-project; Capstone III | Course III complete, capstone CI-gated on a published rubric |
+| **C — Course III** ✅ **COMPLETE 2026-08-03** | Module 7 (6 lessons, lab, mini-project), Module 8 (6 lessons, lab), Capstone III (`projects/capstone_grasp/`, 30/30, CI-gated). Remaining optional: Module 9 mini-project | Course III complete, capstone CI-gated on a published rubric — **met** |
 | **D — Course IV** | Modules 12 and 13 (13 = C++ parity track + GPU performance model); mini-projects for 10 and 11; Capstone IV stages 2–5; rename Capstone II→IV | Course IV complete; four courses, four capstones |
 
 Deferred and explicitly not blocking: Module 6 (ROS 2) content, capstone v5
