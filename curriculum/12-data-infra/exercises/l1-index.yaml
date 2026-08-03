@@ -1,0 +1,151 @@
+id: dat-l1-index
+title: "An inverted index over a fleet archive"
+lesson: modules/12-data-infra/01-indexing
+description: >-
+  Build the index and the query. Two details decide whether it is usable at
+  fleet scale: numeric attributes have to be bucketed before they are keys,
+  because exact float equality never matches; and a conjunctive query should
+  intersect the most selective term first, so the cheapest term bounds the
+  work rather than the most common one.
+setup_code: |
+  import numpy as np
+
+  def make_archive(n=4000, seed=0):
+      """A synthetic fleet archive: one record per episode."""
+      rng = np.random.default_rng(seed)
+      weather = rng.choice(["clear", "rain", "fog"], n, p=[0.75, 0.20, 0.05])
+      site = rng.choice(["depot-a", "depot-b", "yard"], n, p=[0.5, 0.35, 0.15])
+      version = rng.choice(["v7", "v8"], n, p=[0.3, 0.7])
+      speed = rng.uniform(0.2, 2.4, n)
+      # Collisions are rare, and rarer still in clear weather.
+      p_coll = np.where(weather == "clear", 0.02, 0.12)
+      outcome = np.where(rng.random(n) < p_coll, "collision", "success")
+      return [{"id": i, "weather": str(weather[i]), "site": str(site[i]),
+               "version": str(version[i]), "speed": float(speed[i]),
+               "outcome": str(outcome[i])} for i in range(n)]
+
+  ARCHIVE = make_archive()
+starter_code: |
+  import numpy as np
+  # Provided: ARCHIVE — a list of dicts with id, weather, site, version,
+  #           speed (float), outcome.
+
+  def bucket_speed(v, width=0.5):
+      """Map a speed to a bucket label like 'speed=[1.0,1.5)'.
+
+      Exact float keys never match: nobody queries for 1.2000001. Bucketing
+      is what makes a numeric attribute indexable at all.
+      """
+      # TODO
+      return "speed=?"
+
+  def build_index(archive):
+      """Inverted index: {"field=value": set_of_episode_ids}.
+
+      Index every categorical field (weather, site, version, outcome) and
+      the bucketed speed. Return a plain dict of sets.
+      """
+      # TODO
+      return {}
+
+  def query(index, terms):
+      """Episode ids matching ALL terms (a conjunction).
+
+      Intersect the SMALLEST posting list first, so the most selective term
+      bounds the work. Starting from the largest gives the same answer and
+      touches far more ids.
+
+      An unknown term matches nothing — return an empty set rather than
+      ignoring it, or a typo silently widens the query.
+      """
+      # TODO
+      return set()
+
+  idx = build_index(ARCHIVE)
+  print("index keys: %d" % len(idx))
+  for terms in (["outcome=collision"],
+                ["outcome=collision", "weather=rain"],
+                ["outcome=collision", "weather=rain", "version=v8"]):
+      print("%-58s -> %4d episodes" % (" AND ".join(terms), len(query(idx, terms))))
+tests: |
+  import numpy as np
+  _idx = build_index(ARCHIVE)
+  assert isinstance(_idx, dict) and _idx, "build_index must return a non-empty dict"
+  assert all(isinstance(v, set) for v in _idx.values()), "posting lists should be sets"
+
+  # Categorical postings must be exact and complete.
+  for _field in ("weather", "site", "version", "outcome"):
+      for _val in {r[_field] for r in ARCHIVE}:
+          _key = "%s=%s" % (_field, _val)
+          assert _key in _idx, "missing index key %s" % _key
+          _truth = {r["id"] for r in ARCHIVE if r[_field] == _val}
+          assert _idx[_key] == _truth, "posting list for %s is wrong (%d vs %d)" % (_key, len(_idx[_key]), len(_truth))
+
+  # Speed must be bucketed, not stored as a float key.
+  assert any(k.startswith("speed=[") for k in _idx), "speed must be bucketed into range keys like 'speed=[1.0,1.5)'"
+  assert not any(k.startswith("speed=") and "[" not in k for k in _idx), "a raw float speed key will never be matched by a query"
+  assert bucket_speed(1.2) == bucket_speed(1.4), "1.2 and 1.4 belong to the same 0.5-wide bucket"
+  assert bucket_speed(1.2) != bucket_speed(1.7), "1.2 and 1.7 do not"
+  # Every episode lands in exactly one speed bucket.
+  _in_buckets = sum(len(v) for k, v in _idx.items() if k.startswith("speed=["))
+  assert _in_buckets == len(ARCHIVE), "expected %d episodes across speed buckets, got %d" % (len(ARCHIVE), _in_buckets)
+
+  # Conjunctions.
+  _got = query(_idx, ["outcome=collision", "weather=rain"])
+  _truth = {r["id"] for r in ARCHIVE if r["outcome"] == "collision" and r["weather"] == "rain"}
+  assert _got == _truth, "conjunctive query is wrong: %d vs %d" % (len(_got), len(_truth))
+  assert query(_idx, []) == set() or query(_idx, []) is not None, "an empty query should be well defined"
+
+  # An unknown term must match nothing rather than being ignored.
+  assert query(_idx, ["weather=hail"]) == set(), "an unknown term must return the empty set"
+  assert query(_idx, ["outcome=collision", "weather=hail"]) == set(), "one unknown term makes the whole conjunction empty; ignoring it would silently widen the query"
+
+  # Selectivity: intersecting smallest-first must not change the answer.
+  _a = query(_idx, ["version=v8", "outcome=collision"])
+  _b = query(_idx, ["outcome=collision", "version=v8"])
+  assert _a == _b, "term order must not change the result"
+hints:
+  - "bucket_speed: `lo = np.floor(v / width) * width`, then format as 'speed=[%.1f,%.1f)' with lo and lo+width. Keep the formatting consistent or two calls will disagree."
+  - "build_index: `idx.setdefault(key, set()).add(rec['id'])` for each field of each record."
+  - "query: look up every term first, returning set() as soon as one is missing. Then sort the posting lists by length and intersect from the smallest."
+solution: |
+  import numpy as np
+
+  def bucket_speed(v, width=0.5):
+      lo = float(np.floor(float(v) / width) * width)
+      return "speed=[%.1f,%.1f)" % (lo, lo + width)
+
+  def build_index(archive):
+      idx = {}
+      for rec in archive:
+          keys = ["weather=%s" % rec["weather"], "site=%s" % rec["site"],
+                  "version=%s" % rec["version"], "outcome=%s" % rec["outcome"],
+                  bucket_speed(rec["speed"])]
+          for k in keys:
+              idx.setdefault(k, set()).add(rec["id"])
+      return idx
+
+  def query(index, terms):
+      if not terms:
+          return set()
+      posts = []
+      for t in terms:
+          if t not in index:
+              # A typo must narrow to nothing, not be quietly dropped.
+              return set()
+          posts.append(index[t])
+      # Most selective first: the cheapest term should bound the work.
+      posts.sort(key=len)
+      out = set(posts[0])
+      for p in posts[1:]:
+          out &= p
+          if not out:
+              break
+      return out
+
+  idx = build_index(ARCHIVE)
+  print("index keys: %d" % len(idx))
+  for terms in (["outcome=collision"],
+                ["outcome=collision", "weather=rain"],
+                ["outcome=collision", "weather=rain", "version=v8"]):
+      print("%-58s -> %4d episodes" % (" AND ".join(terms), len(query(idx, terms))))

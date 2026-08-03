@@ -1,0 +1,88 @@
+id: dat-l1-quiz
+title: "Quiz — indexing a fleet archive"
+lesson: modules/12-data-infra/01-indexing
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Somebody asks for every episode where the robot yielded to a pedestrian approaching from the left, and pedestrian bearing was never recorded. What is the answer?"
+    options:
+      - text: "The question is unanswerable, and no amount of compute changes that — recall is bounded by the schema, not the retrieval"
+        correct: true
+        explanation: "The dangerous part is that the query still returns a result set, and nothing in it says the number is a floor rather than an answer."
+      - text: "Scan the raw logs; it will be slow but it will work"
+        explanation: "Only if the raw logs contain the attribute. If nobody recorded bearing, it is not recoverable from anywhere."
+      - text: "Build a better index"
+        explanation: "An index cannot contain information the source data lacks."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Which of the three storage layers is the one you cannot fix later, and what follows from that?"
+    options:
+      - text: "The raw data — indexes and derived features are rebuildable, so the real design question is what raw must contain to make tomorrow's index possible"
+        correct: true
+        explanation: "Indexes are megabytes and cheap to add. Raw is terabytes and, once it is missing an attribute, permanently missing it."
+      - text: "The index, because rebuilding it is expensive"
+        explanation: "Rebuilding an index is usually seconds to minutes."
+      - text: "The derived features, because reprocessing costs money"
+        explanation: "Expensive but possible — that is the key difference from raw."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Why must numeric attributes be bucketed before being used as index keys?"
+    options:
+      - text: "Exact float keys never match — nobody queries for speed = 1.2000001, so the posting list is unreachable"
+        correct: true
+        explanation: "Bucketing turns a continuous attribute into a finite set of keys that a query can actually name."
+      - text: "To save space"
+        explanation: "It does, and that is not the reason it is necessary."
+      - text: "Floats cannot be dictionary keys"
+        explanation: "They can; they are simply useless as query terms."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A conjunctive query has three terms with posting lists of 200,000, 5,000 and 60 ids. Which do you intersect first, and why does it matter?"
+    options:
+      - text: "The 60 — the most selective term bounds the work, and starting from the largest gives the same answer while touching thousands of times more ids"
+        correct: true
+        explanation: "Correctness is unaffected and cost is not. It is the single cheapest optimisation in a query engine."
+      - text: "The 200,000, to establish the candidate set"
+        explanation: "That is the expensive order for an identical result."
+      - text: "Order does not affect performance for set intersection"
+        explanation: "Intersection cost scales with the smaller operand, so starting small keeps every subsequent step small."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Your archive is indexed on message receipt time. What breaks, and for which episodes?"
+    options:
+      - text: "Delayed uploads land in the wrong day — and it bites hardest for robots with connectivity problems, which are exactly the episodes you most want to find"
+        correct: true
+        explanation: "Sensor capture time, receipt time, monotonic clock and wall clock all differ. Index on when the thing happened, not when you heard about it."
+      - text: "Nothing, provided clocks are synchronised"
+        explanation: "Clock sync does not address upload delay, which can be hours."
+      - text: "Only episodes near midnight"
+        explanation: "Those are the most visible cases, not the only ones."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "What belongs in an episode's key beyond the sensor data, and why is it usually missing?"
+    options:
+      - text: "Software version, calibration id, hardware revision — the machine's own configuration. It is missing because nobody needs it until an incident makes it essential"
+        correct: true
+        explanation: "An episode without them is barely interpretable and not reproducible. It is also the cheapest thing in the whole schema to record."
+      - text: "Nothing — sensor data is self-describing"
+        explanation: "The same sensor stream means different things under different calibrations."
+      - text: "The operator's name, for accountability"
+        explanation: "A blameless-postmortem culture has better uses for that field."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "What is a query log worth, and why?"
+    options:
+      - text: "It is the specification for next quarter's schema — the questions people actually ask, collected for free"
+        correct: true
+        explanation: "Especially the queries that returned nothing. Those are the attributes you should have been recording, named by the people who needed them."
+      - text: "Little; it mostly captures typos"
+        explanation: "The failed queries are the most informative part of it."
+      - text: "It is useful for capacity planning only"
+        explanation: "That too, and it undersells the design signal."

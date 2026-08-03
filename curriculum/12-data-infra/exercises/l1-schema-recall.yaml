@@ -1,0 +1,161 @@
+id: dat-l1-schema-recall
+title: "The question the archive cannot answer"
+lesson: modules/12-data-infra/01-indexing
+description: >-
+  **The request:** *"pull every episode where we yielded to a pedestrian
+  approaching from the left."*
+
+  The index is correct, the query engine is correct, and the answer is
+  wrong — because recall is bounded by the schema, not by the retrieval.
+  Measure the gap honestly, then make the archive able to answer.
+setup_code: |
+  import numpy as np
+
+  def make_episodes(n=1500, seed=0):
+      """Episodes with FULL ground truth. The archive only keeps some of it."""
+      rng = np.random.default_rng(seed)
+      eps = []
+      for i in range(n):
+          has_ped = bool(rng.random() < 0.25)
+          eps.append({
+              "id": i,
+              "weather": str(rng.choice(["clear", "rain"], p=[0.8, 0.2])),
+              "version": str(rng.choice(["v7", "v8"], p=[0.3, 0.7])),
+              "outcome": "success",
+              # Ground truth the raw log CONTAINS but the schema ignores:
+              "ped_present": has_ped,
+              "ped_from_left": bool(has_ped and rng.random() < 0.45),
+              "yielded": bool(has_ped and rng.random() < 0.70),
+          })
+      return eps
+
+  EPISODES = make_episodes()
+
+  # What the archive schema actually stores. Note what is missing.
+  SCHEMA_V1 = ("weather", "version", "outcome")
+
+  def archive_records(episodes, schema):
+      """Project episodes down to the recorded schema."""
+      return [{"id": e["id"], **{f: e[f] for f in schema}} for e in episodes]
+
+  def build_index(records):
+      """Inverted index over whatever fields the records carry."""
+      idx = {}
+      for rec in records:
+          for f, v in rec.items():
+              if f == "id":
+                  continue
+              idx.setdefault("%s=%s" % (f, v), set()).add(rec["id"])
+      return idx
+
+  def query(index, terms):
+      if not terms:
+          return set()
+      posts = []
+      for t in terms:
+          if t not in index:
+              return set()
+          posts.append(index[t])
+      posts.sort(key=len)
+      out = set(posts[0])
+      for p in posts[1:]:
+          out &= p
+      return out
+
+  def true_matches(episodes):
+      """Ground truth: episodes where the robot yielded to a pedestrian
+      approaching from the left."""
+      return {e["id"] for e in episodes if e["yielded"] and e["ped_from_left"]}
+
+  def raw_log(episode_id):
+      """The raw episode. Expensive to scan, but it has everything —
+      this is what a reprocessing job would read."""
+      return EPISODES[episode_id]
+starter_code: |
+  import numpy as np
+  # Provided: EPISODES (full truth), SCHEMA_V1, archive_records(eps, schema),
+  #           build_index(records), query(index, terms), true_matches(eps),
+  #           raw_log(episode_id)
+
+  def answer_the_question(episodes):
+      """Return the set of episode ids that answer the request.
+
+      The v1 archive cannot express it. Reprocess the RAW logs to extract
+      the missing attributes, extend the schema, rebuild the index, and
+      query — that is what "make it answerable" costs, and it is the point
+      of the exercise.
+      """
+      records = archive_records(episodes, SCHEMA_V1)      # <-- v1 schema
+      idx = build_index(records)
+      return query(idx, ["yielded=True", "ped_from_left=True"])
+
+  def schema_recall(found, truth):
+      """Fraction of genuinely matching episodes that are findable."""
+      # TODO
+      return 0.0
+
+  truth = true_matches(EPISODES)
+  found = answer_the_question(EPISODES)
+  print("episodes that genuinely match : %d" % len(truth))
+  print("episodes the archive returns  : %d" % len(found))
+  print("schema recall                 : %.3f" % schema_recall(found, truth))
+tests: |
+  import numpy as np
+  _truth = true_matches(EPISODES)
+  assert len(_truth) > 50, "test setup: expect a healthy number of true matches"
+
+  # The metric itself.
+  assert abs(schema_recall(set(), _truth) - 0.0) < 1e-9, "no results means zero recall"
+  assert abs(schema_recall(_truth, _truth) - 1.0) < 1e-9, "finding all of them is recall 1.0"
+  assert abs(schema_recall(set(list(_truth)[:len(_truth)//2]), _truth) - 0.5) < 0.02, "half of them is about 0.5"
+  assert abs(schema_recall(_truth, set()) - 1.0) < 1e-9 or schema_recall(_truth, set()) == 1.0, "an empty truth set should not divide by zero"
+
+  # Show the v1 schema genuinely cannot answer it.
+  _v1 = build_index(archive_records(EPISODES, SCHEMA_V1))
+  assert query(_v1, ["yielded=True", "ped_from_left=True"]) == set(), "sanity: v1 has no such fields, so the query is empty"
+
+  # THE POINT: after reprocessing, recall must be 1.0 — the information was
+  # in the raw logs the whole time.
+  _found = answer_the_question(EPISODES)
+  _r = schema_recall(_found, _truth)
+  assert _r > 0.99, "schema recall is %.3f. The attributes are present in every raw log; they were simply never projected into the archive. Reprocess the raw episodes, extend the schema, rebuild the index." % _r
+  assert _found == _truth, "the answer should be exactly the true match set (got %d, expected %d)" % (len(_found), len(_truth))
+
+  # And it must be an INDEX lookup, not a scan dressed up as one — the
+  # extended index has to actually carry the new keys.
+  _v2 = build_index(archive_records(EPISODES, SCHEMA_V1 + ("yielded", "ped_from_left")))
+  assert "ped_from_left=True" in _v2, "the rebuilt index must contain the new attribute"
+  assert query(_v2, ["yielded=True", "ped_from_left=True"]) == _truth, "the rebuilt index must answer the query directly"
+hints:
+  - "schema_recall is |found ∩ truth| / |truth|, guarding the empty-truth case."
+  - "answer_the_question: the fields you need are already in `raw_log(i)` for every episode. Project a wider schema — `SCHEMA_V1 + ('yielded', 'ped_from_left')` — rebuild the index over those records, and query it."
+  - "The lesson is in what that costs: rebuilding the index is milliseconds, reprocessing raw logs to extract attributes is the expensive part, and neither is possible at all if the raw data never contained the attribute."
+solution: |
+  import numpy as np
+
+  def schema_recall(found, truth):
+      truth = set(truth)
+      if not truth:
+          return 1.0
+      return len(set(found) & truth) / len(truth)
+
+  def answer_the_question(episodes):
+      # The v1 schema cannot express the query. The attributes DO exist in
+      # the raw logs — they were simply never projected into the archive.
+      # So: reprocess raw, widen the schema, rebuild the index, query.
+      #
+      # Note the cost asymmetry. Rebuilding the index is milliseconds and
+      # reprocessing raw logs is the afternoon; but had the raw data never
+      # contained pedestrian bearing at all, no amount of either would help.
+      schema_v2 = SCHEMA_V1 + ("yielded", "ped_from_left")
+      records = [{"id": e["id"],
+                  **{f: raw_log(e["id"])[f] for f in schema_v2}}
+                 for e in episodes]
+      idx = build_index(records)
+      return query(idx, ["yielded=True", "ped_from_left=True"])
+
+  truth = true_matches(EPISODES)
+  found = answer_the_question(EPISODES)
+  print("episodes that genuinely match : %d" % len(truth))
+  print("episodes the archive returns  : %d" % len(found))
+  print("schema recall                 : %.3f" % schema_recall(found, truth))
