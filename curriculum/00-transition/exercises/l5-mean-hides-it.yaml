@@ -1,0 +1,101 @@
+id: tr-l5-mean-hides-it
+title: "Bug 3: the average that shipped the wrong controller"
+lesson: modules/00-transition/05-lab-notebook-to-robot
+description: >-
+  **Symptom:** three candidate controllers, forty evaluation episodes each,
+  and a selection script that has picked the best one on every release for a
+  year. The controller it just picked put a robot through a shelf. The script
+  did exactly what it was written to do. Diagnose from the probe, then fix
+  `select`.
+setup_code: |
+  import numpy as np
+
+  # Forty episodes per candidate. `violations` counts moments the arm left
+  # its certified envelope — a physical constraint, not a preference.
+  def _episodes(n, err_mean, err_sd, violation_eps, seed):
+      rng = np.random.default_rng(seed)
+      out = []
+      for i in range(n):
+          out.append({
+              "tracking_error": float(abs(rng.normal(err_mean, err_sd))),
+              "violations": int(violation_eps[i]) if i < len(violation_eps) else 0,
+          })
+      return out
+
+  RESULTS = {
+      "reckless":     _episodes(40, 0.080, 0.02, [2, 1, 3, 1], seed=1),
+      "aggressive":   _episodes(40, 0.110, 0.02, [1],          seed=2),
+      "conservative": _episodes(40, 0.150, 0.02, [],           seed=3),
+  }
+starter_code: |
+  import numpy as np
+  # Provided: RESULTS — {name: [{"tracking_error": float, "violations": int}, ...]}
+
+  def select(results):
+      """Return the name of the controller to ship."""
+      best, best_score = None, np.inf
+      for name, eps in results.items():
+          err = np.mean([e["tracking_error"] for e in eps])
+          viol = np.mean([e["violations"] for e in eps])
+          score = err + 0.01 * viol                     # <-- suspicious
+          if score < best_score:
+              best, best_score = name, score
+      return best
+
+  for name, eps in RESULTS.items():
+      err = np.mean([e["tracking_error"] for e in eps])
+      total = sum(e["violations"] for e in eps)
+      bad_eps = sum(1 for e in eps if e["violations"] > 0)
+      print("%-13s mean error %.3f  violations %d in %d episodes"
+            % (name, err, total, bad_eps))
+  print("selected:", select(RESULTS))
+tests: |
+  import numpy as np
+  _pick = select(RESULTS)
+  assert _pick == "conservative", "selected %r. Two of the three candidates left the certified envelope during evaluation; the third never did. A controller that violates a physical constraint is not a worse option, it is not an option." % _pick
+
+  # A constraint is not a weight: no error value may buy a violation back.
+  _tempting = {
+      "flawless_but_unsafe": [{"tracking_error": 0.0001, "violations": 1}] + [{"tracking_error": 0.0001, "violations": 0}] * 39,
+      "plain_but_safe":      [{"tracking_error": 0.900,  "violations": 0}] * 40,
+  }
+  assert select(_tempting) == "plain_but_safe", "a single violation must not be outweighed by any tracking error, however small"
+
+  # If nothing is safe, say so rather than shipping the least-bad option.
+  _all_bad = {
+      "a": [{"tracking_error": 0.1, "violations": 1}] * 5,
+      "b": [{"tracking_error": 0.2, "violations": 3}] * 5,
+  }
+  assert select(_all_bad) is None, "when every candidate violates the envelope, return None — 'least unsafe' is not a shipping decision"
+
+  # Still has to rank the safe ones sensibly.
+  _safe = {
+      "worse": [{"tracking_error": 0.5, "violations": 0}] * 5,
+      "better": [{"tracking_error": 0.2, "violations": 0}] * 5,
+  }
+  assert select(_safe) == "better", "among safe candidates, lower tracking error should still win"
+hints:
+  - "Run the probe and read the two columns separately. 'reckless' has the lowest mean error AND seven envelope violations across four episodes."
+  - "`0.01 * viol` makes a violation worth 0.0018 of score — less than the noise between candidates. Averaging a constraint over forty episodes is how a hard limit becomes a rounding error."
+  - "Filter first, then rank. Discard every candidate with any violations, choose the lowest tracking error among what survives, and return None if nothing does."
+solution: |
+  import numpy as np
+
+  def select(results):
+      """Return the name of the controller to ship, or None if none qualify."""
+      # Safety is a CONSTRAINT, not a term in the objective. Filter, then rank —
+      # once a violation is inside a weighted sum, some accuracy gain always
+      # buys it back, and the weight that prevents that does not exist.
+      safe = {name: eps for name, eps in results.items()
+              if sum(e["violations"] for e in eps) == 0}
+      if not safe:
+          return None
+      return min(safe, key=lambda n: np.mean([e["tracking_error"] for e in safe[n]]))
+
+  for name, eps in RESULTS.items():
+      err = np.mean([e["tracking_error"] for e in eps])
+      total = sum(e["violations"] for e in eps)
+      bad_eps = sum(1 for e in eps if e["violations"] > 0)
+      print("%-13s mean error %.3f  violations %d in %d episodes"
+            % (name, err, total, bad_eps))
+  print("selected:", select(RESULTS))

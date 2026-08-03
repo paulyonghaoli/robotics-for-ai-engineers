@@ -1,0 +1,74 @@
+id: tr-l5-stale-estimate
+title: "Bug 2: the perfect detector that was too late"
+lesson: modules/00-transition/05-lab-notebook-to-robot
+description: >-
+  **Symptom:** the obstacle detector is exact — zero error, verified against
+  ground truth on every frame. The robot still hits things. Slowing the robot
+  down fixes it, which everyone reads as "the detector isn't good enough at
+  speed", so the team is buying a better camera. Diagnose from the probe,
+  then fix `brake_command`.
+setup_code: |
+  import numpy as np
+
+  DT = 0.05
+  LATENCY_STEPS = 6            # 0.30 s from photon to detection on the bus
+  DECEL = 3.0                  # m/s^2 the robot can actually shed
+  SAFE_GAP = 0.30              # must stop at least this far short
+
+  def run(speed, obstacle_at=12.0, steps=400):
+      """Drive toward an obstacle. Perception is EXACT but LATENCY_STEPS old."""
+      x, v, history = 0.0, float(speed), []
+      for _ in range(steps):
+          history.append(obstacle_at - x)                 # true gap, logged now
+          # What perception hands you is the gap as it was 0.30 s ago.
+          reported = history[-1 - LATENCY_STEPS] if len(history) > LATENCY_STEPS \
+              else history[0]
+          v = max(0.0, v + brake_command(reported, v) * DT)
+          x += v * DT
+          if obstacle_at - x <= 0.0:
+              return "COLLISION", obstacle_at - x, v
+      return "stopped", obstacle_at - x, v
+starter_code: |
+  import numpy as np
+  # Provided: DT, LATENCY_STEPS (6 = 0.30 s), DECEL, SAFE_GAP, run(speed)
+
+  def brake_command(reported_gap, v):
+      """Return acceleration (negative to brake)."""
+      stopping_distance = v * v / (2.0 * DECEL)
+      if reported_gap <= stopping_distance + SAFE_GAP:     # <-- suspicious
+          return -DECEL
+      return 0.0
+
+  for speed in (1.0, 2.0, 3.0):
+      outcome, gap, v_end = run(speed)
+      print("v=%.1f m/s -> %-9s final gap %+.2f m" % (speed, outcome, gap))
+tests: |
+  import numpy as np
+  for _speed in (1.0, 2.0, 3.0, 4.0):
+      _outcome, _gap, _v = run(_speed)
+      assert _outcome == "stopped", "at %.1f m/s the robot hit the obstacle (final gap %+.2f m). Perception is exact, so the error is not in the measurement — it is in how old the measurement is by the time you act on it." % (_speed, _gap)
+      assert _gap >= 0.0, "ended %.2f m past the obstacle" % _gap
+      assert _v < 1e-6, "did not come to a stop (v=%.3f)" % _v
+  # Must not "fix" it by braking absurdly early.
+  _o, _g, _ = run(2.0)
+  assert _g < 3.0, "stops %.2f m short — that is not a fix, it is refusing to drive. Compensate for the latency, don't add a huge blanket margin." % _g
+hints:
+  - "The detector is exact, so stop looking at detection error. Print `reported` next to the true gap inside the loop and compare them."
+  - "At 2 m/s, 0.30 s of latency is 0.60 m. The gap you are handed describes where the obstacle was 0.60 m ago; you have already covered that ground. This is why the bug scales with speed and disappears when you slow down."
+  - "Propagate the measurement forward by the known latency before using it: `current_gap ~= reported_gap - v * LATENCY_STEPS * DT`. Latency you can measure is latency you can compensate."
+solution: |
+  import numpy as np
+
+  def brake_command(reported_gap, v):
+      """Return acceleration (negative to brake)."""
+      # The report describes the world LATENCY_STEPS ago. We have been moving
+      # since; propagate it forward before making a decision with it.
+      current_gap = reported_gap - v * LATENCY_STEPS * DT
+      stopping_distance = v * v / (2.0 * DECEL)
+      if current_gap <= stopping_distance + SAFE_GAP:
+          return -DECEL
+      return 0.0
+
+  for speed in (1.0, 2.0, 3.0):
+      outcome, gap, v_end = run(speed)
+      print("v=%.1f m/s -> %-9s final gap %+.2f m" % (speed, outcome, gap))

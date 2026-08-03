@@ -1,0 +1,96 @@
+id: tr-l5-offline-metric
+title: "Bug 1: the metric that said 97%"
+lesson: modules/00-transition/05-lab-notebook-to-robot
+description: >-
+  **Symptom:** a lane-keeping policy scores 97% action agreement on a
+  genuinely held-out test set and is signed off. On the road it leaves the
+  lane and never comes back. The expert it was cloned from drives the same
+  road, through the same gust of wind, without trouble. The model is not
+  overfitting. Diagnose from the probe, then fix `evaluate`.
+setup_code: |
+  import numpy as np
+
+  DT = 0.1
+  LANE_HALF_WIDTH = 1.0
+  CAMBER = 0.35          # the road slopes away from centre: mildly unstable
+  GUST_STEP, GUST = 40, 1.3
+
+  def expert(y):
+      """The demonstrator. Gain 1.2 > CAMBER, so it recovers from anything."""
+      return -1.2 * y
+
+  def policy(y, rng):
+      """The cloned policy. Matches the expert closely where it was trained
+      (|y| <~ 0.7) and has no idea what to do outside that."""
+      off = max(0.0, abs(y) - 0.7)
+      gain = 1.2 * np.exp(-3.0 * off)
+      return -gain * y + rng.normal(0.0, 0.05)
+
+  def plant(y, action, k, rng):
+      """Next lateral offset. A gust hits every run at GUST_STEP."""
+      gust = GUST if k == GUST_STEP else 0.0
+      return y + (action + CAMBER * y) * DT + rng.normal(0.0, 0.01) + gust
+
+  def expert_states(rng, steps=150):
+      """The trajectory the EXPERT drives — i.e. the training/test set."""
+      y, out = 0.6, []
+      for _ in range(steps):
+          out.append(y)
+          y = y + (expert(y) + CAMBER * y) * DT + rng.normal(0.0, 0.01)
+      return np.array(out)
+starter_code: |
+  import numpy as np
+  # Provided: DT, LANE_HALF_WIDTH, expert, policy, plant, expert_states
+
+  def evaluate(seed=0, tol=0.10):
+      """Return (action agreement, worst |y| reached)."""
+      rng = np.random.default_rng(seed)
+      states = expert_states(rng)                   # <-- suspicious
+      agree = [abs(policy(y, rng) - expert(y)) < tol for y in states]
+      return float(np.mean(agree)), float(np.max(np.abs(states)))
+
+  score, worst = evaluate()
+  print("action agreement   %.3f" % score)
+  print("worst |y| reached  %.2f m" % worst)
+  print("lane half-width    %.2f m" % LANE_HALF_WIDTH)
+tests: |
+  import numpy as np
+  _score, _worst = evaluate()
+  assert 0.0 <= _score <= 1.0, "first return value should be a fraction"
+  assert _worst > 5.0 * LANE_HALF_WIDTH, "worst |y| is only %.2f m, so by this evaluation the car never even nears the lane edge. You are still scoring the policy at states the EXPERT visits; roll the policy out and let its own actions decide where it goes next." % _worst
+  assert _score < 0.60, "agreement %.3f is still essentially the offline number; on its own states the policy is far off the expert" % _score
+  # Reproduces across seeds: this is structural, not one unlucky draw.
+  for _s in (1, 2, 3):
+      _sc, _w = evaluate(seed=_s)
+      assert _w > 5.0 * LANE_HALF_WIDTH, "seed %d only reached %.2f m" % (_s, _w)
+  # And the task itself is doable: the expert survives the same gust.
+  _rng = np.random.default_rng(0)
+  _y, _we = 0.6, 0.0
+  for _k in range(150):
+      _y = plant(_y, expert(_y), _k, _rng)
+      _we = max(_we, abs(_y))
+  assert _we < 2.0, "sanity check failed — the expert should recover from the gust"
+hints:
+  - "Read the probe. Worst |y| is 0.60 m against a 1.00 m lane half-width, so this evaluation says the car never approaches the edge. Ask where those 150 states came from."
+  - "`expert_states` is the trajectory the EXPERT drives. The policy is scored at states it will only ever occupy while somebody else is steering. Its own small errors take it somewhere else, and the next state comes from THERE — that is what a closed loop means."
+  - "Roll the policy out: start at the same y, take the POLICY's action, advance with `plant(y, action, k, rng)`, repeat. Score agreement along that trajectory and return the worst |y| it actually reaches."
+solution: |
+  import numpy as np
+
+  def evaluate(seed=0, tol=0.10):
+      """Closed loop: the policy drives, and is judged where it ends up."""
+      rng = np.random.default_rng(seed)
+      y, agree, worst = 0.6, [], 0.0
+      for k in range(150):
+          action = policy(y, rng)
+          agree.append(abs(action - expert(y)) < tol)
+          # The action determines the next state. That is the whole difference:
+          # offline, the expert chose the states; here the policy does.
+          y = plant(y, action, k, rng)
+          worst = max(worst, abs(y))
+      return float(np.mean(agree)), float(worst)
+
+  score, worst = evaluate()
+  print("action agreement   %.3f" % score)
+  print("worst |y| reached  %.2f m" % worst)
+  print("lane half-width    %.2f m" % LANE_HALF_WIDTH)

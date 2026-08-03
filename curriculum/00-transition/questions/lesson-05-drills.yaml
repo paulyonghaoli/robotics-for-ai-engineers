@@ -1,0 +1,83 @@
+id: tr-l5-drills
+title: "Diagnosis drills — notebook to robot"
+lesson: modules/00-transition/05-lab-notebook-to-robot
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "A policy scores 97% action agreement on a genuinely held-out set and leaves the lane within seconds on the robot. There is no overfitting. What is the most likely cause?"
+    options:
+      - text: "It was scored on states the expert visited, not states it reaches itself — and its own errors take it somewhere the training data never went"
+        correct: true
+        explanation: "The held-out set is held out along the wrong axis. It holds out *episodes*, not the state distribution the policy will actually induce."
+      - text: "The test set is too small"
+        explanation: "A larger sample of the same distribution measures the same wrong thing more precisely."
+      - text: "The model needs more capacity"
+        explanation: "It already matches the expert closely on the states it was trained on; capacity is not the constraint."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "Why does collecting more demonstrations from the same expert often fail to fix that?"
+    options:
+      - text: "A good expert rarely visits recovery states, so more of its data still contains almost no examples of getting out of trouble"
+        correct: true
+        explanation: "Which is exactly the argument for DAgger and for intervention data: you need labels on the states the *learner* reaches, not more of the states the expert prefers."
+      - text: "More data always fixes it, just slowly"
+        explanation: "Not when the missing region has near-zero probability under the expert's own policy."
+      - text: "The demonstrations are mislabelled"
+        explanation: "They're correctly labelled — for states the policy won't be in."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "An obstacle detector is verified exact against ground truth on every frame. The robot collides at 2 m/s but not at 1 m/s. Where is the bug?"
+    options:
+      - text: "Pipeline latency — a perfect measurement of where the obstacle was 0.30 s ago is a 0.60 m error at 2 m/s"
+        correct: true
+        explanation: "The tell is that it scales with speed and vanishes when you slow down. That is a time problem wearing an accuracy problem's clothes."
+      - text: "The detector degrades under motion blur at speed"
+        explanation: "Possible in general, but here the detector is exact by construction on every frame."
+      - text: "The braking model is wrong"
+        explanation: "The stopping-distance arithmetic is right; it's being fed a gap that is already stale."
+  - id: d4
+    type: numeric
+    difficulty: core
+    prompt: "A perception pipeline takes 250 ms end to end. At 1.6 m/s, how many metres of travel does that represent? (metres)"
+    answer: 0.4
+    tolerance: 0.02
+    explanation: "0.25 s × 1.6 m/s = 0.40 m. Every latency budget is really a distance budget once the robot is moving, which is why lesson 11.1 states deadlines in metres as often as milliseconds."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "A release script ranks controllers by `mean_error + 0.01 * mean_violations` and just shipped one that broke a shelf. What is the correct fix?"
+    options:
+      - text: "Stop treating the violation as a term. Filter out every candidate with any violation, then rank the survivors on error"
+        correct: true
+        explanation: "Inside a weighted sum, any violation can be bought back by enough accuracy. The weight that prevents this does not exist, because the trade is not one anybody actually endorses."
+      - text: "Raise the violation weight until it dominates"
+        explanation: "You'd be picking a price for leaving the certified envelope. Any finite price is one somebody's accuracy improvement will eventually pay."
+      - text: "Report the max violation instead of the mean"
+        explanation: "Better, but it's still in the objective and still tradeable."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "The filtered selection finds that *every* candidate violated the envelope at least once. What should the script output?"
+    options:
+      - text: "None — and say so. 'Nothing here is shippable' is a valid result; the least-unsafe option is not a shipping decision"
+        correct: true
+        explanation: "Same discipline as lesson 11.6's 'insufficient telemetry': the honest output beats a confident wrong one, and it is the only one that leads anywhere useful."
+      - text: "The one with the fewest violations"
+        explanation: "That reintroduces the trade you just removed, with an implicit weight instead of an explicit one."
+      - text: "Rerun the evaluation until one comes back clean"
+        explanation: "That's selecting on noise, and it will reliably ship whichever candidate got lucky."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "What do all three bugs in this lab have in common?"
+    options:
+      - text: "In each, the offline artifact was measured correctly and answered a question that stopped being the right one once the model was in a loop with the world"
+        correct: true
+        explanation: "None of the three is a modelling error. Each is a mismatch between what was measured and what the deployed system actually needs to be true."
+      - text: "They're all caused by insufficient training data"
+        explanation: "Only the first is even adjacent to data volume, and more data from the same source doesn't fix it."
+      - text: "They're all numerical precision issues"
+        explanation: "None involves numerical precision at all."

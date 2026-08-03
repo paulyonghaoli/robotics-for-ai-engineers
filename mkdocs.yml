@@ -73,6 +73,7 @@ nav:
       - "0.2 Anatomy of an autonomy stack": modules/00-transition/02-anatomy.md
       - "0.3 Roles field guide": modules/00-transition/03-roles.md
       - "0.4 Math diagnostic": modules/00-transition/04-diagnostic.md
+      - "0.5 Lab: from the notebook to the robot": modules/00-transition/05-lab-notebook-to-robot.md
   - "Module 1 · Geometry & Motion":
       - Overview: modules/01-geometry/index.md
       - "1.1 Coordinate frames & rigid transforms": modules/01-geometry/01-coordinate-frames.md
