@@ -1,0 +1,89 @@
+id: man-l6-bug-wrap
+title: "Bug 1: the two-degree move that took the long way"
+lesson: modules/08-manipulation/06-lab-arm-in-sim
+description: >-
+  **Symptom:** a wrist that occasionally makes a full, fast, alarming
+  revolution to reach a pose two degrees away. It happens perhaps once an
+  hour, always near the same part of the workspace, and never in the
+  simulator's plots — which show a perfectly smooth interpolation. Diagnose
+  from the probe, then fix `interpolate`.
+setup_code: |
+  import numpy as np
+
+  def wrap(a):
+      w = np.mod(-np.asarray(a, dtype=float) + np.pi, 2.0 * np.pi)
+      r = -(w - np.pi)
+      return float(r) if np.ndim(a) == 0 else r
+
+  def path_length(traj):
+      """Total joint-space distance actually travelled along a trajectory."""
+      t = np.asarray(traj, dtype=float)
+      return float(np.abs(np.diff(t, axis=0)).sum())
+starter_code: |
+  import numpy as np
+  # Provided: wrap(angle), path_length(traj)
+
+  def interpolate(q_start, q_goal, n=25):
+      """(n, dof) joint trajectory from q_start to q_goal."""
+      a = np.asarray(q_start, dtype=float)
+      b = np.asarray(q_goal, dtype=float)
+      t = np.linspace(0.0, 1.0, n)[:, None]
+      return a + t * (b - a)                       # <-- suspicious
+
+  # Probe: a wrist just below +pi moving to just above -pi. Two degrees apart.
+  start = np.array([0.0, 0.0, np.radians(179.0)])
+  goal = np.array([0.0, 0.0, np.radians(-179.0)])
+  traj = interpolate(start, goal)
+  print("shortest angular difference : %.1f deg"
+        % np.degrees(abs(wrap(goal[2] - start[2]))))
+  print("distance actually travelled : %.1f deg" % np.degrees(path_length(traj)))
+tests: |
+  import numpy as np
+  _start = np.array([0.0, 0.0, np.radians(179.0)])
+  _goal = np.array([0.0, 0.0, np.radians(-179.0)])
+  _traj = np.asarray(interpolate(_start, _goal))
+  assert _traj.shape == (25, 3), "expected (25, 3), got %s" % str(_traj.shape)
+
+  # It must take the short way round: 2 degrees, not 358.
+  _travelled = np.degrees(path_length(_traj))
+  assert _travelled < 5.0, "the trajectory travels %.1f deg to cover a 2 deg move. Joint angles are periodic: interpolating the raw difference between +179 and -179 goes the long way round, and on hardware that is a full revolution at speed." % _travelled
+
+  # Endpoints must still be the requested ones, up to a full turn.
+  assert np.allclose(_traj[0], _start, atol=1e-9), "the trajectory must start exactly at q_start"
+  assert abs(wrap(_traj[-1, 2] - _goal[2])) < 1e-9, "the trajectory must end at q_goal (up to a multiple of 2*pi)"
+
+  # No step may jump: a smooth path has small increments everywhere.
+  _steps = np.degrees(np.abs(np.diff(_traj, axis=0)).max())
+  assert _steps < 2.0, "the largest single step is %.1f deg — that is a discontinuity, not an interpolation" % _steps
+
+  # Ordinary moves must be unchanged.
+  _a = np.array([0.1, -0.4, 0.9]); _b = np.array([0.6, 0.2, 1.3])
+  _ord = np.asarray(interpolate(_a, _b))
+  assert np.allclose(_ord[0], _a) and np.allclose(_ord[-1], _b, atol=1e-9), "a normal move must still interpolate straight"
+  assert abs(np.degrees(path_length(_ord)) - np.degrees(np.abs(_b - _a).sum())) < 1e-6, "a normal move must not be lengthened"
+
+  # And a genuine half-turn should still be a half-turn, not zero.
+  _half = np.asarray(interpolate(np.array([0.0]), np.array([np.pi])))
+  assert abs(np.degrees(path_length(_half)) - 180.0) < 1e-6, "a real 180 deg move must still travel 180 deg"
+hints:
+  - "Run the probe. The shortest angular difference is 2 degrees; the trajectory covers 358. Nothing is wrong with the linear interpolation itself — the problem is the quantity being interpolated."
+  - "`b - a` for angles is not the angular difference. From +179 to -179 the raw subtraction gives -358, and interpolating that sweeps the joint all the way round the other side."
+  - "Interpolate the WRAPPED difference instead: `delta = wrap(b - a)`, then `a + t * delta`. Start from a and add the short-way delta, so the endpoint is correct up to a full turn."
+solution: |
+  import numpy as np
+
+  def interpolate(q_start, q_goal, n=25):
+      a = np.asarray(q_start, dtype=float)
+      b = np.asarray(q_goal, dtype=float)
+      # Interpolate the SHORT-WAY difference. Raw subtraction on periodic
+      # quantities gives -358 degrees where the joint only needs to move 2.
+      delta = wrap(b - a)
+      t = np.linspace(0.0, 1.0, n)[:, None]
+      return a + t * delta
+
+  start = np.array([0.0, 0.0, np.radians(179.0)])
+  goal = np.array([0.0, 0.0, np.radians(-179.0)])
+  traj = interpolate(start, goal)
+  print("shortest angular difference : %.1f deg"
+        % np.degrees(abs(wrap(goal[2] - start[2]))))
+  print("distance actually travelled : %.1f deg" % np.degrees(path_length(traj)))

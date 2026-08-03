@@ -1,0 +1,83 @@
+id: man-l6-drills
+title: "Diagnosis drills — the arm that worked in simulation"
+lesson: modules/08-manipulation/06-lab-arm-in-sim
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** a wrist occasionally makes a full fast revolution to reach a pose two degrees away, always near the same part of the workspace. Diagnosis?"
+    options:
+      - text: "Joint angles are periodic, and the interpolation is using the raw difference — from +179° to −179° that is −358°, so the joint sweeps the long way round"
+        correct: true
+        explanation: "Interpolate the wrapped difference instead. The tool plot looks perfectly smooth throughout, which is why this survives simulation."
+      - text: "An encoder fault near that joint position"
+        explanation: "A fault would be erratic; this is deterministic and always at the ±π boundary."
+      - text: "The IK solver is diverging"
+        explanation: "The solver returns correct endpoints; the interpolation between them is what goes the long way."
+  - id: d2
+    type: numeric
+    difficulty: core
+    prompt: "A joint moves from +179° to −179°. How many degrees does a raw linear interpolation travel?"
+    answer: 358
+    tolerance: 1
+    explanation: "358°, to accomplish a 2° move. The sign of the raw difference is what sends it the wrong way round the circle."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the planner reports every path collision-free, world obstacles are respected perfectly, and the arm folds its wrist into its own upper link. Diagnosis?"
+    options:
+      - text: "The validity check only asks about the world — the arm is an obstacle too, and self-collision was never tested"
+        correct: true
+        explanation: "The checker is entirely correct about the question it was asked. The bug is the question."
+      - text: "The obstacle list is missing an entry"
+        explanation: "Every world obstacle is respected; the thing being hit is not in the world."
+      - text: "The collision resolution is too coarse"
+        explanation: "Resolution cannot help with a pair that is never compared."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "In self-collision checking, why must adjacent links be excluded from the comparison?"
+    options:
+      - text: "They share a joint, so their distance is always zero — comparing them reports a collision in every configuration"
+        correct: true
+        explanation: "Compare link i against link j only for j ≥ i + 2. This is not an optimisation; including adjacent pairs makes the checker useless."
+      - text: "Adjacent links cannot collide"
+        explanation: "They can, on arms with enough range, which is handled by joint limits rather than by distance tests."
+      - text: "To save computation"
+        explanation: "The saving is trivial; correctness is the reason."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the tool follows a smooth arc, moving 3 cm per waypoint, and once per traverse the joints jump 1125°. Every waypoint reaches its target exactly. Diagnosis?"
+    options:
+      - text: "Every IK solve is seeded from the same fixed configuration, so the solver lands in whichever branch that seed falls into — and which branch that is changes as the target moves"
+        correct: true
+        explanation: "IK is a relation. The seed is what selects a solution, and warm-starting from the previous answer takes this trajectory from 1125° to 2°."
+      - text: "The IK solver is numerically unstable"
+        explanation: "It converges to machine precision at every waypoint — each answer is correct, they just are not the same branch."
+      - text: "The tool path has a discontinuity"
+        explanation: "It is smooth to machine precision, which is what makes the joint jump so striking."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "Why does a better null-space posture controller make the self-collision bug appear MORE often?"
+    options:
+      - text: "The null-space term moves the elbow freely through configurations that the world-only checker never examines, so the more redundancy you exploit the more reliably you find the gap"
+        correct: true
+        explanation: "A nice example of two correct components combining badly: the posture controller is right, the checker is right about its own question, and the system folds itself up."
+      - text: "It increases joint velocities"
+        explanation: "Null-space motion can be arbitrarily slow and still reach a self-colliding configuration."
+      - text: "It disables collision checking"
+        explanation: "It never touches it — which is precisely the problem."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "What do all three bugs in this lab have in common, and what does that imply about debugging arms?"
+    options:
+      - text: "All three are invisible in task space and obvious in joint space — the tool is smooth in every one of them, because the tool is what was optimised"
+        correct: true
+        explanation: "Whatever you optimise will look fine. Plot what you did NOT optimise, which for an arm means plotting joint angles and per-step deltas alongside the tool path."
+      - text: "They are all numerical precision problems"
+        explanation: "None of them is; all three are exact arithmetic doing the wrong thing."
+      - text: "They all require hardware to reproduce"
+        explanation: "All three reproduce in simulation — the trouble is that the usual plot does not show them."

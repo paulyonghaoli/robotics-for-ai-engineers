@@ -169,6 +169,7 @@ nav:
       - "8.3 Grasp synthesis": modules/08-manipulation/03-grasping.md
       - "8.4 Configuration-space planning": modules/08-manipulation/04-cspace-planning.md
       - "8.5 Visual servoing": modules/08-manipulation/05-visual-servoing.md
+      - "8.6 Lab: the arm that worked in simulation": modules/08-manipulation/06-lab-arm-in-sim.md
   - "Capstone III · See It, Grasp It":
       - Overview: modules/capstone-3/index.md
   - "Capstone IV · Ship a Learned Policy":

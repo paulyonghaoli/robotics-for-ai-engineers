@@ -1,0 +1,137 @@
+id: man-l6-bug-selfcollide
+title: "Bug 2: the collision checker that forgot the arm"
+lesson: modules/08-manipulation/06-lab-arm-in-sim
+description: >-
+  **Symptom:** the planner returns paths that are collision-free by its own
+  report, and the arm folds its wrist into its own upper link. Obstacle
+  avoidance works perfectly — every world obstacle is respected. Diagnose
+  from the probe, then fix `is_valid`.
+
+  The null-space posture term from lesson 8.2 makes this worse, because it
+  moves the elbow freely through configurations nobody is checking.
+setup_code: |
+  import numpy as np
+
+  LINKS = np.array([1.0, 0.8, 0.6])
+  LINK_RADIUS = 0.05
+  OBSTACLES = np.array([[1.60, 0.90, 0.25]])
+
+  def joint_positions(q, links=LINKS):
+      q = np.asarray(q, dtype=float)
+      ang = np.cumsum(q)
+      seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
+      return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
+
+  def seg_seg_distance(a1, a2, b1, b2, n=24):
+      """Approximate minimum distance between two segments by sampling."""
+      ta = np.linspace(0, 1, n)[:, None]
+      tb = np.linspace(0, 1, n)[:, None]
+      A = a1 + ta * (a2 - a1)
+      B = b1 + tb * (b2 - b1)
+      return float(np.min(np.linalg.norm(A[:, None, :] - B[None, :, :], axis=2)))
+
+  def point_seg_distance(c, a, b):
+      ab = b - a
+      den = float(ab @ ab)
+      if den < 1e-15:
+          return float(np.linalg.norm(c - a))
+      t = float(np.clip((c - a) @ ab / den, 0.0, 1.0))
+      return float(np.linalg.norm(c - (a + t * ab)))
+
+  def hits_obstacle(q, obstacles=OBSTACLES):
+      """True if any link touches a world obstacle."""
+      pts = joint_positions(q)
+      for a, b in zip(pts[:-1], pts[1:]):
+          for ox, oy, orad in np.atleast_2d(obstacles):
+              if point_seg_distance(np.array([ox, oy]), a, b) < orad + LINK_RADIUS:
+                  return True
+      return False
+
+  # A configuration that folds the third link back against the first.
+  FOLDED = np.array([0.0, 2.7, 2.7])
+  OPEN = np.array([0.27, -0.55, -1.10])
+starter_code: |
+  import numpy as np
+  # Provided: LINKS, LINK_RADIUS, OBSTACLES, joint_positions(q),
+  #           seg_seg_distance(a1, a2, b1, b2), point_seg_distance(c, a, b),
+  #           hits_obstacle(q), FOLDED, OPEN
+
+  def hits_self(q):
+      """True if any two NON-ADJACENT links of the arm touch each other.
+
+      Adjacent links share a joint, so they always touch there — comparing
+      them is meaningless. Compare link i against link j only when
+      j >= i + 2, and call it a collision when the segment-to-segment
+      distance is below 2 * LINK_RADIUS.
+      """
+      # TODO
+      return False
+
+  def is_valid(q, obstacles=OBSTACLES):
+      """True if the configuration is safe to command."""
+      return not hits_obstacle(q, obstacles)      # <-- suspicious
+
+  for name, q in (("open", OPEN), ("folded", FOLDED)):
+      pts = joint_positions(q)
+      d = seg_seg_distance(pts[0], pts[1], pts[2], pts[3])
+      print("%-7s link1-link3 gap %.3f m (need %.2f)   obstacle hit: %-5s  valid: %s"
+            % (name, d, 2 * LINK_RADIUS, hits_obstacle(q), is_valid(q)))
+tests: |
+  import numpy as np
+  # The folded configuration is nowhere near the world obstacle...
+  assert not hits_obstacle(FOLDED), "sanity: the folded pose is clear of every world obstacle"
+  # ...and the first and third links are overlapping.
+  _p = joint_positions(FOLDED)
+  _gap = seg_seg_distance(_p[0], _p[1], _p[2], _p[3])
+  assert _gap < 2 * LINK_RADIUS, "sanity: links 1 and 3 are %.3f m apart, inside the %.2f m sum of radii" % (_gap, 2 * LINK_RADIUS)
+
+  assert hits_self(FOLDED), "hits_self must detect that the third link is folded back onto the first"
+  assert not hits_self(OPEN), "an ordinary open configuration must not report a self-collision"
+
+  # THE BUG: is_valid must reject it.
+  assert not is_valid(FOLDED), "is_valid accepts a configuration where the arm passes through itself. Obstacle avoidance is not collision checking — the arm is an obstacle too, and the null-space posture term from 8.2 will walk you into exactly this."
+  assert is_valid(OPEN), "an ordinary configuration must remain valid"
+
+  # Adjacent links must NOT be compared: they share a joint and always touch.
+  assert not hits_self(np.array([0.0, 0.0, 0.0])), "a straight arm has no self-collision, but adjacent links touch at every shared joint — compare only links two or more apart"
+  assert not hits_self(np.array([0.0, 0.6, 0.0])), "a gently bent arm is not self-colliding"
+
+  # And world obstacles must still be caught.
+  _at_obs = None
+  for _t in np.linspace(0.2, 1.2, 60):
+      _q = np.array([_t, 0.1, 0.1])
+      if hits_obstacle(_q):
+          _at_obs = _q
+          break
+  assert _at_obs is not None, "test setup: expected some configuration to reach the obstacle"
+  assert not is_valid(_at_obs), "world obstacles must still be rejected"
+hints:
+  - "hits_self: get the joint positions, form the list of link segments, and loop over pairs (i, j) with j >= i + 2. Use seg_seg_distance and compare against 2 * LINK_RADIUS."
+  - "With three links there is exactly one such pair — link 0 against link 2. Skipping adjacent pairs is not an optimisation: they meet at a shared joint, so their distance is always zero."
+  - "is_valid should be the conjunction: not hits_obstacle AND not hits_self."
+solution: |
+  import numpy as np
+
+  def hits_self(q):
+      pts = joint_positions(q)
+      segs = list(zip(pts[:-1], pts[1:]))
+      for i in range(len(segs)):
+          # j >= i + 2: adjacent links share a joint and always touch there,
+          # so comparing them reports a collision for every configuration.
+          for j in range(i + 2, len(segs)):
+              a1, a2 = segs[i]
+              b1, b2 = segs[j]
+              if seg_seg_distance(a1, a2, b1, b2) < 2 * LINK_RADIUS:
+                  return True
+      return False
+
+  def is_valid(q, obstacles=OBSTACLES):
+      # The arm is an obstacle too. Checking only the world is how a planner
+      # returns a "collision-free" path that folds the wrist into the elbow.
+      return not hits_obstacle(q, obstacles) and not hits_self(q)
+
+  for name, q in (("open", OPEN), ("folded", FOLDED)):
+      pts = joint_positions(q)
+      d = seg_seg_distance(pts[0], pts[1], pts[2], pts[3])
+      print("%-7s link1-link3 gap %.3f m (need %.2f)   obstacle hit: %-5s  valid: %s"
+            % (name, d, 2 * LINK_RADIUS, hits_obstacle(q), is_valid(q)))

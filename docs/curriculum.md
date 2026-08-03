@@ -33,7 +33,7 @@ Courses I and II are the classical stack, which is well covered elsewhere — th
 | Module | Contents | Status |
 |---|---|---|
 | [**7 · Robotic perception**](modules/07-perception/index.md) | Camera models, stereo & depth, point clouds, registration, 3D detection, BEV, fusion | ✅ 6 lessons + lab + [autograded project](modules/07-perception/project-perception.md) |
-| [**8 · Manipulation**](modules/08-manipulation/index.md) | Manipulator kinematics, IK, grasp synthesis, configuration-space planning, visual servoing | 🔨 5 lessons |
+| [**8 · Manipulation**](modules/08-manipulation/index.md) | Manipulator kinematics, IK, grasp synthesis, configuration-space planning, visual servoing | ✅ 6 lessons + lab |
 | [**9 · Robot learning & embodied AI**](modules/09-robot-learning/index.md) | Imitation (ACT, diffusion policy), the data engine & human-in-the-loop, RL, sim-to-real, world models, VLA evaluation | ✅ 7 lessons + lab |
 | [**Capstone III · see it, grasp it**](modules/capstone-3/index.md) | A planar manipulator with a depth sensor: perceive, synthesize a grasp, plan in configuration space, execute under Jacobian control | 🔨 brief live |
 

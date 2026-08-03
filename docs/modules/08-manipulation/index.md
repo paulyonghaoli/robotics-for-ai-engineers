@@ -1,6 +1,6 @@
 # Module 8 · Manipulation
 
-**Status:** In progress · **Course III**
+**Status:** Complete · **Course III**
 
 Everything so far has been a base that moves through a world. This module is about an arm that *changes* one — and almost every intuition built up over five modules of mobile robotics needs adjusting.
 
@@ -15,7 +15,7 @@ The payoff is that manipulation is where robotics stops being navigation. Graspi
 3. [Grasp synthesis: where to put the fingers](03-grasping.md) — **available**
 4. [Configuration-space planning: the obstacle you cannot draw](04-cspace-planning.md) — **available**
 5. [Visual servoing: closing the loop through the camera](05-visual-servoing.md) — **available**
-6. Lab: the arm that worked in simulation — *planned*
+6. [Lab: the arm that worked in simulation](06-lab-arm-in-sim.md) — **available**
 
 ## What you'll build
 
