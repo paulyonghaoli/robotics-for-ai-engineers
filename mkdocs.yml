@@ -181,5 +181,6 @@ nav:
   - "Module 13 · Systems Performance":
       - Overview: modules/13-systems-perf/index.md
       - "13.1 The performance model": modules/13-systems-perf/01-performance-model.md
+      - "13.2 Real-time: fast vs on time": modules/13-systems-perf/02-real-time.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md

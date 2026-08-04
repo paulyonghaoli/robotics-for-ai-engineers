@@ -1,0 +1,175 @@
+id: sys-l2-jitter
+title: "Fast on average, late on purpose"
+lesson: modules/13-systems-perf/02-real-time
+description: >-
+  Three implementations of the same 100 Hz control step, each measured for
+  twenty seconds. One has the best mean AND the best p99 and misses its
+  deadline every 1.7 seconds. Work out which one you ship, and what metric
+  would have told you without running this exercise.
+setup_code: |
+  import numpy as np
+
+  HZ = 100.0
+  DEADLINE_MS = 10.0
+  N = 2000                      # 20 s at 100 Hz
+
+  _rng = np.random.default_rng(2)
+
+  # A — allocates in the hot path. Almost always fast; occasionally the
+  # allocator takes a slow path and the frame stops for tens of ms.
+  _A = 4.2 + 0.25 * _rng.standard_normal(N)
+  _A = _A + (_rng.random(N) < 0.006) * (12.0 + 13.0 * _rng.random(N))
+
+  # B — fixed-capacity buffers, nothing allocated after startup. Slower,
+  # and boring.
+  _B = 6.2 + 0.18 * _rng.standard_normal(N)
+
+  # C — fast, sharing a core with a background job that wakes up
+  # periodically and preempts it.
+  _C = 4.4 + 0.22 * _rng.standard_normal(N)
+  for _s in range(180, N, 200):
+      _n = min(6, N - _s)
+      _C[_s:_s + _n] += 9.0 + 3.0 * _rng.random(_n)
+
+  TRACES = {"A-allocating": _A, "B-preallocated": _B, "C-preempted": _C}
+starter_code: |
+  import numpy as np
+  # Provided: TRACES (three arrays of per-frame latency in ms),
+  #           HZ = 100.0, DEADLINE_MS = 10.0, N = 2000
+
+  def mean_ms(trace):
+      # TODO
+      return 0.0
+
+  def p99_ms(trace):
+      # TODO
+      return 0.0
+
+  def max_ms(trace):
+      # TODO
+      return 0.0
+
+  def miss_rate(trace, deadline=DEADLINE_MS):
+      """Fraction of frames that exceeded the deadline."""
+      # TODO
+      return 0.0
+
+  def seconds_between_misses(trace, deadline=DEADLINE_MS, hz=HZ):
+      """Average wall-clock seconds between deadline misses.
+      Return float('inf') if there are none — that is the answer, not a
+      division by zero."""
+      # TODO
+      return 0.0
+
+  def max_consecutive_misses(trace, deadline=DEADLINE_MS):
+      """Longest run of consecutive missed frames.
+
+      One late frame is a glitch the controller absorbs. Six in a row is
+      60 ms with no new command, which is a different event entirely."""
+      # TODO
+      return 0
+
+  def choose(traces, deadline=DEADLINE_MS):
+      """Which implementation do you ship?
+
+      Rule: an implementation that misses its deadline is disqualified,
+      however good its average. Among the survivors take the lowest mean.
+      If nothing survives, take the one whose failures are shortest —
+      bounded degradation beats a better average."""
+      # TODO
+      return "A-allocating"
+
+  for _n, _t in TRACES.items():
+      print("%-16s mean %5.2f  p99 %5.2f  max %6.2f  miss %.4f  worst run %2d  a miss every %s" % (
+          _n, mean_ms(_t), p99_ms(_t), max_ms(_t), miss_rate(_t),
+          max_consecutive_misses(_t),
+          "never" if seconds_between_misses(_t) == float("inf") else "%.2f s" % seconds_between_misses(_t)))
+  print("ship:", choose(TRACES))
+tests: |
+  import numpy as np
+  _A, _B, _C = TRACES["A-allocating"], TRACES["B-preallocated"], TRACES["C-preempted"]
+
+  # 1. A wins on every summary statistic anyone puts in a slide.
+  assert mean_ms(_A) < mean_ms(_B) and mean_ms(_A) < mean_ms(_C), "A has the best mean"
+  assert p99_ms(_A) < p99_ms(_B), \
+      "A's p99 (%.2f ms) is better than B's (%.2f ms) — the implementation with the fat tail also wins the tail metric" % (p99_ms(_A), p99_ms(_B))
+  assert p99_ms(_A) < 5.0, "A's p99 is %.2f ms against a 10 ms deadline: enormous margin" % p99_ms(_A)
+
+  # ...and its worst frame is nearly three times the deadline.
+  assert max_ms(_A) > 25.0, "A's worst frame is %.1f ms" % max_ms(_A)
+  assert miss_rate(_A) > 0.004, "A misses %.2f%% of its deadlines" % (100 * miss_rate(_A))
+  assert 1.0 < seconds_between_misses(_A) < 3.0, \
+      "A misses a deadline every %.2f s. p99 could not see it: the event is rarer than 1 in 100, and at 100 Hz 1-in-100 is once a second. p99 is not a tail metric for a control loop." % seconds_between_misses(_A)
+
+  # 2. The two-second benchmark that says everything is fine.
+  assert miss_rate(_A[:200]) == 0.0, \
+      "the first 200 frames of A contain no misses at all — a short benchmark reports a clean run, and the property being measured is rare, not absent"
+  assert max_ms(_A[:200]) < 6.0, "and its worst frame over that window is %.2f ms" % max_ms(_A[:200])
+
+  # 3. B is worse at everything except the only thing that matters.
+  assert mean_ms(_B) > 1.4 * mean_ms(_A), "B's mean is %.0f%% worse than A's" % (100 * (mean_ms(_B) / mean_ms(_A) - 1))
+  assert miss_rate(_B) == 0.0, "B never misses"
+  assert max_ms(_B) < DEADLINE_MS, "B's WORST frame (%.2f ms) is inside the deadline, which is the property you are actually buying" % max_ms(_B)
+
+  # 4. C and A have comparable miss rates and completely different failures.
+  assert miss_rate(_C) > miss_rate(_A), "C misses more often"
+  assert max_consecutive_misses(_A) <= 2, "A's misses are isolated single frames"
+  assert max_consecutive_misses(_C) >= 5, \
+      "C's misses arrive in runs of %d — 60 ms with no new command, ten times in twenty seconds. Reported as a 3%% miss rate it sounds milder than A's 0.6%%." % max_consecutive_misses(_C)
+
+  # 5. The decision.
+  assert choose(TRACES) == "B-preallocated", \
+      "ship B. It is 45%% slower on average and it is the only one that is never late, and 'never late' is the requirement — being early buys nothing."
+
+  # And when nothing meets the deadline, prefer bounded failure.
+  assert miss_rate(_B, 6.0) > 0.4, "at a 6 ms deadline B misses most frames"
+  assert choose(TRACES, 6.0) == "A-allocating", \
+      "at 6 ms nothing qualifies, and A's failures are single frames while B misses continuously and C loses six at a time. A degraded loop that recovers every frame is survivable; one that is out for 60 ms is not."
+hints:
+  - "mean/p99/max: `float(np.mean(t))`, `float(np.percentile(t, 99))`, `float(np.max(t))`."
+  - "miss_rate: `float(np.mean(trace > deadline))`. seconds_between_misses: total seconds `len(trace)/hz` divided by the number of misses, or `float('inf')` when there are none."
+  - "max_consecutive_misses: walk the boolean array keeping a running count that resets on every frame that made its deadline, and track the largest value seen."
+  - "choose: filter to implementations with `miss_rate == 0`, and if any remain return the one with the smallest mean. Otherwise return the one with the smallest max_consecutive_misses. The rule encodes the actual requirement — a control loop is not scored on speed, it is scored on whether it produced a command in time."
+solution: |
+  import numpy as np
+
+  def mean_ms(trace):
+      return float(np.mean(trace))
+
+  def p99_ms(trace):
+      return float(np.percentile(trace, 99))
+
+  def max_ms(trace):
+      return float(np.max(trace))
+
+  def miss_rate(trace, deadline=DEADLINE_MS):
+      return float(np.mean(np.asarray(trace) > deadline))
+
+  def seconds_between_misses(trace, deadline=DEADLINE_MS, hz=HZ):
+      misses = int(np.sum(np.asarray(trace) > deadline))
+      if misses == 0:
+          return float("inf")
+      return (len(trace) / hz) / misses
+
+  def max_consecutive_misses(trace, deadline=DEADLINE_MS):
+      best = run = 0
+      for late in np.asarray(trace) > deadline:
+          run = run + 1 if late else 0
+          best = max(best, run)
+      return int(best)
+
+  def choose(traces, deadline=DEADLINE_MS):
+      # Meeting the deadline is a qualification, not a score. Nothing an
+      # implementation does on the other 99.4% of frames compensates.
+      safe = {n: t for n, t in traces.items() if miss_rate(t, deadline) == 0.0}
+      if safe:
+          return min(safe, key=lambda n: mean_ms(safe[n]))
+      # Nothing qualifies. Prefer the failure you can ride out.
+      return min(traces, key=lambda n: max_consecutive_misses(traces[n], deadline))
+
+  for _n, _t in TRACES.items():
+      print("%-16s mean %5.2f  p99 %5.2f  max %6.2f  miss %.4f  worst run %2d  a miss every %s" % (
+          _n, mean_ms(_t), p99_ms(_t), max_ms(_t), miss_rate(_t),
+          max_consecutive_misses(_t),
+          "never" if seconds_between_misses(_t) == float("inf") else "%.2f s" % seconds_between_misses(_t)))
+  print("ship:", choose(TRACES))

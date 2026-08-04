@@ -1,0 +1,95 @@
+id: sys-l2-quiz
+title: "Quiz — real-time behaviour"
+lesson: modules/13-systems-perf/02-real-time
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Implementation A has the best mean AND the best p99 against a 10 ms deadline, and misses that deadline every 1.7 seconds. How is that possible?"
+    options:
+      - text: "At 100 Hz a once-per-1.7-seconds event is rarer than 1 in 100, so it sits entirely above p99 — the 99th percentile is describing the ordinary case under a tail-sounding name"
+        correct: true
+        explanation: "p99 at 100 Hz is the once-per-second event. To see a once-a-minute pause you would need p99.983, which nobody computes. At control rates the honest tail statistic is the maximum."
+      - text: "The p99 was computed incorrectly"
+        explanation: "It is correct; the metric is the problem, not the arithmetic."
+      - text: "The deadline is measured differently from the latency"
+        explanation: "Same clock, same frames."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A 100 Hz control loop misses its deadline 0.6% of the time. On average, how many seconds between misses?"
+    answer: 1.67
+    tolerance: 0.2
+    explanation: "20 s / 12 misses = 1.67 s. Stated as 0.6% it sounds like rounding error; stated as 'the robot loses a control cycle every 1.7 seconds' it sounds like what it is."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You ship B: 45% slower on average, never late. What did finishing in 4.3 ms instead of 6.2 ms buy the system?"
+    options:
+      - text: "Nothing. The loop runs at 100 Hz either way; the spare time is idle. Being early has no value, and being late has a large one"
+        correct: true
+        explanation: "This is what separates a real-time requirement from a performance target. 'Fast' is a score; 'on time' is a qualification, and no amount of score compensates for failing it."
+      - text: "Headroom for future features"
+        explanation: "A real argument for a different decision, and it is headroom in the mean, which the tail does not respect."
+      - text: "Lower power consumption"
+        explanation: "Marginal, and not why anyone chose A."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "C misses 3% of deadlines in runs of six; A misses 0.6% as isolated single frames. Which is worse for the robot?"
+    options:
+      - text: "C — six consecutive misses is 60 ms with no new command, ten times in twenty seconds. A single late frame is absorbed; a 60 ms gap is an open-loop interval"
+        correct: true
+        explanation: "A miss rate is a marginal statistic and marginal statistics cannot see correlation. Log the run lengths, not just the rate."
+      - text: "A, because its worst frame is longer"
+        explanation: "27 ms once is survivable; 60 ms of no control repeatedly is not."
+      - text: "Equivalent — both are small percentages"
+        explanation: "The percentage is the part that hides the difference."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Why is 'no allocation in the hot path' a real-time rule rather than a performance rule?"
+    options:
+      - text: "Because `malloc` is usually fast and occasionally unbounded — it converts a bounded worst case into an unbounded one, and the average is unaffected either way"
+        correct: true
+        explanation: "Preallocation buys variance, not speed. It usually makes the mean slightly worse, which is exactly the trade implementation B represents."
+      - text: "Because allocation is slow"
+        explanation: "It is fast in the common case, which is why the rule sounds like superstition until you look at the maximum."
+      - text: "Because it fragments memory over long runs"
+        explanation: "True and secondary."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "You benchmark for two seconds and see no missed deadlines and a 5.6 ms maximum. What have you established?"
+    options:
+      - text: "That the failure is rarer than your measurement window, which is not the same as absent — a 1.7-second event and a nonexistent one look identical over 200 frames"
+        correct: true
+        explanation: "The practical test is the max-over-duration curve: measure for 1, 10, 60, 600 seconds and see whether the observed maximum plateaus. A flat curve is evidence of a bound; a climbing one means you are still sampling a tail."
+      - text: "That the implementation meets its deadline"
+        explanation: "Over 200 frames. The exercise's implementation A passes exactly this check and misses twelve deadlines in the next eighteen seconds."
+      - text: "Nothing at all"
+        explanation: "Too strong — it does rule out anything more frequent than about 1 in 200."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "A low-priority logging thread holds a mutex your control thread needs, and a medium-priority perception thread preempts the logger. What happens, and what is it called?"
+    options:
+      - text: "Priority inversion — the control thread is blocked on work that is not being scheduled, so a high-priority task waits on a medium-priority one indefinitely. Priority-inheritance mutexes are the fix"
+        correct: true
+        explanation: "Mars Pathfinder reset itself repeatedly on the surface for this reason. The failure needs three threads and a shared lock, which is why it survives most testing."
+      - text: "A deadlock"
+        explanation: "Nothing is circularly waiting; the logger would finish if it ever ran."
+      - text: "Starvation of the logging thread"
+        explanation: "That is the mechanism, and the consequence lands on the control thread."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Which is more suspicious in a benchmark result: a mean that improved 30%, or a maximum that improved 30%?"
+    options:
+      - text: "The mean. Most mean-improving optimizations work by adding a fast path with a rare slow fallback, which raises the maximum — so a better mean is weak evidence and sometimes evidence against"
+        correct: true
+        explanation: "Caching, lazy initialization, adaptive batching and dynamic shapes all have this shape. An improved maximum is harder to fake and is the number the deadline cares about."
+      - text: "The maximum, since single samples are noisy"
+        explanation: "It is noisy, which argues for measuring longer, not for preferring the mean."
+      - text: "Neither — both are equally informative"
+        explanation: "They are informative about different things, and only one of them is the requirement."
