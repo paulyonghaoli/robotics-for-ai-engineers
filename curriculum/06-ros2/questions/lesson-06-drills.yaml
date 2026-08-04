@@ -1,0 +1,100 @@
+id: ros-l6-drills
+title: "Diagnosis drills — nodes in a system"
+lesson: modules/06-ros2/06-lab-worked-alone
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the callback never fires. `ros2 topic info` on the resolved name shows one publisher. Diagnosis?"
+    options:
+      - text: "QoS mismatch — a publisher is there and the profiles do not match, so the endpoints never connect"
+        correct: true
+        explanation: "`--verbose` prints both profiles. Compare reliability, durability and deadline in that order; the sensor-data default is the usual culprit."
+      - text: "Name mismatch"
+        explanation: "There is a publisher on the resolved name, so the name is right."
+      - text: "The publisher is not running"
+        explanation: "`topic info` says otherwise."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the callback never fires. `ros2 topic info` on the resolved name shows ZERO publishers, while another node insists it is publishing. Diagnosis?"
+    options:
+      - text: "Name mismatch — the two nodes resolved to different fully qualified names, so each is talking to nobody. A namespace, or one leading slash"
+        correct: true
+        explanation: "A and B in the lab look identical from inside the node. This one observation is what separates them."
+      - text: "QoS mismatch"
+        explanation: "A QoS mismatch still shows the publisher on the topic; they simply do not connect."
+      - text: "The topic name is misspelled in your code"
+        explanation: "Possible, and far more often it is spelled correctly and resolved differently."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** the node stopped responding entirely, mid-run, and never recovered. Diagnosis?"
+    options:
+      - text: "Executor deadlock — a synchronous service call waiting for a response the executor cannot deliver, because the only thread or the only group is occupied by the caller"
+        correct: true
+        explanation: "Diagnosed first, before anything else observable about the node, because everything else is downstream of the hang."
+      - text: "An infinite loop in the callback"
+        explanation: "Possible; the profile distinguishes them — a deadlocked thread uses no CPU and a spinning one uses all of it."
+      - text: "Head-of-line blocking"
+        explanation: "That makes a node late, not silent."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** a 50 Hz callback runs at 12 Hz. Its own work is 4 ms. Diagnosis?"
+    options:
+      - text: "Head-of-line blocking — 77 ms of other callbacks in the same mutually-exclusive group are ahead of it"
+        correct: true
+        explanation: "Its own work fits its period five times over. Fix the grouping and the thread count, both of them, or remove whatever is blocking."
+      - text: "The callback is too slow"
+        explanation: "4 ms in a 20 ms period is not the problem."
+      - text: "QoS depth is too shallow"
+        explanation: "That would drop messages, not delay the ones you get."
+  - id: d5
+    type: single
+    difficulty: core
+    prompt: "**Symptom:** a 50 Hz callback runs at 40 Hz. Its own work is 25 ms and nothing else is in its group. Diagnosis?"
+    options:
+      - text: "The code is too slow — this is not a middleware problem, and an executor change here would be a week spent on a scheduler that is behaving correctly"
+        correct: true
+        explanation: "After five lessons of middleware failures the middleware becomes the default suspect. Profile the callback; 13.3's table is the tool."
+      - text: "Head-of-line blocking"
+        explanation: "Nothing is blocking it — the delay is entirely its own work."
+      - text: "The executor needs more threads"
+        explanation: "More threads do not make one callback faster."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "**Symptom:** every rate is nominal, nothing is blocked, and the detections land 65 cm from the obstacle. Diagnosis, and why is it hard?"
+    options:
+      - text: "Stale transform — `Time(0)` instead of the message stamp. It is hard because no timing probe finds it: a healthy graph is not a correct one"
+        correct: true
+        explanation: "The whole class of 'it works and the numbers are wrong' is invisible to the tools you reach for when something is slow. The checks that catch it are yours to write."
+      - text: "The detector is inaccurate"
+        explanation: "Worth ruling out, and the error growing with range points squarely at a rotation applied at the wrong time."
+      - text: "Head-of-line blocking is delaying the transform"
+        explanation: "Nothing is late; that is what makes this one uncomfortable."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "You get one change to how nodes in your system start up. What do you add?"
+    options:
+      - text: "A startup log of the effective configuration — every parameter with its value AND source, every topic with its resolved name, each endpoint's QoS. Ten lines, and three of the lab's seven incidents stop being silent"
+        correct: true
+        explanation: "It is the cheapest fix available here and the least commonly implemented, and it exists in no package you can install."
+      - text: "Retry logic on failed lookups"
+        explanation: "Helps the 'future' tf case and hides several others."
+      - text: "A watchdog that restarts unhealthy nodes"
+        explanation: "Four of the seven report healthy throughout."
+  - id: d8
+    type: single
+    difficulty: stretch
+    prompt: "Why does ROS 2 fail silently so much more often than a typical backend framework?"
+    options:
+      - text: "Most of what it does is matching — endpoints, parameter keys, resolved names — and an unmatched thing is not an error, it is a state the system is entitled to be in indefinitely"
+        correct: true
+        explanation: "It is indistinguishable from 'the peer has not started yet', which is a normal condition on a robot. The only thing that can tell them apart is you."
+      - text: "Because it is written in C++"
+        explanation: "The Python client library behaves identically."
+      - text: "Because error handling is left to the user"
+        explanation: "It is not an error being unhandled; there is no error to handle."

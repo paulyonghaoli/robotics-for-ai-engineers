@@ -48,7 +48,11 @@ Three of these are worth sitting with.
 
 **G is not a middleware problem.** Nothing is misconfigured, nothing is blocked, and the callback takes 25 ms in a 20 ms period. The answer is [13.3](../13-systems-perf/03-hot-path.md)'s profile, not a callback group — and reaching for an executor change here would be a week spent on a scheduler that is behaving correctly. Including it is the point: after five lessons of middleware failures the middleware becomes the default suspect, and it is not always guilty.
 
-## D. Debrief
+## D. Diagnosis drills
+
+<quiz-bank src="ros-l6-drills"></quiz-bank>
+
+## E. Debrief
 
 Three habits close out the module.
 
@@ -60,7 +64,7 @@ Three habits close out the module.
 
 And the thread through Module 6: **ROS 2 does not fail loudly, because most of what it does is matching.** An unmatched endpoint, an unmatched parameter key, an unmatched name — none of these is an error condition. Each is a state the system is entitled to be in, indefinitely, and the only thing that distinguishes it from "the publisher has not started yet" is you.
 
-## E. Graded work & portfolio extension
+## F. Graded work & portfolio extension
 
 **Graded:** the seven-node triage closes Module 6, and the probes transfer directly to any ROS system you touch.
 

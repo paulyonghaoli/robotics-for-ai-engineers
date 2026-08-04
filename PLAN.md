@@ -277,7 +277,7 @@ interesting material.
 | **C — Course III** ✅ **COMPLETE 2026-08-03** | Module 7 (6 lessons, lab, mini-project), Module 8 (6 lessons, lab), Capstone III (`projects/capstone_grasp/`, 30/30, CI-gated). Remaining optional: Module 9 mini-project | Course III complete, capstone CI-gated on a published rubric — **met** |
 | **D — Course IV** ✅ **COMPLETE 2026-08-03** | Module 12 ✅ (4 lessons, 2026-08-03), Module 13 ✅ (5 lessons, 2026-08-03), Capstone IV all five stages ✅. Mini-projects for Modules 9, 10 and 11 ✅ | Course IV complete; four courses, three capstones (II, III, IV) — **met 2026-08-03** |
 
-Deferred and explicitly not blocking: Module 6 (ROS 2) content, capstone v5
+Module 6 (ROS 2) content ✅ **complete 2026-08-03** — 6 browser-runnable lessons covering the architecture questions the official tutorials do not; the WSL2/devcontainer decision now gates only the optional hands-on half. Still deferred: capstone v5
 (loop closure), the ROS 2 environment decision.
 
 ## 6. Resolved questions (decided 2026-08-01)

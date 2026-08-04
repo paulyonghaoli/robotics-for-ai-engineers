@@ -64,16 +64,18 @@ graph TD
 
 All four courses are complete, and every module carries the same four rungs — in-browser exercises, a diagnostic lab where you're handed working-*looking* code with a real bug, an autograded mini-project, and a capstone.
 
-- **76 lessons** across fourteen modules: geometry, control, estimation, mapping & SLAM, planning, perception, manipulation, robot learning, evaluation, deployment, data infrastructure, and systems performance
-- **111 coding exercises** and **78 question banks** (498 questions), every reference solution executed against its own tests in CI
-- **13 diagnostic labs** — each one a working-looking system with a real defect, and a debrief on what the defect was evidence of
+- **82 lessons** across fourteen modules: geometry, control, estimation, mapping & SLAM, planning, ROS 2, perception, manipulation, robot learning, evaluation, deployment, data infrastructure, and systems performance
+- **117 coding exercises** and **84 question banks** (546 questions), every reference solution executed against its own tests in CI
+- **14 diagnostic labs** — each one a working-looking system with a real defect, and a debrief on what the defect was evidence of
 - **9 autograded mini-projects** (`python -m grader`, randomized scenarios each run)
 - **Three capstones**, one per course from II onward: an [autonomous 2D navigation stack](modules/capstone/index.md) in five versions, a [perception-to-grasp arm](modules/capstone-3/index.md), and the [infrastructure that decides whether a policy ships](modules/capstone-2/index.md) — plus an [engineering log](capstone-log.md) of the debugging campaigns behind them
 - A [Course I exam](course-1-exam.md), a [Course II exam](course-2-exam.md), and a researched [frontier map](frontier.md) of where the field is heading
 
 Everything above is verified by **22 CI gates** on every push — linting, tests, content integrity, a strict docs build, every mini-project's reference solution, and every capstone rubric.
 
-Still to come: the ROS 2 track (Module 6), which needs an environment decision, and a loop-closure version of the navigation capstone.
+The ROS 2 track (Module 6) is written to run in the browser like everything else, and deliberately does not re-explain the official tutorials' mechanics — it covers why a synchronous service call stalls a control loop, why two nodes with compatible-looking QoS never connect, and where your callbacks actually run. Installing ROS 2 is optional and nothing in the module waits for it.
+
+Still to come: a loop-closure version of the navigation capstone.
 
 ## Honest caveats
 

@@ -1,6 +1,6 @@
 # Curriculum map
 
-Four courses, fourteen modules. **All four courses are complete.** Today that is **76 lessons, 13 diagnostic labs, 9 autograded mini-projects, 111 in-browser exercises, 78 quiz banks (498 questions) and 3 capstones**, all CI-verified by 22 gates.
+Four courses, fourteen modules, **every one of them complete** — including the ROS 2 parallel track. Today that is **82 lessons, 14 diagnostic labs, 9 autograded mini-projects, 117 in-browser exercises, 84 quiz banks (546 questions) and 3 capstones**, all CI-verified by 22 gates.
 
 Courses I and II are the classical stack, which is well covered elsewhere — they are meant to be complete and polished rather than expanded. The weight goes into III and IV.
 
