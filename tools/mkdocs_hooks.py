@@ -44,8 +44,10 @@ def _write_lesson_manifest() -> int:
         text = md.read_text(encoding="utf-8")
         m = re.search(r"^#\s+(.+)$", text, re.M)
         rel = md.relative_to(docs).as_posix()
-        url = "/" + (rel[:-len("index.md")] if rel.endswith("index.md")
-                     else rel[:-len(".md")] + "/")
+        # Relative to the site root, not the domain root: progress.js
+        # prefixes whatever base it is actually served from.
+        url = (rel[:-len("index.md")] if rel.endswith("index.md")
+               else rel[:-len(".md")] + "/")
         out.append({
             "url": url,
             "title": (m.group(1).strip() if m else md.stem),

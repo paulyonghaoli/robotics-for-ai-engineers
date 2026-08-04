@@ -14,6 +14,24 @@
 
   var KEY = "rfae:progress:v1";
 
+  // Same derivation interactive.js uses: take the base from this script's
+  // own src rather than assuming the site sits at the domain root.
+  var SITE_BASE = (function () {
+    var s = document.currentScript;
+    if (s && s.src) return s.src.replace(/javascripts\/progress\.js.*$/, "");
+    return "/";
+  })();
+
+  // SITE_BASE is a full URL; the stored keys are pathnames, so keep a
+  // pathname-only form for comparing against manifest entries.
+  var BASE_PATH = (function () {
+    try {
+      return new URL(SITE_BASE, window.location.href).pathname;
+    } catch (e) {
+      return "/";
+    }
+  })();
+
   var STATES = [
     { id: "reading", label: "Reading", icon: "◐", hint: "Started this one" },
     { id: "done", label: "Done", icon: "✓", hint: "Finished and understood" },
@@ -190,7 +208,7 @@
         var ls = byModule[k];
         var m = ls[0].module || k;
         var d = ls.filter(function (l) {
-          var r = data[pageKey(l.url)];
+          var r = data[pageKey(BASE_PATH + l.url)];
           return r && r.state === "done";
         }).length;
         html += "<tr><td>" + escapeHtml(m) + "</td><td>" + d + " / " + ls.length + "</td></tr>";
@@ -264,7 +282,7 @@
   function initSummary() {
     var host = document.querySelector("progress-summary");
     if (!host) return;
-    fetch("/assets/generated/lessons.json")
+    fetch(SITE_BASE + "assets/generated/lessons.json")
       .then(function (r) { return r.ok ? r.json() : []; })
       .catch(function () { return []; })
       .then(function (lessons) { renderSummary(host, lessons || []); });
