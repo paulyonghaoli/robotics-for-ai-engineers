@@ -1,0 +1,95 @@
+id: sys-l3-quiz
+title: "Quiz — the hot path"
+lesson: modules/13-systems-perf/03-hot-path
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A stage takes 2.0 ms — 31% of the frame — and is a single `cv2.undistort` call. What does porting it to C++ buy?"
+    options:
+      - text: "Essentially nothing. The time is already inside compiled code running the same instructions; the port removes one microsecond of Python call dispatch"
+        correct: true
+        explanation: "1.0002x in the exercise. The biggest stage in a profile is very often the worst port candidate, because size and portability are unrelated."
+      - text: "Roughly the same speedup as the rest of the loop"
+        explanation: "The rest of the loop is interpreter overhead; this stage has almost none."
+      - text: "A 2-3x improvement from better memory layout"
+        explanation: "OpenCV's implementation is already tuned; you would be competing with it."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Which stage should you port: the one with the largest wall time, the largest speedup ratio, or the largest absolute saving?"
+    options:
+      - text: "The largest absolute saving — it is the only one of the three denominated in the same units as the budget you are trying to meet"
+        correct: true
+        explanation: "In the exercise the largest stage saves 0.001 ms and the best ratio (58x) saves 0.017 ms. The right answer saves 2.954 ms and is neither."
+      - text: "The largest speedup ratio, since it has the most headroom"
+        explanation: "58x of 0.017 ms is 0.017 ms. A ratio has no denominator in a frame budget."
+      - text: "The largest wall time, since that is where the frame goes"
+        explanation: "Where the frame goes and what a port can move are different questions."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "A 6.54 ms loop contains 3.29 ms that a C++ port cannot improve. What is the best possible speedup from porting everything else?"
+    answer: 1.99
+    tolerance: 0.1
+    explanation: "6.54 / 3.29 = 1.99x. Two stages in that loop get 28x and 58x faster and the loop as a whole doubles. Amdahl sets the ceiling, and it is worth computing before the project rather than after."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Your requirement is 3.0 ms and the fully-ported floor is 3.29 ms. What is the correct conclusion?"
+    options:
+      - text: "The port is not the project. No amount of C++ reaches the target, so the next move is a different algorithm or less input — fewer points, lower resolution"
+        correct: true
+        explanation: "This is the cheapest possible discovery and it comes from arithmetic you can do in an afternoon, before committing anyone to a rewrite."
+      - text: "Port everything and optimize the C++ afterwards"
+        explanation: "The floor is vectorized library code; optimizing your own C++ does not move it."
+      - text: "The estimate must be wrong"
+        explanation: "Worth checking, and if it holds, the conclusion stands."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "What does a C++ port change that has nothing to do with average speed?"
+    options:
+      - text: "Control over allocation and object lifetime — which converts an unbounded worst case into a bounded one, and is often the better half of the argument"
+        correct: true
+        explanation: "13.2's row B. Preallocation and RAII buy variance, and the mean may even get slightly worse."
+      - text: "Nothing — the port is purely a speed change"
+        explanation: "The speed change is usually the smaller half."
+      - text: "Numerical accuracy"
+        explanation: "Ideally unchanged, and if it changes you have a bug, not a benefit."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Which C++ concept is genuinely new to someone arriving from Python and NumPy?"
+    options:
+      - text: "Ownership — deciding for every object who is responsible for its lifetime, which the language forces you to state and garbage collection let you ignore"
+        correct: true
+        explanation: "Not speed and not syntax. `const T&` to borrow, `unique_ptr<T>` to own, `T*` to observe: in Python every name is a borrowed reference and the question never arose."
+      - text: "Vectorization"
+        explanation: "You already do it — that instinct is the same one that avoids per-element interpreter overhead."
+      - text: "Static typing"
+        explanation: "Familiar from type hints and from NumPy dtypes; the syntax is new, the concept is not."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "You port one stage of five and it is 91% of the achievable gain. Why not port the other four anyway?"
+    options:
+      - text: "Because you would take on the memory-safety surface of three more components to win 9% — and each ported stage needs its own parity harness, build, and maintenance forever"
+        correct: true
+        explanation: "The cost of a port is not the week of writing. Scope it to what the budget requires and leave the rest in the language with the better debugging story."
+      - text: "Because C++ is harder to write"
+        explanation: "True and not the argument; the ongoing cost matters more than the writing."
+      - text: "There is no reason not to"
+        explanation: "There are several, and they compound with every stage."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Before reaching for C++ on a stage that is a Python loop over point pairs, what should you try?"
+    options:
+      - text: "Vectorizing it, or Numba — both often capture most of the gain, keep the whole harness, and take a day instead of a quarter"
+        correct: true
+        explanation: "The 28x in the exercise is per-element interpreter overhead, and that is exactly what vectorization removes too. Reach for the language change when the seam genuinely needs it."
+      - text: "Nothing — a Python loop is a Python loop"
+        explanation: "Most of them are a reformulation away from being an array operation."
+      - text: "More cores"
+        explanation: "Parallelizing interpreter overhead scales the overhead."

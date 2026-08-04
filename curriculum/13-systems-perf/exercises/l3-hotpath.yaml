@@ -1,0 +1,178 @@
+id: sys-l3-hotpath
+title: "Which stages are worth porting"
+lesson: modules/13-systems-perf/03-hot-path
+description: >-
+  A perception-and-control loop in Python: five stages, 6.54 ms per frame,
+  and a 3.5 ms slice of the budget to fit into. You have time to port some of
+  it to C++. Work out which stages, what the ceiling is, and why the two
+  obvious ways of ranking the candidates both pick a stage worth nothing.
+setup_code: |
+  # What a port actually changes.
+  #
+  # Time inside a vectorized kernel is ALREADY compiled C — NumPy, BLAS,
+  # OpenCV. Porting it changes nothing, and `vector_ms` is therefore
+  # identical in both columns.
+  #
+  # What the port removes is per-call interpreter dispatch and per-element
+  # interpreter overhead, which is where a Python loop spends its life.
+  PY_CALL_US = 1.2       # a Python-level call plus NumPy argument dispatch
+  CPP_CALL_US = 0.02     # an inlined C++ call
+  PY_ELEM_NS = 75.0      # one iteration of a Python loop body
+  CPP_ELEM_NS = 1.5      # one iteration of the same loop in C++
+
+  # (vector_ms, calls_per_frame, python_loop_iterations_per_frame)
+  STAGES = {
+      "undistort": (2.00,   1,     0),      # one big OpenCV call
+      "cluster":   (0.05,  12, 40000),      # a Python loop over point pairs
+      "associate": (0.02, 240,     0),      # many small calls
+      "solve":     (1.15,   1,     0),      # one LAPACK call
+      "control":   (0.00,  12,    40),      # a handful of scalar operations
+  }
+
+  # This pipeline's slice of a 200 Hz frame; the rest of the 5 ms goes to
+  # the planner, the drivers and the middleware.
+  BUDGET_MS = 3.5
+starter_code: |
+  # Provided: STAGES, BUDGET_MS, PY_CALL_US, CPP_CALL_US,
+  #           PY_ELEM_NS, CPP_ELEM_NS
+
+  def py_ms(stage):
+      """Milliseconds for one frame of this stage, in Python."""
+      # TODO
+      return 0.0
+
+  def cpp_ms(stage):
+      """The same stage ported. `vector_ms` is unchanged — it was already
+      compiled code."""
+      # TODO
+      return 0.0
+
+  def speedup(stage):
+      # TODO
+      return 1.0
+
+  def saving(stage):
+      """Milliseconds removed from the frame by porting this stage."""
+      # TODO
+      return 0.0
+
+  def frame_ms(ported=frozenset()):
+      """Total frame time with `ported` (a set of stage names) in C++ and
+      everything else still in Python."""
+      # TODO
+      return 1.0
+
+  def ceiling():
+      """Best possible speedup: the whole loop ported."""
+      # TODO
+      return 1.0
+
+  def port_order():
+      """Stage names, best candidate first."""
+      # TODO
+      return list(STAGES)
+
+  def minimal_ports(target_ms):
+      """The smallest set of stages that gets the frame under `target_ms`,
+      taking them in port_order(). Return None if no set can."""
+      # TODO
+      return None
+
+  print("frame: %.3f ms in Python, %.3f ms fully ported (ceiling %.2fx), budget %.1f ms\n" % (
+      frame_ms(), frame_ms(frozenset(STAGES)), ceiling(), BUDGET_MS))
+  for _n in sorted(STAGES, key=lambda s: -py_ms(STAGES[s])):
+      _s = STAGES[_n]
+      print("%-10s %6.3f ms (%4.1f%% of frame)   port -> %6.3f ms   x%6.2f   saves %6.3f ms" % (
+          _n, py_ms(_s), 100 * py_ms(_s) / frame_ms(), cpp_ms(_s), speedup(_s), saving(_s)))
+  print("\nport order:", port_order())
+  print("to make the budget:", minimal_ports(BUDGET_MS))
+tests: |
+  _by = lambda n: STAGES[n]
+
+  # 1. The Python loop is the whole problem, and it is not the biggest stage.
+  assert abs(frame_ms() - 6.542) < 0.01, "the Python frame is 6.542 ms, got %.3f" % frame_ms()
+  assert py_ms(_by("undistort")) > py_ms(_by("associate")), "undistort is one of the largest stages by wall time"
+  assert speedup(_by("undistort")) < 1.01, \
+      "undistort takes 2.0 ms — 31%% of the frame — and porting it is worth %.4fx. It is one OpenCV call; the time is already inside compiled code and a port cannot touch it." % speedup(_by("undistort"))
+  assert saving(_by("undistort")) < 0.01, "porting undistort saves %.4f ms" % saving(_by("undistort"))
+  assert speedup(_by("solve")) < 1.01, "same story for the LAPACK call"
+
+  # 2. Ranking by SPEEDUP picks a stage worth nothing either.
+  _fastest = max(STAGES, key=lambda n: speedup(_by(n)))
+  assert _fastest == "control", "control has the best ratio, %.0fx" % speedup(_by("control"))
+  assert saving(_by("control")) < 0.02, \
+      "control is 58x faster in C++ and saves %.3f ms, which is 0.3%% of the frame. A ratio is not a budget." % saving(_by("control"))
+
+  # 3. The right ranking is absolute time saved, and it has one clear winner.
+  assert port_order()[0] == "cluster", "cluster should be the first candidate, got %s" % port_order()[0]
+  _achievable = frame_ms() - frame_ms(frozenset(STAGES))
+  assert saving(_by("cluster")) / _achievable > 0.88, \
+      "cluster alone is %.0f%% of everything a full port could ever win" % (100 * saving(_by("cluster")) / _achievable)
+
+  # 4. Amdahl: two stages are 28x and 58x faster and the whole loop is 2x.
+  assert speedup(_by("cluster")) > 25.0, "cluster is %.0fx faster ported" % speedup(_by("cluster"))
+  assert 1.9 < ceiling() < 2.1, \
+      "rewriting the ENTIRE loop in C++ is worth %.2fx, because 3.15 ms of it is vectorized work that was already C and cannot move" % ceiling()
+
+  # 5. The decision. One stage does not make the budget; two do.
+  assert frame_ms(frozenset(["cluster"])) > BUDGET_MS, \
+      "porting cluster gets to %.3f ms — 90%% of the achievable gain is not the same as enough" % frame_ms(frozenset(["cluster"]))
+  assert minimal_ports(BUDGET_MS) == ["cluster", "associate"], \
+      "two stages of five make the budget, got %s" % minimal_ports(BUDGET_MS)
+  assert frame_ms(frozenset(minimal_ports(BUDGET_MS))) < BUDGET_MS
+
+  # 6. And a target the port cannot reach, which is worth finding out before
+  #    committing a quarter to it rather than after.
+  assert minimal_ports(3.0) is None, \
+      "3 ms is below the fully-ported floor of %.3f ms. No amount of C++ gets there — the next move is a different algorithm, or fewer pixels." % frame_ms(frozenset(STAGES))
+hints:
+  - "py_ms: `vector_ms + calls * PY_CALL_US / 1e3 + iters * PY_ELEM_NS / 1e6`. cpp_ms is the same expression with the C++ constants — note `vector_ms` appears unchanged in both, which is the entire point of the exercise."
+  - "frame_ms: sum cpp_ms for stages in `ported` and py_ms for the rest. ceiling() is frame_ms() / frame_ms(everything)."
+  - "port_order: sort by `saving` descending, not by speedup and not by stage size. saving is `py_ms - cpp_ms`."
+  - "minimal_ports: walk port_order() accumulating stages until frame_ms(set) drops below the target; return None if you exhaust the list without getting there."
+solution: |
+  def py_ms(stage):
+      vector_ms, calls, iters = stage
+      return vector_ms + calls * PY_CALL_US / 1e3 + iters * PY_ELEM_NS / 1e6
+
+  def cpp_ms(stage):
+      # vector_ms is unchanged. That term was already compiled code, and no
+      # amount of C++ makes a BLAS call faster.
+      vector_ms, calls, iters = stage
+      return vector_ms + calls * CPP_CALL_US / 1e3 + iters * CPP_ELEM_NS / 1e6
+
+  def speedup(stage):
+      return py_ms(stage) / cpp_ms(stage)
+
+  def saving(stage):
+      return py_ms(stage) - cpp_ms(stage)
+
+  def frame_ms(ported=frozenset()):
+      return sum((cpp_ms(s) if n in ported else py_ms(s)) for n, s in STAGES.items())
+
+  def ceiling():
+      return frame_ms() / frame_ms(frozenset(STAGES))
+
+  def port_order():
+      # Absolute milliseconds removed. A speedup ratio has no denominator
+      # in the frame budget.
+      return sorted(STAGES, key=lambda n: -saving(STAGES[n]))
+
+  def minimal_ports(target_ms):
+      chosen = []
+      for name in port_order():
+          if frame_ms(frozenset(chosen)) < target_ms:
+              break
+          chosen.append(name)
+      if frame_ms(frozenset(chosen)) >= target_ms:
+          return None
+      return chosen
+
+  print("frame: %.3f ms in Python, %.3f ms fully ported (ceiling %.2fx), budget %.1f ms\n" % (
+      frame_ms(), frame_ms(frozenset(STAGES)), ceiling(), BUDGET_MS))
+  for _n in sorted(STAGES, key=lambda s: -py_ms(STAGES[s])):
+      _s = STAGES[_n]
+      print("%-10s %6.3f ms (%4.1f%% of frame)   port -> %6.3f ms   x%6.2f   saves %6.3f ms" % (
+          _n, py_ms(_s), 100 * py_ms(_s) / frame_ms(), cpp_ms(_s), speedup(_s), saving(_s)))
+  print("\nport order:", port_order())
+  print("to make the budget:", minimal_ports(BUDGET_MS))

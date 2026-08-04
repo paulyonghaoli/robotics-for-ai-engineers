@@ -14,7 +14,7 @@ Two threads run through it, and they meet at the same question.
 
 1. [The performance model: why the datacenter number doesn't transfer](01-performance-model.md) — **available**
 2. [Real-time: the difference between fast and on time](02-real-time.md) — **available**
-3. The hot path: what C++ buys, and what it does not — *planned*
+3. [The hot path: what C++ buys, and what it does not](03-hot-path.md) — **available**
 4. Porting with parity: validating a rewrite you cannot trust — *planned*
 5. Lab: the optimization that didn't help — *planned*
 

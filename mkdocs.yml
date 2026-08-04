@@ -182,5 +182,6 @@ nav:
       - Overview: modules/13-systems-perf/index.md
       - "13.1 The performance model": modules/13-systems-perf/01-performance-model.md
       - "13.2 Real-time: fast vs on time": modules/13-systems-perf/02-real-time.md
+      - "13.3 The hot path": modules/13-systems-perf/03-hot-path.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md
