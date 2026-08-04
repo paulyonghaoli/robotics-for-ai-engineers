@@ -178,5 +178,8 @@ nav:
       - "12.2 Replay determinism": modules/12-data-infra/02-replay-determinism.md
       - "12.3 Schema evolution": modules/12-data-infra/03-schema-evolution.md
       - "12.4 Lab: the dataset that could not be rebuilt": modules/12-data-infra/04-lab-could-not-rebuild.md
+  - "Module 13 · Systems Performance":
+      - Overview: modules/13-systems-perf/index.md
+      - "13.1 The performance model": modules/13-systems-perf/01-performance-model.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md

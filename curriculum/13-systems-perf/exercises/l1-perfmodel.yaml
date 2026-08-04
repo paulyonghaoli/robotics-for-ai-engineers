@@ -1,0 +1,232 @@
+id: sys-l1-perfmodel
+title: "Where the frame time actually goes"
+lesson: modules/13-systems-perf/01-performance-model
+description: >-
+  The same policy runs at 220 fps on the workstation and 62 fps on the
+  robot. The obvious explanation is that the robot's GPU is smaller. Build
+  the latency model, find out what fraction of the frame the GPU is
+  responsible for, and check what a faster one would buy you.
+setup_code: |
+  # A small visuomotor policy: convolutional trunk, transformer head,
+  # action MLP. Measured at batch 1, which is the only batch size a robot
+  # ever runs.
+  #
+  # `bytes` is the total memory traffic for ONE inference — weights read
+  # once plus activations written and read back. At batch 1 the weights
+  # dominate, and they are re-read every single frame.
+  MODEL = {
+      "name": "visuomotor-policy",
+      "ops": 72,                # kernels launched per inference
+      "flops": 2.1e9,
+      "bytes": 80e6,
+      "input_bytes": 2.0e6,     # two camera frames plus proprioception
+  }
+
+  # achieved_frac: the fraction of theoretical peak that batch-1 kernels
+  # actually reach. It is measured, not derived — small kernels do not fill
+  # the machine. 0.35 is typical and generous.
+  #
+  # dispatch_us_per_op: CPU time to launch one kernel from an eager
+  # framework. This is a property of the HOST, not the accelerator.
+  DEVICES = {
+      "workstation-A100": {
+          "peak_flops": 312e12,          # BF16 dense
+          "bandwidth_bps": 1555e9,       # HBM2e
+          "achieved_frac": 0.35,
+          "dispatch_us_per_op": 60.0,    # server CPU, eager framework
+          "graph_launch_us": 5.0,        # whole graph, one launch
+          "link_bps": 25e9,              # PCIe 4.0 x16, achieved
+      },
+      "robot-AGX-Orin": {
+          "peak_flops": 68.75e12,        # FP16 dense
+          "bandwidth_bps": 204.8e9,      # LPDDR5
+          "achieved_frac": 0.35,
+          "dispatch_us_per_op": 210.0,   # embedded CPU, same framework
+          "graph_launch_us": 20.0,
+          "link_bps": None,              # unified memory: no copy at all
+      },
+  }
+starter_code: |
+  # Provided: MODEL, DEVICES
+
+  def arithmetic_intensity(model):
+      """FLOPs per byte of memory traffic. A property of the MODEL alone."""
+      # TODO
+      return 0.0
+
+  def ridge_point(dev):
+      """Arithmetic intensity at which a device stops being memory-bound
+      and starts being compute-bound, in FLOP/byte."""
+      # TODO
+      return 0.0
+
+  def gpu_seconds(model, dev):
+      """Time on the accelerator: compute and memory traffic overlap, so
+      the slower of the two sets the pace. Both are scaled by
+      `achieved_frac`."""
+      # TODO
+      return 0.0
+
+  def dispatch_seconds(model, dev, mode):
+      """CPU time spent launching work.
+      mode='eager' launches every op separately; mode='graph' launches the
+      whole captured graph once."""
+      # TODO
+      return 0.0
+
+  def transfer_seconds(model, dev):
+      """Time to get the input onto the device. Zero if the device has
+      unified memory (`link_bps` is None)."""
+      # TODO
+      return 0.0
+
+  def frame_seconds(model, dev, mode):
+      """Total latency for one inference. The three terms serialize: in
+      eager mode the CPU cannot enqueue the next op until the last one has
+      returned, so dispatch does not hide behind GPU work."""
+      # TODO
+      return 1.0
+
+  def fps(model, dev, mode):
+      # TODO
+      return 0.0
+
+  def bottleneck(model, dev, mode):
+      """Which term is largest: 'cpu-dispatch', 'gpu', or 'transfer'."""
+      # TODO
+      return "gpu"
+
+  print("arithmetic intensity: %.1f FLOP/byte" % arithmetic_intensity(MODEL))
+  for _name, _dev in DEVICES.items():
+      print("  ridge point %-18s %6.0f FLOP/byte" % (_name, ridge_point(_dev)))
+  print()
+  for _mode in ("eager", "graph"):
+      for _name, _dev in DEVICES.items():
+          _t = frame_seconds(MODEL, _dev, _mode)
+          print("%-6s %-18s %7.3f ms  %7.1f fps   gpu %4.1f%% of frame   -> %s" % (
+              _mode, _name, _t * 1e3, fps(MODEL, _dev, _mode),
+              100 * gpu_seconds(MODEL, _dev) / _t, bottleneck(MODEL, _dev, _mode)))
+tests: |
+  import copy
+  _WS, _ORIN = DEVICES["workstation-A100"], DEVICES["robot-AGX-Orin"]
+
+  # 1. The model is memory-bound on BOTH devices, by a wide margin.
+  _ai = arithmetic_intensity(MODEL)
+  assert abs(_ai - 26.25) < 0.01, "2.1 GFLOP over 80 MB is 26.25 FLOP/byte, got %.2f" % _ai
+  assert abs(ridge_point(_WS) - 200.6) < 1.0, "the A100's ridge is peak/bandwidth = 200.6 FLOP/byte, got %.1f" % ridge_point(_WS)
+  assert abs(ridge_point(_ORIN) - 335.7) < 1.0, "the Orin's ridge is 335.7 FLOP/byte, got %.1f" % ridge_point(_ORIN)
+  for _n, _d in DEVICES.items():
+      assert _ai < ridge_point(_d), \
+          "%s: intensity %.1f is far below the ridge %.0f, so this model is memory-bound there — and note the ridge does not depend on achieved_frac, since it scales both terms" % (_n, _ai, ridge_point(_d))
+
+  # 2. In eager mode BOTH devices are bound by the CPU, not the GPU.
+  for _n, _d in DEVICES.items():
+      assert bottleneck(MODEL, _d, "eager") == "cpu-dispatch", \
+          "%s in eager mode is limited by kernel launch, not by the accelerator" % _n
+      _share = gpu_seconds(MODEL, _d) / frame_seconds(MODEL, _d, "eager")
+      assert _share < 0.08, \
+          "%s: the GPU accounts for %.1f%% of the frame. Every conversation about which accelerator to buy is about that sliver." % (_n, 100 * _share)
+
+  _f_ws = fps(MODEL, _WS, "eager")
+  _f_or = fps(MODEL, _ORIN, "eager")
+  assert 210 < _f_ws < 230, "expected about 220 fps on the workstation, got %.1f" % _f_ws
+  assert 55 < _f_or < 70, "expected about 62 fps on the robot, got %.1f" % _f_or
+
+  # 3. THE TEST THAT MATTERS. Double the accelerator's peak FLOPs and
+  #    measure what it buys.
+  _fast = copy.deepcopy(_WS)
+  _fast["peak_flops"] *= 2.0
+  _gain = fps(MODEL, _fast, "eager") / _f_ws - 1.0
+  assert abs(_gain) < 0.005, \
+      "doubling peak FLOPs changed throughput by %.1f%%. It should change nothing: the model is memory-bound, so the compute term was never the max, and in eager mode the GPU term is 3%% of the frame regardless." % (100 * _gain)
+
+  # Doubling the BANDWIDTH doesn't rescue eager mode either.
+  _wide = copy.deepcopy(_ORIN)
+  _wide["bandwidth_bps"] *= 2.0
+  assert fps(MODEL, _wide, "eager") / _f_or - 1.0 < 0.05, \
+      "twice the memory bandwidth is worth less than 5% while the CPU is the bottleneck"
+
+  # Halving the per-op dispatch cost nearly doubles throughput, which is
+  # where the money was the whole time.
+  _quick = copy.deepcopy(_ORIN)
+  _quick["dispatch_us_per_op"] /= 2.0
+  assert fps(MODEL, _quick, "eager") > 1.8 * _f_or, \
+      "halving dispatch cost should nearly double throughput — that term is 93%% of the frame"
+
+  # 4. Capture the graph and the picture inverts: now the accelerator is
+  #    the bottleneck on both, and the model is memory-bound as predicted.
+  for _n, _d in DEVICES.items():
+      assert fps(MODEL, _d, "graph") > 10 * fps(MODEL, _d, "eager"), \
+          "%s: removing per-op launch overhead should be worth more than 10x" % _n
+  assert bottleneck(MODEL, _ORIN, "graph") == "gpu", "the Orin becomes memory-bound once dispatch is gone"
+  assert bottleneck(MODEL, _WS, "graph") == "gpu", "so does the workstation, though its PCIe copy is now a third of the frame"
+  _xfer_share = transfer_seconds(MODEL, _WS) / frame_seconds(MODEL, _WS, "graph")
+  assert _xfer_share > 0.25, \
+      "on the optimized workstation path the host-to-device copy is %.0f%% of the frame — and it is exactly 0%% on the robot, whose unified memory needs no copy at all" % (100 * _xfer_share)
+
+  # 5. And the uncomfortable part: optimizing WIDENS the gap.
+  _gap_eager = frame_seconds(MODEL, _ORIN, "eager") / frame_seconds(MODEL, _WS, "eager")
+  _gap_graph = frame_seconds(MODEL, _ORIN, "graph") / frame_seconds(MODEL, _WS, "graph")
+  assert 3.4 < _gap_eager < 3.8, "eager gap should be about 3.6x, got %.2f" % _gap_eager
+  assert _gap_graph > _gap_eager, \
+      "the gap grew from %.1fx to %.1fx after optimization. The CPU bottleneck was hurting both machines and masking the hardware difference; removing it exposes the 7.6x bandwidth ratio underneath." % (_gap_eager, _gap_graph)
+hints:
+  - "arithmetic_intensity is flops/bytes and depends only on the model. ridge_point is peak/bandwidth — note that achieved_frac cancels, so the ridge is the same whether you use theoretical or achieved figures."
+  - "gpu_seconds: `max(flops / (peak * frac), bytes / (bandwidth * frac))`. Roofline assumes compute and memory traffic overlap, so the slower one sets the pace."
+  - "dispatch_seconds: `ops * dispatch_us_per_op * 1e-6` in eager mode, `graph_launch_us * 1e-6` in graph mode. Note it does not reference the accelerator at all — this is host time."
+  - "frame_seconds is the sum of the three terms, and the sum is the point: in eager mode the CPU issues one kernel, waits, issues the next. Nothing overlaps. bottleneck returns the name of the largest term."
+solution: |
+  def arithmetic_intensity(model):
+      return model["flops"] / model["bytes"]
+
+  def ridge_point(dev):
+      # achieved_frac scales compute and bandwidth alike, so it cancels:
+      # the ridge is a property of the hardware's balance, not of how well
+      # any particular kernel uses it.
+      return dev["peak_flops"] / dev["bandwidth_bps"]
+
+  def gpu_seconds(model, dev):
+      frac = dev["achieved_frac"]
+      compute = model["flops"] / (dev["peak_flops"] * frac)
+      memory = model["bytes"] / (dev["bandwidth_bps"] * frac)
+      return max(compute, memory)
+
+  def dispatch_seconds(model, dev, mode):
+      # Host time. Notice this function never touches peak_flops or
+      # bandwidth — which is why buying a better accelerator does not move
+      # it.
+      if mode == "eager":
+          return model["ops"] * dev["dispatch_us_per_op"] * 1e-6
+      return dev["graph_launch_us"] * 1e-6
+
+  def transfer_seconds(model, dev):
+      if dev["link_bps"] is None:
+          return 0.0
+      return model["input_bytes"] / dev["link_bps"]
+
+  def frame_seconds(model, dev, mode):
+      return (dispatch_seconds(model, dev, mode)
+              + gpu_seconds(model, dev)
+              + transfer_seconds(model, dev))
+
+  def fps(model, dev, mode):
+      return 1.0 / frame_seconds(model, dev, mode)
+
+  def bottleneck(model, dev, mode):
+      terms = {
+          "cpu-dispatch": dispatch_seconds(model, dev, mode),
+          "gpu": gpu_seconds(model, dev),
+          "transfer": transfer_seconds(model, dev),
+      }
+      return max(terms, key=terms.get)
+
+  print("arithmetic intensity: %.1f FLOP/byte" % arithmetic_intensity(MODEL))
+  for _name, _dev in DEVICES.items():
+      print("  ridge point %-18s %6.0f FLOP/byte" % (_name, ridge_point(_dev)))
+  print()
+  for _mode in ("eager", "graph"):
+      for _name, _dev in DEVICES.items():
+          _t = frame_seconds(MODEL, _dev, _mode)
+          print("%-6s %-18s %7.3f ms  %7.1f fps   gpu %4.1f%% of frame   -> %s" % (
+              _mode, _name, _t * 1e3, fps(MODEL, _dev, _mode),
+              100 * gpu_seconds(MODEL, _dev) / _t, bottleneck(MODEL, _dev, _mode)))

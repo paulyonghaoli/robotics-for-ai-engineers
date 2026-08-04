@@ -1,0 +1,90 @@
+id: sys-l1-quiz
+title: "Quiz — the performance model"
+lesson: modules/13-systems-perf/01-performance-model
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why is a batch-1 network memory-bound on essentially every device?"
+    options:
+      - text: "At batch 1 each weight is read once and used once, so there is no reuse to amortize the read against — arithmetic intensity is low by construction, not by accident"
+        correct: true
+        explanation: "Batching is what raises intensity, and a robot has one camera and one frame. The regime is forced by the deployment, not chosen."
+      - text: "Because small models have fewer FLOPs"
+        explanation: "Fewer FLOPs and fewer bytes; the ratio is what matters, and it does not improve."
+      - text: "Because edge devices have slow memory"
+        explanation: "They do, and the same model is memory-bound on an A100 with 1.5 TB/s."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A device has 312 TFLOP/s of peak compute and 1555 GB/s of bandwidth. What is its ridge point, in FLOP/byte?"
+    answer: 200.6
+    tolerance: 5
+    explanation: "312e12 / 1555e9 = 200.6. Below that intensity the device is memory-bound. Note the achieved-efficiency factor cancels — it scales both terms — so the ridge is a property of the hardware's balance."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your policy is memory-bound. The vendor offers a part with 2× the peak TOPS at the same memory bandwidth. What does it buy?"
+    options:
+      - text: "Nothing. The compute term was not the maximum and doubling it does not make it the maximum"
+        correct: true
+        explanation: "Exactly zero, not approximately. The only ratio that exists for a memory-bound model is the bandwidth ratio."
+      - text: "Roughly 2×"
+        explanation: "That is what the datasheet comparison implies and it is the wrong model for this workload."
+      - text: "Roughly √2×"
+        explanation: "There is no regime where this is the answer."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "In eager mode the GPU accounts for 3% of the workstation's frame time and 7% of the robot's. What is consuming the rest?"
+    options:
+      - text: "CPU kernel-launch dispatch — 72 ops launched one at a time, each costing host time that does not overlap with the GPU work"
+        correct: true
+        explanation: "Which makes the robot's frame rate a property of its CPU. This is why capturing the graph is worth 14-20x and touches no hardware."
+      - text: "Memory bandwidth on the host side"
+        explanation: "Small compared with the dispatch loop at these sizes."
+      - text: "Data loading and preprocessing"
+        explanation: "Real and separate; the model above already excludes it."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "You capture the model as a CUDA graph. Frame time drops 20×. What actually got faster?"
+    options:
+      - text: "Nothing computational — the same kernels run in the same order. One launch replaced seventy-two, so the host stopped being the bottleneck"
+        correct: true
+        explanation: "Worth being precise about, because it predicts when the trick will NOT help: a model with six large kernels has little dispatch overhead to remove."
+      - text: "The kernels were fused into faster ones"
+        explanation: "Fusion is a separate optimization that also reduces memory traffic; graph capture alone removes launch overhead."
+      - text: "Memory access patterns improved"
+        explanation: "Unchanged by graph capture."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "After optimization the workstation/robot gap grew from 3.6× to 4.9×. Why does removing a bottleneck make the edge device look relatively worse?"
+    options:
+      - text: "The CPU bottleneck was hurting both machines and masking the hardware difference. Removing it exposes the 7.6× bandwidth ratio that was there all along"
+        correct: true
+        explanation: "A team that benchmarks in eager mode budgets for a 3.6x problem and discovers a 4.9x problem after the port — which is the wrong order to learn it in."
+      - text: "The optimization is less effective on embedded hardware"
+        explanation: "It is worth 14x there and 20x on the workstation; that difference is not the mechanism."
+      - text: "Thermal throttling"
+        explanation: "A real effect, and not present in this model."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "The optimized workstation spends 34% of its frame on the host-to-device copy; the robot spends 0%. Why?"
+    options:
+      - text: "The Jetson has unified memory — the camera buffer is already in memory the accelerator can address, so there is no copy to make"
+        correct: true
+        explanation: "On this axis the embedded part is the better machine. A naive port that allocates host buffers and copies anyway pays for hardware it already owns."
+      - text: "The robot's link is faster"
+        explanation: "There is no link; that is the point."
+      - text: "The robot's input is smaller"
+        explanation: "Same input in this model."
+  - id: q8
+    type: numeric
+    difficulty: stretch
+    prompt: "A 7B-parameter VLA in FP16 must read all its weights once per inference. On a device with 205 GB/s of memory bandwidth, what is the maximum achievable frame rate, in fps?"
+    answer: 14.6
+    tolerance: 3
+    explanation: "14 GB / 205 GB/s = 68 ms, so about 14.6 fps as a hard ceiling before any arithmetic, any dispatch, and at 100% of peak bandwidth. Quantizing to INT4 is not a compression trick here — it is a 4x frame-rate change."
