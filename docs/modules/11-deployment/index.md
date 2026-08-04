@@ -15,6 +15,8 @@ This is the module where your platform-engineering instincts transfer most direc
 5. [Safety cases for learned components](05-safety-cases.md) — **available**
 6. [Lab: the incident](06-lab-the-incident.md) — **available**
 
+**Graded:** [Mini-project: the deployment gate](project-deployment.md) — 100 pts, autograded.
+
 ## What you'll build
 
 A latency budget for a real control pipeline — and the discovery that the stage with the largest *mean* is usually not the one causing deadline misses. Then the same lens applied to model precision, where ranking by accuracy and ranking by robot reliability put opposite models first.
