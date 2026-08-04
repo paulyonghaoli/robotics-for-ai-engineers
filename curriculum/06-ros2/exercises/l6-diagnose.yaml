@@ -1,0 +1,241 @@
+id: ros-l6-diagnose
+title: "Seven nodes that worked alone"
+lesson: modules/06-ros2/06-lab-worked-alone
+description: >-
+  Seven nodes, each of which passes its own tests and misbehaves inside the
+  system. Six are middleware problems with no error message between them.
+  One is not a middleware problem at all, and saying so is the point of
+  including it.
+setup_code: |
+  # What you can observe from outside each node. Every field is something
+  # `ros2 topic hz`, `ros2 param get`, `ros2 topic info --verbose`, a
+  # profiler, or a stopwatch will tell you.
+  #
+  #   expected_hz / observed_hz   the callback's nominal and actual rate
+  #   has_publisher               is anything publishing on the name this
+  #                               node RESOLVED to?
+  #   qos_compatible              do the endpoint QoS profiles match?
+  #   hangs                       did the node stop responding entirely?
+  #   own_ms / blocked_ms         time in this callback, and time waiting
+  #                               behind other callbacks
+  #   period_ms                   the callback's period
+  #   param_expected / param_actual / param_source
+  #   tf_lookup                   'stamp', 'latest', or None
+  #   tf_error_m                  measured detection error
+  INCIDENTS = {
+      "A": {"expected_hz": 10.0, "observed_hz": 0.0, "has_publisher": True,
+            "qos_compatible": False, "hangs": False,
+            "own_ms": 3.0, "blocked_ms": 0.0, "period_ms": 100.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": None, "tf_error_m": 0.0},
+
+      "B": {"expected_hz": 50.0, "observed_hz": 0.0, "has_publisher": False,
+            "qos_compatible": None, "hangs": False,
+            "own_ms": 2.0, "blocked_ms": 0.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": None, "tf_error_m": 0.0},
+
+      "C": {"expected_hz": 50.0, "observed_hz": 0.0, "has_publisher": True,
+            "qos_compatible": True, "hangs": True,
+            "own_ms": 4.0, "blocked_ms": 0.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": None, "tf_error_m": 0.0},
+
+      "D": {"expected_hz": 50.0, "observed_hz": 12.4, "has_publisher": True,
+            "qos_compatible": True, "hangs": False,
+            "own_ms": 4.0, "blocked_ms": 77.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": None, "tf_error_m": 0.0},
+
+      "E": {"expected_hz": 50.0, "observed_hz": 50.0, "has_publisher": True,
+            "qos_compatible": True, "hangs": False,
+            "own_ms": 4.0, "blocked_ms": 0.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": "latest", "tf_error_m": 0.65},
+
+      "F": {"expected_hz": 50.0, "observed_hz": 50.0, "has_publisher": True,
+            "qos_compatible": True, "hangs": False,
+            "own_ms": 4.0, "blocked_ms": 0.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 0.5, "param_source": "default",
+            "tf_lookup": "stamp", "tf_error_m": 0.0},
+
+      "G": {"expected_hz": 50.0, "observed_hz": 40.0, "has_publisher": True,
+            "qos_compatible": True, "hangs": False,
+            "own_ms": 25.0, "blocked_ms": 0.0, "period_ms": 20.0,
+            "param_expected": 1.5, "param_actual": 1.5, "param_source": "yaml",
+            "tf_lookup": "stamp", "tf_error_m": 0.0},
+  }
+
+  TF_TOL_M = 0.10
+starter_code: |
+  # Provided: INCIDENTS (A-G), TF_TOL_M
+
+  def silent(inc):
+      """True if the callback never fires at all."""
+      # TODO
+      return False
+
+  def late(inc):
+      """True if the callback fires, and slower than it should."""
+      # TODO
+      return False
+
+  def starved(inc):
+      """True if OTHER callbacks are what pushes this one past its period."""
+      # TODO
+      return False
+
+  def overruns(inc):
+      """True if this callback's own work exceeds its period, with nothing
+      else to blame."""
+      # TODO
+      return False
+
+  def misconfigured(inc):
+      """True if a parameter fell back to its declared default when
+      something was supposed to set it."""
+      # TODO
+      return False
+
+  def stale_tf(inc):
+      """True if transforms are looked up at the latest time and the
+      resulting error exceeds TF_TOL_M."""
+      # TODO
+      return False
+
+  def diagnose(name):
+      """One of:
+        'executor-deadlock'      the node stopped responding entirely
+        'name-mismatch'          nothing publishes on the resolved name
+        'qos-mismatch'           a publisher exists and the profiles do not match
+        'parameter-not-applied'  running on a default that something meant to override
+        'stale-transform'        looked up at the latest time instead of the stamp
+        'head-of-line-blocking'  other callbacks push this one past its period
+        'callback-too-slow'      this callback's own work does not fit
+        'healthy'                nothing to report
+
+      Check them in that order — several incidents satisfy more than one
+      description, and the order encodes which explanation comes first.
+      """
+      # TODO
+      return "healthy"
+
+  for _n in sorted(INCIDENTS):
+      _i = INCIDENTS[_n]
+      print("%s  %5.1f/%5.1f Hz  own %4.1f blocked %4.1f of %4.1f ms  -> %s" % (
+          _n, _i["observed_hz"], _i["expected_hz"],
+          _i["own_ms"], _i["blocked_ms"], _i["period_ms"], diagnose(_n)))
+tests: |
+  _I = INCIDENTS
+
+  # 1. The probes.
+  assert silent(_I["A"]) and silent(_I["B"]) and silent(_I["C"])
+  assert not silent(_I["D"]) and late(_I["D"])
+  assert not late(_I["E"]), "E's loop runs at exactly its nominal rate"
+  assert starved(_I["D"]) and not starved(_I["G"]), (
+      "D is delayed by other callbacks (77 ms of them); G is delayed by "
+      "itself")
+  assert overruns(_I["G"]) and not overruns(_I["D"]), (
+      "G's own callback takes 25 ms in a 20 ms period, with nothing else "
+      "running")
+  assert misconfigured(_I["F"]) and not misconfigured(_I["A"])
+  assert stale_tf(_I["E"]) and not stale_tf(_I["F"])
+
+  # 2. Seven incidents, seven causes.
+  _expected = {
+      "A": "qos-mismatch",
+      "B": "name-mismatch",
+      "C": "executor-deadlock",
+      "D": "head-of-line-blocking",
+      "E": "stale-transform",
+      "F": "parameter-not-applied",
+      "G": "callback-too-slow",
+  }
+  for _n, _want in _expected.items():
+      _got = diagnose(_n)
+      assert _got == _want, "%s should be %s, got %s" % (_n, _want, _got)
+  assert len({diagnose(n) for n in _I}) == 7, "each one has its own explanation"
+
+  # 3. The three that are worth arguing about.
+  assert _I["A"]["has_publisher"] and not _I["B"]["has_publisher"], (
+      "A and B look identical from inside the node — the callback never "
+      "fires. They are told apart by ONE observation: is anything publishing "
+      "on the name this node actually resolved to? If yes it is QoS; if no "
+      "the node is listening to a topic that does not exist.")
+
+  assert _I["E"]["observed_hz"] == _I["E"]["expected_hz"], (
+      "E is the uncomfortable one. Every rate is nominal, nothing is blocked, "
+      "no callback is late, and the detections land 0.65 m from the obstacle. "
+      "A healthy graph is not a correct one, and no timing probe finds this.")
+
+  assert not starved(_I["G"]) and _I["G"]["blocked_ms"] == 0.0, (
+      "G is not a middleware problem. Nothing is misconfigured, nothing is "
+      "blocked, and the callback takes 25 ms in a 20 ms period — the code is "
+      "too slow and the answer is 13.3's profile, not a callback group. "
+      "Including it is the point: the middleware is not always the suspect.")
+
+  # 4. And the ordering matters, because the descriptions overlap.
+  assert diagnose("C") == "executor-deadlock", (
+      "C is silent AND has a compatible publisher, so it satisfies more than "
+      "one probe. A node that has stopped responding is diagnosed as that "
+      "first — everything else about it is a consequence")
+hints:
+  - "silent: observed_hz == 0. late: observed_hz below expected_hz but not zero. starved: blocked_ms > 0 and own_ms + blocked_ms > period_ms. overruns: own_ms > period_ms."
+  - "misconfigured: param_source == 'default' and param_actual != param_expected. stale_tf: tf_lookup == 'latest' and tf_error_m > TF_TOL_M."
+  - "diagnose: check hangs first, then the two silent cases split by has_publisher, then misconfigured, then stale_tf, then starved, then overruns, then healthy."
+  - "A and B differ in one field and only one: has_publisher. That is the observation that tells a QoS mismatch from a name mismatch, and it is why `ros2 topic info --verbose` on the RESOLVED name is the first command to run."
+solution: |
+  def silent(inc):
+      return inc["observed_hz"] == 0.0
+
+  def late(inc):
+      return 0.0 < inc["observed_hz"] < inc["expected_hz"]
+
+  def starved(inc):
+      # Somebody else's work is what pushed this callback over.
+      return bool(inc["blocked_ms"] > 0.0
+                  and inc["own_ms"] + inc["blocked_ms"] > inc["period_ms"])
+
+  def overruns(inc):
+      return bool(inc["own_ms"] > inc["period_ms"])
+
+  def misconfigured(inc):
+      return bool(inc["param_source"] == "default"
+                  and inc["param_actual"] != inc["param_expected"])
+
+  def stale_tf(inc):
+      return bool(inc["tf_lookup"] == "latest" and inc["tf_error_m"] > TF_TOL_M)
+
+  def diagnose(name):
+      inc = INCIDENTS[name]
+
+      # A node that has stopped responding is that, first. Everything else
+      # observable about it is downstream of the hang.
+      if inc["hangs"]:
+          return "executor-deadlock"
+
+      if silent(inc):
+          # One observation separates these: is anything publishing on the
+          # name this node actually resolved to?
+          if not inc["has_publisher"]:
+              return "name-mismatch"
+          if not inc["qos_compatible"]:
+              return "qos-mismatch"
+
+      # These two are invisible to any timing probe.
+      if misconfigured(inc):
+          return "parameter-not-applied"
+      if stale_tf(inc):
+          return "stale-transform"
+
+      if starved(inc):
+          return "head-of-line-blocking"
+      if overruns(inc):
+          return "callback-too-slow"
+      return "healthy"
+
+  for _n in sorted(INCIDENTS):
+      _i = INCIDENTS[_n]
+      print("%s  %5.1f/%5.1f Hz  own %4.1f blocked %4.1f of %4.1f ms  -> %s" % (
+          _n, _i["observed_hz"], _i["expected_hz"],
+          _i["own_ms"], _i["blocked_ms"], _i["period_ms"], diagnose(_n)))

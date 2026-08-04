@@ -128,6 +128,7 @@ nav:
       - "6.3 Executors and callback groups": modules/06-ros2/03-executors.md
       - "6.4 tf2": modules/06-ros2/04-tf2.md
       - "6.5 Launch and parameters": modules/06-ros2/05-launch-params.md
+      - "6.6 Lab: the node that worked alone": modules/06-ros2/06-lab-worked-alone.md
   - "Capstone II · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: thirteen bugs": capstone-log.md

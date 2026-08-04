@@ -1,6 +1,6 @@
 # Module 6 · Robotics Software with ROS 2
 
-**Status:** In progress · **Parallel track — not a prerequisite** · **Pinned distro:** ROS 2 Jazzy
+**Status:** Complete · **Parallel track — not a prerequisite** · **Pinned distro:** ROS 2 Jazzy
 
 !!! info "This module is optional for Courses I–II"
     Everything through the capstone runs in pure Python; you never need a ROS installation to finish the classical stack. Take this track whenever you want industrial integration skills. Worth knowing from the [frontier research](../../frontier.md): ROS 2 is mandatory at Agility, Boston Dynamics, and Amazon Robotics, and conspicuously absent from frontier VLA-lab job postings — it's a platform/integration credential, not a robot-learning one.
@@ -16,7 +16,7 @@ We reference the [official ROS 2 tutorials](https://docs.ros.org/en/jazzy/Tutori
 3. [Executors and callback groups: where your callbacks actually run](03-executors.md) — **available**
 4. [tf2: the transform tree as a service](04-tf2.md) — **available**
 5. [Launch, parameters, and the configuration surface](05-launch-params.md) — **available**
-6. Lab: the node that worked alone — *planned*
+6. [Lab: the node that worked alone](06-lab-worked-alone.md) — **available**
 
 ## How this module is taught
 
