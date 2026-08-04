@@ -203,11 +203,58 @@ The remaining gap does **not** close by tuning, and the ablation says so directl
 | dead reckoning | 3.26 m | 0.37 – **8.56** |
 | v4's scan matching | 2.31 m | 0.47 – 6.30 |
 
-Scan matching **bounds** drift; it does not remove it. A constant bias is invisible to incremental matching, because detecting it means recognising a place you mapped *before* you drifted — the map and the pose are wrong together and perfectly self-consistent, which is precisely what bug 11's confidence trace was showing. Removing it needs loop closure and a pose graph ([lesson 4.4](modules/04-mapping/04-pose-graphs.md)). That is what v5 would be.
+Scan matching **bounds** drift; it does not remove it. A constant bias is invisible to incremental matching, because detecting it means recognising a place you mapped *before* you drifted — the map and the pose are wrong together and perfectly self-consistent, which is precisely what bug 11's confidence trace was showing. Removing it needs loop closure and a pose graph ([lesson 4.4](modules/04-mapping/04-pose-graphs.md)).
+
+So I built one. It did not become v5, and the reason is worth more than the code.
+
+## Note 14 — the loop closure that had no loop to close
+
+The back end works. `projects/capstone_nav/posegraph.py` is scan-to-scan matching, a Gauss-Newton pose graph on SE(2) with the first keyframe pinned as the gauge, and a map rebuilt from the optimised poses. Against a graph whose answer is known by construction — an octagon walked with a 0.05 rad per-edge bias, which opens the loop by 1.10 m — one closure brings the final node to **0.000 m** and the worst node anywhere on the trajectory to 0.017 m. Those are unit tests, not a demo.
+
+Then I ran it on the capstone and it changed nothing: 2.31 m → 2.28 m, six closures across six seeds.
+
+The instinct is to tune the detector. The right move was to ask whether there was anything to detect, so I counted revisits directly — pairs of points on the true trajectory more than six seconds apart and closer than 1.5 m:
+
+| seed | 0 | 17 | 34 | 51 | 68 | 85 |
+|---|---:|---:|---:|---:|---:|---:|
+| revisit pairs | **0** | **0** | **0** | **0** | **0** | **0** |
+
+Zero. Every one. **The capstone task is a single traverse from a start to a goal, and a single traverse never returns to anywhere it has been.** There is no loop, so there is nothing for loop closure to do, and no amount of work on the detector would have changed that. An hour of tuning would have produced a slightly different zero.
+
+Loop closure is a property of the **trajectory**, not of the algorithm.
+
+### What it is worth when there is a loop
+
+Give the robot a there-and-back tour — drive to the goal, then home, which is what a SLAM benchmark actually drives — and the trajectory revisits everything. Same localizer, same bias, `slam_ablation.py lc+bias+tour`:
+
+| | RMSE | final error |
+|---|---:|---:|
+| dead reckoning | 5.34 m | 9.14 m |
+| v4 scan matching | 4.31 m | 7.92 m |
+| **+ loop closure and pose graph** | **3.73 m** | **4.83 m** |
+
+And the aggregate hides the actual result. Two of the six seeds cannot close a loop even on a tour, for two different measured reasons — and separating them is the whole story:
+
+| | v4 | + loop closure | |
+|---|---:|---:|---|
+| seeds 0, 34, 68, 85 | 2.23 m | **1.37 m** | **39% better** |
+| seeds 17, 51 | 8.45 m | 8.44 m | unchanged |
+
+Seed 17's world is open, so most beams are max-range misses and a keyframe carries fewer than fourteen usable points — **there is not enough geometry to identify a place**, and the matcher correctly refuses rather than closing confidently on six points. Seed 51's tour ran out of steps before completing the return leg, leaving four revisit pairs in the whole episode.
+
+So the honest summary is: where a loop exists and the environment has structure, closure removes 39% of the error the front end could not touch; where either is missing, it does exactly nothing and says so. Both halves are the result.
+
+### Why there is no v5 stack
+
+Making this a shipped capstone version would mean changing the task from "reach the goal" to "tour and return", which means a new simulator termination contract and a new rubric for every earlier version to be re-scored against. That is a different capstone, not a fifth version of this one — and inventing a task to justify a technique I had already written is the wrong order to do engineering in.
+
+The back end, its unit tests and the ablation evidence stay in the repository, and the capstone stays a four-version stack whose published envelope is honest about what bounds its drift.
 
 ---
 
-## What the thirteen have in common
+## What the thirteen bugs have in common
+
+(Note 14 is not one of them — it is a negative result, and the only entry here that cost nothing to fix because there was nothing to fix.)
 
 Eleven of the thirteen were **not** bugs in an algorithm. They were bugs in the *interface between* an algorithm and the world: what a sensor's non-detection means, what a clipped coordinate implies, what a blocked command did, how margins accumulate. The algorithms — particle filter, A*, pure pursuit, occupancy mapping, DWA — were textbook-correct throughout.
 

@@ -22,12 +22,21 @@ Modes, in the order they were tried:
     occ    as clip, but scoring only occupied evidence (no free penalty)
     kf     match at keyframes instead of every step
     lf     keyframes, likelihood field, odometry prior, no clipped endpoints
+    lc     as lf, plus loop closure and a pose graph (v5's back end)
 
 Suffix any mode with '+bias' to replace perfect command playback with
 wheel encoders: a constant scale error on translation and a constant
 drift on rotation. Unlike white noise, that does not average out, and it
 is what separates "scan matching helps" from "scan matching is bounded
 by what odometry hands it".
+
+Suffix with '+tour' to drive to the goal AND BACK. The capstone task is a
+single traverse, and a single traverse never revisits a place: measured
+over the six seeds below, the number of trajectory pairs more than six
+seconds apart and within 1.5 m is exactly ZERO. There is no loop to
+close, so loop closure is worth nothing on it, however good the back end.
+A there-and-back tour is what a SLAM benchmark actually drives, and it is
+the only condition under which 'lc' can be judged at all.
 """
 
 import sys
@@ -44,7 +53,16 @@ if str(_SOLUTIONS) not in sys.path:
 
 import reference_stack  # noqa: E402
 from pf_stack import distance_field  # noqa: E402
-from sim import DT, GRID_N, MAX_RANGE, N_RAYS, RESOLUTION, Simulator  # noqa: E402
+from posegraph import PoseGraph, scan_points  # noqa: E402
+from sim import (  # noqa: E402
+    DT,
+    GOAL_TOLERANCE,
+    GRID_N,
+    MAX_RANGE,
+    N_RAYS,
+    RESOLUTION,
+    Simulator,
+)
 
 from robotics_ai.geometry import wrap_angle  # noqa: E402
 from robotics_ai.mapping import OccupancyGridMap  # noqa: E402
@@ -168,16 +186,64 @@ def match_lf(guess, scan, field, dxy, dth, sigma=0.25, gate=1.0,
     return pose, float(lik[best] / len(r))     # fraction of beams that agreed
 
 
+class TourDriver:
+    """The reference controller, driving to the goal and back to the start.
+
+    Everything here uses the TRUE pose, like the rest of this harness: the
+    driver is scaffolding, and the localizer under test only observes.
+    """
+
+    def __init__(self, sim):
+        self.sim = sim
+        # sim.start carries a heading; a planner goal is a position.
+        self.waypoints = [np.asarray(sim.goal, dtype=float)[:2],
+                          np.asarray(sim.start, dtype=float)[:2]]
+        self.k = 0
+        self.stack = reference_stack.ReferenceStack(sim.grid, self.waypoints[0])
+        self.finished = False
+
+    def step(self, obs):
+        if self.finished:
+            return 0.0, 0.0
+        reached = np.hypot(*(self.sim.pose[:2] - self.waypoints[self.k]))
+        if reached < GOAL_TOLERANCE * 0.8:
+            self.k += 1
+            if self.k >= len(self.waypoints):
+                self.finished = True
+                return 0.0, 0.0
+            self.stack = reference_stack.ReferenceStack(
+                self.sim.grid, self.waypoints[self.k])
+        return self.stack.step(obs)
+
+
+def rebuild_map(graph):
+    """Re-integrate every keyframe scan at its OPTIMIZED pose.
+
+    The map was carved through the drift. Correcting the trajectory without
+    redrawing the map would leave the incremental matcher matching against
+    the very error the closure just removed.
+    """
+    gm = OccupancyGridMap((GRID_N, GRID_N), RESOLUTION)
+    for pose, raw in zip(graph.poses, graph.raws, strict=True):
+        if raw is not None:
+            integrate(gm, pose, raw)
+    return gm
+
+
 def run(seed, mode, kf_d=0.35, kf_th=0.25, win=0.10, win_th=0.05):
-    """mode: 'odom' | 'raw' | 'clip' | 'occ' | 'kf', optionally '+bias'.
+    """mode: 'odom' | 'raw' | 'clip' | 'occ' | 'kf' | 'lf' | 'lc',
+    optionally suffixed '+bias' and/or '+tour'.
 
     '+bias' models wheel encoders instead of perfect command playback: a
     constant scale error on translation and a constant drift on rotation,
     fixed per episode. This is what real odometry looks like, and unlike
     white noise it does not average out.
+
+    '+tour' drives to the goal and back, so the trajectory revisits places.
     """
-    bias = mode.endswith("+bias")
-    mode = mode.replace("+bias", "")
+    bias = "+bias" in mode
+    tour = "+tour" in mode
+    mode = mode.replace("+bias", "").replace("+tour", "")
     brng = np.random.default_rng(seed + 555)
     v_scale = 1.0 + (brng.normal(0, 0.05) if bias else 0.0)
     w_drift = brng.normal(0, 0.04) if bias else 0.0
@@ -186,21 +252,50 @@ def run(seed, mode, kf_d=0.35, kf_th=0.25, win=0.10, win_th=0.05):
         v, w = cmd
         return predict(pose, (v * v_scale, w + w_drift), clip=False)
 
-    sim = Simulator(seed)
+    sim = Simulator(seed, max_steps=1400 if tour else 600)
     obs = sim.reset()
-    driver = reference_stack.make_stack(sim)     # drives on the TRUE map+pose
+    driver = (TourDriver(sim) if tour            # drives on the TRUE map+pose
+              else reference_stack.make_stack(sim))
     gmap = OccupancyGridMap((GRID_N, GRID_N), RESOLUTION)
     est = obs["pose_meas"].copy()
     integrate(gmap, est, obs["scan"])
     cmd, errs = (0.0, 0.0), []
     since = est.copy()                            # pose at the last keyframe
     grow = 1.0                                    # search-window growth on lost lock
+    graph = PoseGraph()
+    if mode == "lc":
+        graph.add_keyframe(est, scan_points(obs["scan"], BEARINGS, MAX_RANGE, MISS),
+                           obs["scan"])
 
-    for _ in range(600):
+    for _ in range(1400 if tour else 600):
         obs, done = sim.step(*cmd)
         if mode == "odom":
             est = odo(est, cmd)
             integrate(gmap, est, obs["scan"])
+        elif mode == "lc":
+            est = odo(est, cmd)
+            moved = np.hypot(*(est[:2] - since[:2]))
+            turned = abs(wrap_angle(est[2] - since[2]))
+            if moved > kf_d or turned > kf_th:
+                occ = gmap.occupied_mask(0.65)
+                if occ.sum() > 30:
+                    est, q = match_lf(est, obs["scan"],
+                                      distance_field(occ) * RESOLUTION,
+                                      win * grow, win_th * grow)
+                    grow = 1.0 if q > 0.55 else min(grow * 1.7, 12.0)
+                k = graph.add_keyframe(
+                    est, scan_points(obs["scan"], BEARINGS, MAX_RANGE, MISS),
+                    obs["scan"])
+                found = graph.find_loop(k)
+                if found is not None:
+                    j, z, _q = found
+                    graph.add_loop(j, k, z)
+                    graph.optimize()
+                    est = graph.poses[-1].copy()
+                    gmap = rebuild_map(graph)
+                else:
+                    integrate(gmap, est, obs["scan"])
+                since = est.copy()
         elif mode in ("kf", "lf"):
             est = odo(est, cmd)
             moved = np.hypot(*(est[:2] - since[:2]))
@@ -225,19 +320,27 @@ def run(seed, mode, kf_d=0.35, kf_th=0.25, win=0.10, win_th=0.05):
             integrate(gmap, est, obs["scan"])
         errs.append(np.hypot(*(est[:2] - sim.pose[:2])))
         cmd = driver.step(obs)                    # true-pose controller drives
-        if done or sim.at_goal:
+        if tour:
+            # The simulator ends an episode at the goal, which is the right
+            # contract for the capstone and the wrong one for a tour. Here
+            # the goal is a waypoint, so the driver decides when it is over.
+            if driver.finished or sim.k >= sim.max_steps:
+                break
+        elif done:
             break
-    return float(np.sqrt(np.mean(np.square(errs)))), float(errs[-1])
+    return (float(np.sqrt(np.mean(np.square(errs)))), float(errs[-1]),
+            graph.loops)
 
 
 if __name__ == "__main__":
     seeds = [0, 17, 34, 51, 68, 85]
     modes = sys.argv[1:] or ["odom", "raw", "clip", "occ", "kf"]
-    print(f"{'mode':<6} {'RMSE (m)':>10} {'final (m)':>11}   per-seed RMSE")
+    print(f"{'mode':<12} {'RMSE (m)':>9} {'final (m)':>10} {'loops':>6}   per-seed RMSE")
     for mode in modes:
         rs = [run(s, mode) for s in seeds]
         rmse = np.mean([r[0] for r in rs])
         fin = np.mean([r[1] for r in rs])
-        print(f"{mode:<6} {rmse:>10.2f} {fin:>11.2f}   "
+        loops = sum(r[2] for r in rs)
+        print(f"{mode:<12} {rmse:>9.2f} {fin:>10.2f} {loops:>6}   "
               + "  ".join(f"{r[0]:.2f}" for r in rs))
     sys.exit(0)

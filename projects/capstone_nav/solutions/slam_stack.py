@@ -70,7 +70,20 @@ versus 3.3 m for dead reckoning alone — scan matching bounds drift it
 cannot remove. That is not a tuning failure. A constant bias is invisible
 to incremental matching because correcting it means recognizing a place
 you mapped before you drifted: loop closure and a pose graph (lesson
-4.4), which this stack does not have. That is what v5 would be.
+4.4), which this stack does not have.
+
+That back end now exists — `posegraph.py`, with unit tests — and there is
+still no v5, because it does nothing here. The capstone task is a single
+traverse, and a single traverse never revisits a place: across the six
+ablation seeds, the number of trajectory pairs more than six seconds
+apart and within 1.5 m is exactly zero. There is no loop to close.
+
+Driven on a there-and-back tour instead, the same back end removes 39% of
+the remaining error on the four seeds where a loop exists and exactly
+nothing on the two where it does not — one open world with too few beams
+to identify a place, one tour that ran out of steps. Loop closure is a
+property of the trajectory, not of the algorithm. Capstone log note 14
+has the numbers; `slam_ablation.py lc+bias+tour` reproduces them.
 """
 
 from __future__ import annotations
