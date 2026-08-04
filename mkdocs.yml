@@ -184,5 +184,6 @@ nav:
       - "13.2 Real-time: fast vs on time": modules/13-systems-perf/02-real-time.md
       - "13.3 The hot path": modules/13-systems-perf/03-hot-path.md
       - "13.4 Porting with parity": modules/13-systems-perf/04-porting-parity.md
+      - "13.5 Lab: the optimization that didn't help": modules/13-systems-perf/05-lab-optimization-didnt-help.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md

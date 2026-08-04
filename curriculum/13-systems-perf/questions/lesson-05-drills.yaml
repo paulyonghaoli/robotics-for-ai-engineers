@@ -1,0 +1,88 @@
+id: sys-l5-drills
+title: "Diagnosis drills — optimizations"
+lesson: modules/13-systems-perf/05-lab-optimization-didnt-help
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Result:** throughput ×3.3, per-frame latency 16 ms → 39 ms, deadline 20 ms, misses 2% → 100%. What happened?"
+    options:
+      - text: "Batching. Throughput is the metric a robot does not have — there is one camera and one frame, and each frame now waits for seven that do not exist yet"
+        correct: true
+        explanation: "The most defensible mistake in the table: the optimization worked perfectly and the metric was wrong. Every ML benchmark reports throughput."
+      - text: "The model got larger"
+        explanation: "Throughput would have fallen too."
+      - text: "Thermal throttling"
+        explanation: "That would not raise throughput."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Result:** mean 16.2 ms → 12.1 ms, max 21 ms → 66 ms, misses 2% → 9%. What was added, and why is it a regression?"
+    options:
+      - text: "A cache — by construction a fast path with a slow fallback, and the fallback is the new maximum. Against a deadline it sold the tail to buy the average"
+        correct: true
+        explanation: "The most dangerous entry, because it improved the number the team was tracking. Report the max next to the mean and it is visible immediately."
+      - text: "Nothing is wrong — a 25% mean improvement is a win"
+        explanation: "The system is scored on whether every frame arrives in time, and more of them now do not."
+      - text: "The measurement is noisy"
+        explanation: "A tripled maximum and a 4.5x miss rate is not noise."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Result:** an accelerator with twice the peak throughput. Mean frame time improved 0.3%. What should the profile have told you first?"
+    options:
+      - text: "That the accelerator was 4% of the frame, so the ceiling on the whole change was 4% however good the new part is"
+        correct: true
+        explanation: "Amdahl, computed in an afternoon, is the difference between a quarter of work and a week."
+      - text: "That the new accelerator is not compatible"
+        explanation: "It works; it is just not where the time was."
+      - text: "That the driver needs tuning"
+        explanation: "Tuning a 4% term still yields at most 4%."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Result:** a stage was ported to C++ and nothing changed at all. What was that stage?"
+    options:
+      - text: "A library call — OpenCV, BLAS, a NumPy reduction. Already compiled code running the same instructions, so the port removed a microsecond of Python dispatch"
+        correct: true
+        explanation: "And the profile said which stage was which before the work started. The biggest stage in a profile is usually the worst port candidate."
+      - text: "A stage bound by memory bandwidth"
+        explanation: "Plausible-sounding and it would still have removed the Python loop overhead if there had been any."
+      - text: "The port must have a bug"
+        explanation: "It is correct; it is just not doing anything the reference was not already doing."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "The only change that worked touched no hardware and wrote no C++. What does that suggest about where to look first?"
+    options:
+      - text: "At the gaps between kernels rather than at the kernels — per-op dispatch was most of the frame, and the fix was capturing the graph"
+        correct: true
+        explanation: "It is also the cheapest thing in the table to try, which is a good argument for trying it first regardless of what the profile says."
+      - text: "That hardware upgrades never help"
+        explanation: "They help when the accelerator is the bottleneck, which the profile can tell you in advance."
+      - text: "That C++ is not worth learning"
+        explanation: "It is; it was applied to the wrong stage here."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "You get one change to how your team reports performance results. What do you change?"
+    options:
+      - text: "Report the maximum next to the mean, always. Two of the four failures here are visible immediately in a two-column report and invisible in a one-column one"
+        correct: true
+        explanation: "It costs nothing and removes the whole class of optimization that buys an average by selling the tail."
+      - text: "Report p99 instead of the mean"
+        explanation: "Better, and 13.2 showed p99 is blind to anything rarer than 1 in 100 — which at 100 Hz is once a second."
+      - text: "Report throughput as well as latency"
+        explanation: "Adding the metric that caused one of these failures."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "Which of the five would you keep, and what is the honest summary of the quarter?"
+    options:
+      - text: "Graph capture only. Four of five were competent engineering aimed by intuitions calibrated for large-batch training, and one profile read carefully at the start would have predicted every outcome"
+        correct: true
+        explanation: "Nothing in the quarter was a bug. That is what makes it worth studying — the failure was in choosing the work, not in doing it."
+      - text: "Graph capture and the cache, since both improved the mean"
+        explanation: "The cache raised the miss rate from 2% to 9%; it is a regression against the actual requirement."
+      - text: "All except the accelerator, since the others changed something"
+        explanation: "Changing a measurement is not the same as improving the system."

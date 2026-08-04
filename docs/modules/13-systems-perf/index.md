@@ -1,6 +1,6 @@
 # Module 13 · Systems Performance
 
-**Status:** In progress · **Course IV**
+**Status:** Complete · **Course IV**
 
 Everything up to here has been about whether the robot does the right thing. This module is about whether it does it **in time**, on hardware that costs a few hundred dollars and shares its CPU with four other processes.
 
@@ -16,7 +16,7 @@ Two threads run through it, and they meet at the same question.
 2. [Real-time: the difference between fast and on time](02-real-time.md) — **available**
 3. [The hot path: what C++ buys, and what it does not](03-hot-path.md) — **available**
 4. [Porting with parity: validating a rewrite you cannot trust](04-porting-parity.md) — **available**
-5. Lab: the optimization that didn't help — *planned*
+5. [Lab: the optimization that didn't help](05-lab-optimization-didnt-help.md) — **available**
 
 ## What you'll build
 

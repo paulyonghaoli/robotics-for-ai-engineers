@@ -1,0 +1,205 @@
+id: sys-l5-optimizations
+title: "Five optimizations, one quarter"
+lesson: modules/13-systems-perf/05-lab-optimization-didnt-help
+description: >-
+  Five optimizations shipped against the same 50 Hz loop. Two changed
+  nothing, one improved the headline number and made the robot worse, one
+  improved a metric nobody was measuring against, and one worked. Build the
+  probes that tell them apart from the measurements.
+setup_code: |
+  DEADLINE_MS = 20.0        # a 50 Hz loop
+
+  # Each entry: (before, after) for four measurements, plus two facts from
+  # the profile that was taken before the work started.
+  #
+  #   gpu_share_before  fraction of the frame spent on the accelerator
+  #   stage_was         what the touched stage actually was, if one stage
+  #                     was touched at all
+  OPTIMIZATIONS = {
+      "bigger-accelerator": {
+          "mean_ms": (16.24, 16.19),
+          "max_ms": (21.0, 20.9),
+          "throughput_fps": (61.6, 61.8),
+          "miss_rate": (0.02, 0.02),
+          "gpu_share_before": 0.04,
+          "stage_was": None,
+      },
+      "batch-8": {
+          "mean_ms": (16.24, 39.00),      # per-frame latency, not per batch
+          "max_ms": (21.0, 44.0),
+          "throughput_fps": (61.6, 205.0),
+          "miss_rate": (0.02, 1.00),
+          "gpu_share_before": 0.04,
+          "stage_was": None,
+      },
+      "cache-the-expensive-stage": {
+          "mean_ms": (16.24, 12.10),
+          "max_ms": (21.0, 66.0),         # cold-cache path
+          "throughput_fps": (61.6, 82.6),
+          "miss_rate": (0.02, 0.09),
+          "gpu_share_before": 0.04,
+          "stage_was": "python-loop",
+      },
+      "cpp-port-of-undistort": {
+          "mean_ms": (16.24, 16.23),
+          "max_ms": (21.0, 21.0),
+          "throughput_fps": (61.6, 61.6),
+          "miss_rate": (0.02, 0.02),
+          "gpu_share_before": 0.04,
+          "stage_was": "library-call",
+      },
+      "graph-capture": {
+          "mean_ms": (16.24, 2.30),
+          "max_ms": (21.0, 3.10),
+          "throughput_fps": (61.6, 435.0),
+          "miss_rate": (0.02, 0.00),
+          "gpu_share_before": 0.04,
+          "stage_was": None,
+      },
+  }
+starter_code: |
+  # Provided: OPTIMIZATIONS, DEADLINE_MS
+
+  def mean_gain(opt):
+      """Speedup in mean frame time: before / after. Above 1.0 is better."""
+      # TODO
+      return 1.0
+
+  def max_gain(opt):
+      """Same ratio on the WORST frame. Below 1.0 means the tail got worse."""
+      # TODO
+      return 1.0
+
+  def throughput_gain(opt):
+      """after / before on frames per second. Above 1.0 is better."""
+      # TODO
+      return 1.0
+
+  def deadline_worse(opt):
+      """True if a larger fraction of frames missed the deadline."""
+      # TODO
+      return False
+
+  def moved_nothing(opt, eps=0.05):
+      """True if neither the mean nor the max changed by more than `eps`."""
+      # TODO
+      return False
+
+  def diagnose(name):
+      """One of:
+        'already-compiled'    the stage touched was library code
+        'not-the-bottleneck'  the term optimized was a sliver of the frame
+        'wrong-metric'        throughput improved, per-frame latency did not
+        'mean-not-max'        the average improved and the tail got worse
+        'worked'              both improved and the deadline held
+      """
+      # TODO
+      return "worked"
+
+  def ship():
+      """Which of these would you keep?"""
+      # TODO
+      return sorted(OPTIMIZATIONS)
+
+  for _n in OPTIMIZATIONS:
+      _o = OPTIMIZATIONS[_n]
+      print("%-26s mean x%5.2f  max x%5.2f  fps x%5.2f  miss %.2f->%.2f  -> %s" % (
+          _n, mean_gain(_o), max_gain(_o), throughput_gain(_o),
+          _o["miss_rate"][0], _o["miss_rate"][1], diagnose(_n)))
+  print("\nkeep:", ship())
+tests: |
+  _O = OPTIMIZATIONS
+
+  # 1. Two of the five moved nothing at all, for two different reasons.
+  assert moved_nothing(_O["bigger-accelerator"]), "the bigger accelerator changed the mean by 0.3%"
+  assert moved_nothing(_O["cpp-port-of-undistort"]), "so did the C++ port"
+  assert diagnose("bigger-accelerator") == "not-the-bottleneck", \
+      "the accelerator was 4%% of the frame before the upgrade, so the whole frame could not improve by more than 4%% however good the new part is"
+  assert diagnose("cpp-port-of-undistort") == "already-compiled", \
+      "the ported stage was a library call — already compiled code running the same instructions. The profile said which stage was which BEFORE the quarter was spent."
+
+  # 2. The one that improved the number everybody quotes.
+  assert throughput_gain(_O["batch-8"]) > 3.0, \
+      "batching raised throughput %.1fx" % throughput_gain(_O["batch-8"])
+  assert mean_gain(_O["batch-8"]) < 0.5, \
+      "...and made each frame %.1fx SLOWER, because a frame now waits for seven others that do not exist yet" % (1 / mean_gain(_O["batch-8"]))
+  assert _O["batch-8"]["miss_rate"][1] == 1.0, "every single frame now misses the deadline"
+  assert diagnose("batch-8") == "wrong-metric"
+
+  # 3. The one that improved the headline latency and made the robot worse.
+  assert mean_gain(_O["cache-the-expensive-stage"]) > 1.3, \
+      "the cache improved the mean by %.0f%%" % (100 * (mean_gain(_O["cache-the-expensive-stage"]) - 1))
+  assert max_gain(_O["cache-the-expensive-stage"]) < 0.35, \
+      "...and tripled the worst frame, because a cache is a fast path with a slow fallback and the fallback is the new maximum"
+  assert deadline_worse(_O["cache-the-expensive-stage"]), "misses went from 2%% to 9%%"
+  assert diagnose("cache-the-expensive-stage") == "mean-not-max"
+
+  # 4. The one that worked, and it is the one that touched no hardware.
+  assert mean_gain(_O["graph-capture"]) > 5.0 and max_gain(_O["graph-capture"]) > 5.0, \
+      "graph capture improved the mean AND the max by about 7x"
+  assert not deadline_worse(_O["graph-capture"])
+  assert diagnose("graph-capture") == "worked"
+
+  # 5. Five distinct verdicts, one keeper.
+  _labels = [diagnose(n) for n in OPTIMIZATIONS]
+  assert len(set(_labels)) == 5, "each optimization has its own explanation, got %s" % _labels
+  assert ship() == ["graph-capture"], \
+      "one of five is worth keeping, and the profile taken before the quarter began predicted which — the accelerator was 4%% of the frame and the dispatch loop was most of the rest. Got %s" % ship()
+hints:
+  - "mean_gain and max_gain are before/after (larger is better); throughput_gain is after/before. Keeping the direction consistent is most of what makes the table readable."
+  - "moved_nothing: both |mean_gain - 1| and |max_gain - 1| below eps. deadline_worse: the after miss rate exceeds the before one."
+  - "diagnose: check moved_nothing first and split those two on `stage_was == 'library-call'` versus `gpu_share_before` being small. Then throughput up with mean down is 'wrong-metric'; mean up with max down is 'mean-not-max'; both up is 'worked'."
+  - "ship: keep the ones diagnosed 'worked'. Nothing else earned its place, and three of the other four made some measurement worse."
+solution: |
+  def mean_gain(opt):
+      before, after = opt["mean_ms"]
+      return before / after
+
+  def max_gain(opt):
+      before, after = opt["max_ms"]
+      return before / after
+
+  def throughput_gain(opt):
+      before, after = opt["throughput_fps"]
+      return after / before
+
+  def deadline_worse(opt):
+      before, after = opt["miss_rate"]
+      return after > before
+
+  def moved_nothing(opt, eps=0.05):
+      return abs(mean_gain(opt) - 1.0) < eps and abs(max_gain(opt) - 1.0) < eps
+
+  def diagnose(name):
+      opt = OPTIMIZATIONS[name]
+
+      if moved_nothing(opt):
+          # Nothing changed. The profile taken beforehand says why.
+          if opt["stage_was"] == "library-call":
+              return "already-compiled"
+          if opt["gpu_share_before"] < 0.10:
+              return "not-the-bottleneck"
+
+      # Throughput is not latency. A robot has one frame and it needs it now.
+      if throughput_gain(opt) > 1.5 and mean_gain(opt) < 1.0:
+          return "wrong-metric"
+
+      # A fast path with a slow fallback improves the average by making the
+      # worst case worse, which is the wrong trade against a deadline.
+      if mean_gain(opt) > 1.05 and max_gain(opt) < 1.0:
+          return "mean-not-max"
+
+      if mean_gain(opt) > 1.05 and max_gain(opt) > 1.05:
+          return "worked"
+
+      return "not-the-bottleneck"
+
+  def ship():
+      return sorted(n for n in OPTIMIZATIONS if diagnose(n) == "worked")
+
+  for _n in OPTIMIZATIONS:
+      _o = OPTIMIZATIONS[_n]
+      print("%-26s mean x%5.2f  max x%5.2f  fps x%5.2f  miss %.2f->%.2f  -> %s" % (
+          _n, mean_gain(_o), max_gain(_o), throughput_gain(_o),
+          _o["miss_rate"][0], _o["miss_rate"][1], diagnose(_n)))
+  print("\nkeep:", ship())
