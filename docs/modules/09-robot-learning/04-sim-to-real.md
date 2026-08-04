@@ -1,6 +1,6 @@
 # 9.4 Sim-to-real and domain randomization
 
-**Status:** Code verified · **Prereqs:** lessons 9.1, 10.2 · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
+**Status:** Code verified · **Prereqs:** lessons 9.1, 10.2 *(read ahead)* · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
 
 ---
 

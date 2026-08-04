@@ -1,6 +1,6 @@
 # 9.3 The data engine: interventions and human-in-the-loop
 
-**Status:** Code verified · **Prereqs:** lessons 9.1, 10.4 · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
+**Status:** Code verified · **Prereqs:** lessons 9.1, 10.4 *(read ahead)* · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
 
 ---
 

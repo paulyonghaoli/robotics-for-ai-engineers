@@ -62,7 +62,7 @@ graph TD
 
 ## What exists today
 
-All four courses are complete, and every module carries the same four rungs — in-browser exercises, a diagnostic lab where you're handed working-*looking* code with a real bug, an autograded mini-project, and a capstone.
+All four courses are complete. Every one of the fourteen modules has lessons, in-browser exercises, a question bank, and a diagnostic lab where you're handed working-*looking* code with a real bug. Nine of them add an autograded mini-project; the other five are graded by their lab or by the capstone they feed.
 
 - **82 lessons** across fourteen modules: geometry, control, estimation, mapping & SLAM, planning, ROS 2, perception, manipulation, robot learning, evaluation, deployment, data infrastructure, and systems performance
 - **117 coding exercises** and **84 question banks** (546 questions), every reference solution executed against its own tests in CI

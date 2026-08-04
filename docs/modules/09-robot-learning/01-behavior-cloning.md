@@ -1,6 +1,6 @@
 # 9.1 Behavior cloning and the compounding-error problem
 
-**Status:** Code verified · **Prereqs:** Modules 1–2, lesson 10.1 · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
+**Status:** Code verified · **Prereqs:** Modules 1–2, lesson 10.1 *(read ahead)* · **Time:** ~2.5 h · **Verified:** 2026-08-02, Python 3.13, NumPy ≥ 1.26
 
 ---
 

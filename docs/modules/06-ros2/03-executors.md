@@ -1,6 +1,6 @@
 # 6.3 Executors and callback groups: where your callbacks actually run
 
-**Status:** Code verified · **Prereqs:** lessons 6.1, 13.2 · **Time:** ~2 h · **Verified:** 2026-08-03, Python 3.13
+**Status:** Code verified · **Prereqs:** lesson 6.1 · **Time:** ~2 h · **Verified:** 2026-08-03, Python 3.13
 
 ---
 

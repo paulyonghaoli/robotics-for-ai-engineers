@@ -1,6 +1,6 @@
 # 9.6 Vision-language-action models: inference and honest evaluation
 
-**Status:** Code verified · **Prereqs:** lessons 9.2, 10.1 · **Time:** ~2 h · **Verified:** 2026-08-02
+**Status:** Code verified · **Prereqs:** lessons 9.2, 10.1 *(read ahead)* · **Time:** ~2 h · **Verified:** 2026-08-02
 
 ---
 

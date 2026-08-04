@@ -10,6 +10,7 @@ else checks:
   - every lesson is reachable from the mkdocs nav
   - a module index that calls a lesson "planned" does not link to it, and
     one that calls it "available" does
+  - prereqs exist, and a prereq that comes LATER admits it ("read ahead")
   - every exercise's STARTER fails its own tests
 
 That last one is the important one. An exercise whose starter already
@@ -110,7 +111,36 @@ def main() -> int:
         if rel not in nav:
             problems.append(f"{rel}: not reachable from the mkdocs nav")
 
-    # 5. Module index claims match reality.
+    # 5. Prereqs must exist, and must not silently point forward.
+    #    Modules 10 and 11 were written before Module 9 on purpose, so a
+    #    forward reference is allowed — it just has to admit it, or a reader
+    #    on the numbered path meets a prerequisite they cannot have done.
+    numbered: dict[str, tuple[int, int]] = {}
+    for p in docs:
+        mm = re.match(r"^(\d+)-", p.name)
+        if mm and p.parent.name[:2].isdigit():
+            numbered[f"{int(p.parent.name[:2])}.{int(mm.group(1))}"] = (
+                int(p.parent.name[:2]), int(mm.group(1)))
+    for p in docs:
+        text = p.read_text(encoding="utf-8")
+        m = re.search(r"\*\*Prereqs:\*\*\s*([^\n·]+)", text)
+        if not m:
+            continue
+        line = m.group(1)
+        rel = p.relative_to(ROOT).as_posix()
+        mm = re.match(r"^(\d+)-", p.name)
+        mine = ((int(p.parent.name[:2]), int(mm.group(1)))
+                if mm and p.parent.name[:2].isdigit() else None)
+        for a, b in re.findall(r"(\d+)\.(\d+)", line):
+            key = f"{int(a)}.{int(b)}"
+            if key not in numbered:
+                problems.append(f"{rel}: prereq {key} does not exist")
+            elif mine and (int(a), int(b)) >= mine and "read ahead" not in line:
+                problems.append(
+                    f"{rel}: prereq {key} comes later and is not marked "
+                    f"'(read ahead)'")
+
+    # 6. Module index claims match reality.
     for idx in sorted((DOCS / "modules").glob("*/index.md")):
         text = idx.read_text(encoding="utf-8")
         rel = idx.relative_to(ROOT).as_posix()
@@ -127,7 +157,7 @@ def main() -> int:
             if linked and not (idx.parent / linked.group(1)).exists():
                 problems.append(f"{rel}: links to missing {linked.group(1)}")
 
-    # 6. Starters must fail.
+    # 7. Starters must fail.
     if not args.quick:
         for eid, spec in sorted(cs.exercises.items()):
             msg = run_starter(spec)
