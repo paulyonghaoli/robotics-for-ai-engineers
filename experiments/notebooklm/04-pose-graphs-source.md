@@ -192,15 +192,26 @@ The loop-closure machinery was built, tested, and verified. Then it was run on a
 
 The instinct is to tune the recognition system. The right move was to ask whether there was anything to recognise. So the trajectories were measured directly: how many times does the robot pass within 1.5 metres of somewhere it was more than six seconds ago?
 
-Across six independent test runs, the count was: **zero, zero, zero, zero, zero, zero.**
+Across six independent test runs, that count was: **zero, zero, zero, zero, zero, zero.**
+
+**Be precise about what was zero, because it is easy to get this backwards.** The detector was not idle — it fired six times across those six runs. What was zero is the number of *genuine revisits available to find*. The robot never went back anywhere, so every one of those six was a spurious match between two nearby-but-different places, and the error did not move. "No opportunities existed" is the finding. "The software never ran" is not, and would be wrong.
 
 The task was to drive from a start point to a goal. A single traverse. **A robot that drives from A to B never returns anywhere it has been**, so there is no loop, and loop closure has nothing to close. No amount of work on the algorithm would have changed that.
 
-Give the same robot a there-and-back tour — drive to the goal, then drive home, which is what a proper SLAM benchmark does — and the trajectory revisits everything. Now the same code removes **39%** of the error on the runs where a loop genuinely exists.
+### And then the other half, which must not be left out
 
-And on two runs it still does nothing, for two measurable reasons: one environment was too open, so a laser scan returns mostly empty space and there is not enough geometry to identify a place at all; the other run ran out of time before completing the return trip.
+It would be completely wrong to conclude that loop closure does not work. Give the same robot a there-and-back tour — drive to the goal, then drive home, which is what a proper SLAM benchmark does — and the trajectory revisits everything. Run the identical code:
 
-**The lesson: loop closure is a property of the trajectory and the environment, not a property of the algorithm.** It is a capability that only pays out when the robot's actual behaviour gives it something to work with. Knowing that in advance is worth more than any amount of tuning.
+| | error before | error after |
+|---|---|---|
+| runs where a loop exists (four of six) | 2.23 m | **1.37 m** — a 39% reduction |
+| runs where no loop exists (two of six) | 8.45 m | 8.44 m — unchanged |
+
+**39% of the remaining error, removed by the same software that did nothing on the other task.** Not because the code changed, but because the robot's path changed.
+
+The two runs where it still did nothing failed for two measurable reasons: one environment was too open, so a laser scan returns mostly empty space and there is not enough geometry to identify a place at all; the other ran out of time before completing the return trip.
+
+**The lesson: loop closure is a property of the trajectory and the environment, not a property of the algorithm.** It is a capability that only pays out when the robot's actual behaviour gives it something to work with — and when it does pay out, it pays well. Knowing which situation you are in, in advance, is worth more than any amount of tuning.
 
 ---
 
@@ -212,7 +223,7 @@ And on two runs it still does nothing, for two measurable reasons: one environme
 4. **Weights decide who yields**, and they are the same idea as weighted loss.
 5. **Pin one node**, or the problem has infinitely many answers and the solver will tell you so rudely.
 6. **The optimiser is safe; the recogniser is dangerous.** A confident false loop closure destroys the whole map, which is why robust losses exist.
-7. **None of it fires if the robot never goes back.**
+7. **None of it pays out if the robot never goes back** — and where the robot does go back, it removes 39% of the error. Both halves are the finding; either one alone is misleading.
 
 ---
 

@@ -74,8 +74,17 @@ for w_loop in (1.0, 100.0):
 > single-traverse task, because the robot never revisits anywhere, is the most
 > useful part and should land as the closing point rather than a footnote.
 >
-> Tone: direct and concrete. No hype, no "imagine a world where". Prefer
-> naming a measured number over describing something as powerful or elegant.
+> Tone: direct and concrete. No hype. Do not call anything brilliant,
+> stunning, mind-bending, magic or fascinating — state the number and let it
+> land. End on the trajectory finding itself; do not add a rhetorical
+> closing question about the future of AI.
+>
+> Two things to get exactly right, because a previous generation got both
+> wrong: what measured zero was the number of *revisit opportunities*, not
+> the number of loop closures the software attempted; and the there-and-back
+> tour result (39% error reduction where a loop exists) must be included,
+> because without it the video ends on "the technique does nothing", which is
+> the opposite of the finding.
 
 ## If it works
 
