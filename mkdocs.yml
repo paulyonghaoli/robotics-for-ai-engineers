@@ -177,5 +177,6 @@ nav:
       - "12.1 Indexing a fleet archive": modules/12-data-infra/01-indexing.md
       - "12.2 Replay determinism": modules/12-data-infra/02-replay-determinism.md
       - "12.3 Schema evolution": modules/12-data-infra/03-schema-evolution.md
+      - "12.4 Lab: the dataset that could not be rebuilt": modules/12-data-infra/04-lab-could-not-rebuild.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md

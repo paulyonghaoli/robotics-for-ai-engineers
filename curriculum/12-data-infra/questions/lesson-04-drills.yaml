@@ -1,0 +1,88 @@
+id: dat-l4-drills
+title: "Diagnosis drills — archive requests"
+lesson: modules/12-data-infra/04-lab-could-not-rebuild
+questions:
+  - id: d1
+    type: single
+    difficulty: core
+    prompt: "**Request:** *rebuild the training set for the model we shipped last year.* The manifest says `all episodes under fleet/2023-* with tag=urban`. That filter still runs. Diagnosis?"
+    options:
+      - text: "Unpinned manifest — the description resolves against today's archive, and episodes have been added, retagged and deleted since. Nothing is corrupt; the exact set is simply gone"
+        correct: true
+        explanation: "A dataset is a list of ids and a content hash. A query that produces a list is a different object, and it produces a different list every time you run it."
+      - text: "The data was deleted"
+        explanation: "Almost all of it is still there — which is what makes this hard to notice. The filter returns a plausible set."
+      - text: "Schema drift"
+        explanation: "Possible in addition, and not what breaks the rebuild."
+  - id: d2
+    type: single
+    difficulty: core
+    prompt: "**Request:** *what fraction of runs had a human take over?* The field exists on 45% of the archive — it was added partway through. What do you report?"
+    options:
+      - text: "Not a fleet number. The rate over records that have the field is a statement about the era that recorded it, and reporting it as a fleet rate silently substitutes one population for another"
+        correct: true
+        explanation: "Partial coverage is worse than none, because the computation succeeds. State the window the number covers, or say you cannot answer for the rest."
+      - text: "The rate over the records that have it, since that's the best available estimate"
+        explanation: "It is an estimate of the wrong quantity: the records that have the field are exactly the newer, different-software, different-route ones."
+      - text: "Zero for the records missing the field"
+        explanation: "That turns 'not recorded' into 'did not happen', which is the same lie as a 0.0 default."
+  - id: d3
+    type: single
+    difficulty: core
+    prompt: "**Request:** *reproduce the 0.94 we published for suite-7.* Every episode is pinned by id and still present. The re-run gives 0.91. Diagnosis?"
+    options:
+      - text: "Nondeterministic harness — with the inputs pinned and the output moving, the variation is in the runner, so neither number can be confirmed or refuted"
+        correct: true
+        explanation: "This is the state that makes every regression argument unresolvable: no one can tell a real change from the harness."
+      - text: "The model regressed"
+        explanation: "You cannot claim that from a harness that does not reproduce; 0.91 is not evidence of anything yet."
+      - text: "The episodes were modified"
+        explanation: "Worth checking with a content hash, and ruled out here."
+  - id: d4
+    type: single
+    difficulty: core
+    prompt: "**Request:** *mean speed across the archive.* Every record has a speed. Half are `speed_mps`, half are `speed_kph`. What is the failure, and what saved you from it?"
+    options:
+      - text: "A unit mixture — the mean is computable and wrong. What saved you is that the two eras used two NAMES; had both been called `speed`, nothing would have flagged it"
+        correct: true
+        explanation: "The argument for units in field names, stated as a near miss rather than a style rule."
+      - text: "Missing data"
+        explanation: "Coverage is 1.0, which is why this one gets all the way to a published number."
+      - text: "Nothing — 3.6 is a constant, so the mean is off by a known factor"
+        explanation: "Only if you know which records to scale, and the point is that the aggregate destroyed that information."
+  - id: d5
+    type: single
+    difficulty: stretch
+    prompt: "**Request:** *find every episode recorded on a robot with the recalled lidar.* The hardware table maps robot → lidar. Why is joining on it wrong?"
+    options:
+      - text: "The table describes the fleet NOW. Applying it to two-year-old episodes attributes today's hardware to runs that predate it — a join against current state instead of state-at-capture"
+        correct: true
+        explanation: "The fix is a table with validity intervals, or a hardware id stamped into every record. The second is cheaper and does not require anyone to maintain history."
+      - text: "The table might have typos"
+        explanation: "A different and lesser problem."
+      - text: "Robots are not a meaningful grouping"
+        explanation: "They are — the grouping is fine, the time dimension is missing."
+  - id: d6
+    type: single
+    difficulty: stretch
+    prompt: "You have budget to fix exactly one of these classes this quarter. Which buys the most, and why?"
+    options:
+      - text: "Pin datasets by content — an immutable manifest of ids and hashes. It is the cheapest to implement and it is the precondition for the others: without it, 'reproduce this' has no referent to reproduce"
+        correct: true
+        explanation: "Determinism, schema and coverage work all assume you can say which data you mean. Pinning is a few lines and it stops the bleeding immediately, while the historical gaps stay unfixable regardless."
+      - text: "Backfill the missing fields"
+        explanation: "Not possible — the measurements were never taken. You can only start recording them today, which is worth doing and fixes nothing retroactively."
+      - text: "Rewrite the archive into one schema"
+        explanation: "Irreversible, expensive, and it destroys the original bytes that let you check the rewrite. Migrate on read instead."
+  - id: d7
+    type: single
+    difficulty: stretch
+    prompt: "Which of these requests should get a number, and what does answering it require you to have said about the other six?"
+    options:
+      - text: "The episode count per robot — full coverage, one spelling, no artifact, no join. Answering it credibly requires having said plainly that the other six cannot be answered, rather than returning a number for each"
+        correct: true
+        explanation: "A data platform that answers every question is not trustworthy on any of them. The value of 'yes' is set entirely by how often it says 'no'."
+      - text: "All of them, with caveats attached"
+        explanation: "Caveats get stripped the moment the number is pasted into a slide. A blocked request has to be blocked."
+      - text: "None — the archive is too damaged"
+        explanation: "Overcorrection, and it is not true: most of the archive is fine for most purposes, which is why the specific failures are worth naming specifically."

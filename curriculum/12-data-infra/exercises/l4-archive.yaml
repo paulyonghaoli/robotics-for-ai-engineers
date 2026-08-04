@@ -1,0 +1,261 @@
+id: dat-l4-archive
+title: "Seven requests against a two-year-old archive"
+lesson: modules/12-data-infra/04-lab-could-not-rebuild
+description: >-
+  Seven reasonable questions arrive in one week, and six of them cannot be
+  answered from an archive that contains, in some sense, all the data. Build
+  the probes that say WHY each one is blocked — because "we can't" is a
+  useless answer and "here is the number" is worse when the number is wrong.
+setup_code: |
+  T0 = 1690000000          # first episode
+  DAY = 86400
+
+  # Two years of fleet data, written by two generations of software.
+  #
+  #   era 1 (episodes 0-32)   speed in m/s under `speed_mps`
+  #   era 2 (episodes 33-59)  speed in km/h under `speed_kph`, and a new
+  #                           `takeover` field that era 1 never had
+  ARCHIVE = []
+  for i in range(60):
+      rec = {
+          "episode": "e%04d" % i,
+          "t": T0 + i * DAY,
+          "robot": "r%02d" % (i % 6),
+          "tags": ["urban"] if i % 3 else ["highway"],
+      }
+      if i < 33:
+          rec["schema_version"] = 1
+          rec["speed_mps"] = round(1.0 + 0.02 * i, 3)
+      else:
+          rec["schema_version"] = 2
+          rec["speed_kph"] = round(3.6 * (1.0 + 0.02 * i), 3)
+          rec["takeover"] = (i % 7 == 0)
+      ARCHIVE.append(rec)
+
+  # A concept can be spelled several ways across eras. This is the entire
+  # reason the unit belongs in the name: two spellings are DETECTABLE.
+  FIELD_ALIASES = {
+      "speed": ("speed_mps", "speed_kph"),
+      "takeover": ("takeover",),
+      "pedestrian_side": ("pedestrian_side",),
+      "robot": ("robot",),
+  }
+
+  # What was published, and how it was described at the time.
+  MANIFESTS = {
+      "model-v3.2": {
+          # A description, resolved against whatever the archive holds when
+          # you run it. Not a list of episodes.
+          "described_as": {"tag": "urban"},
+          "episode_ids": None,
+          "n_episodes_at_build": 37,
+          "deterministic": True,
+      },
+      "report-suite-7": {
+          "described_as": {"tag": "urban"},
+          "episode_ids": ["e%04d" % i for i in (1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17)],
+          "n_episodes_at_build": 12,
+          # The evaluation harness read the wall clock and merged streams by
+          # arrival. Nobody recorded a seed.
+          "deterministic": False,
+      },
+  }
+
+  # Which lidar each robot carries — as of today. `since` is when the entry
+  # was written; nothing records what came before it.
+  HARDWARE_TABLE = {
+      "r00": {"lidar": "LX-2", "since": T0 + 40 * DAY},
+      "r01": {"lidar": "LX-2", "since": T0 + 40 * DAY},
+      "r02": {"lidar": "LX-2", "since": T0 + 40 * DAY},
+      "r03": {"lidar": "LX-1", "since": T0},
+      "r04": {"lidar": "LX-1", "since": T0},
+      "r05": {"lidar": "LX-1", "since": T0},
+  }
+
+  # The week's requests. Each names the field it needs, the published
+  # artifact it refers to, or the table it has to join against.
+  REQUESTS = {
+      "R1": {"ask": "Rebuild the exact training set behind model v3.2.",
+             "field": None, "artifact": "model-v3.2", "join": None},
+      "R2": {"ask": "Every episode where the robot yielded to a pedestrian approaching from the left.",
+             "field": "pedestrian_side", "artifact": None, "join": None},
+      "R3": {"ask": "Reproduce the 0.94 success rate we published for suite-7.",
+             "field": None, "artifact": "report-suite-7", "join": None},
+      "R4": {"ask": "Mean speed across the whole archive.",
+             "field": "speed", "artifact": None, "join": None},
+      "R5": {"ask": "Every episode recorded on a robot carrying the recalled LX-2 lidar.",
+             "field": None, "artifact": None, "join": "hardware"},
+      "R6": {"ask": "How often does a human take over? Give me a rate.",
+             "field": "takeover", "artifact": None, "join": None},
+      "R7": {"ask": "How many episodes per robot?",
+             "field": "robot", "artifact": None, "join": None},
+  }
+starter_code: |
+  # Provided: ARCHIVE, FIELD_ALIASES, MANIFESTS, HARDWARE_TABLE, REQUESTS, T0, DAY
+
+  def coverage(field):
+      """Fraction of ARCHIVE records that carry `field` under ANY of its
+      aliases. 0.0 means the question was never askable; a value strictly
+      between 0 and 1 means the answer would be silently biased toward
+      whichever era recorded it."""
+      # TODO
+      return 0.0
+
+  def spellings_used(field):
+      """How many of `field`'s aliases actually appear in the archive.
+      More than one means the values are not comparable to each other."""
+      # TODO
+      return 0
+
+  def resolve(description):
+      """Episode ids matching `description` in TODAY's archive.
+      `description` looks like {"tag": "urban"}."""
+      # TODO
+      return []
+
+  def manifest_pinned(name):
+      """True if the manifest names its episodes explicitly rather than
+      describing them."""
+      # TODO
+      return False
+
+  def manifest_drifted(name):
+      """True if re-resolving the manifest's description today yields a
+      different number of episodes than it did at build time."""
+      # TODO
+      return False
+
+  def stale_join_fraction(key="hardware"):
+      """Fraction of episodes that PREDATE the hardware-table entry for
+      their own robot — i.e. episodes the table cannot speak to."""
+      # TODO
+      return 0.0
+
+  def diagnose(name):
+      """One of:
+        'unpinned-manifest'   the dataset was described, not pinned
+        'nondeterministic'    the run cannot be reproduced
+        'not-recorded'        the field never existed
+        'partially-recorded'  the field exists for part of the archive
+        'unit-mixture'        one concept, two incomparable spellings
+        'stale-join'          joined against current state, not state-at-capture
+        'answerable'          go ahead
+      """
+      # TODO
+      return "answerable"
+
+  for _n in sorted(REQUESTS):
+      print("%s  %-28s %s" % (_n, diagnose(_n), REQUESTS[_n]["ask"]))
+tests: |
+  # --- probes ----------------------------------------------------------
+  assert coverage("robot") == 1.0, "every record names its robot"
+  assert coverage("pedestrian_side") == 0.0, "nothing in the archive records which side a pedestrian came from"
+  _c = coverage("takeover")
+  assert 0.4 < _c < 0.5, "takeover was added partway through: expected about 0.45 coverage, got %.2f" % _c
+  assert coverage("speed") == 1.0, "every record has a speed under one spelling or the other"
+  assert spellings_used("speed") == 2, "speed appears as both speed_mps and speed_kph"
+  assert spellings_used("robot") == 1
+
+  assert len(resolve({"tag": "urban"})) == 40, "40 urban episodes in the archive today, got %d" % len(resolve({"tag": "urban"}))
+  assert not manifest_pinned("model-v3.2"), "model-v3.2 was described by a filter, not pinned to episode ids"
+  assert manifest_pinned("report-suite-7"), "report-suite-7 lists its episodes"
+  assert manifest_drifted("model-v3.2"), \
+      "re-resolving model-v3.2's description gives %d episodes against %d at build time — the set moved under a stable description, which is why a description is not a dataset" % (
+          len(resolve(MANIFESTS["model-v3.2"]["described_as"])), MANIFESTS["model-v3.2"]["n_episodes_at_build"])
+
+  _sj = stale_join_fraction()
+  assert 0.3 < _sj < 0.4, "about 35%% of episodes predate their robot's hardware entry, got %.2f" % _sj
+
+  # --- diagnoses -------------------------------------------------------
+  assert diagnose("R1") == "unpinned-manifest", \
+      "R1: the training set was defined as 'everything matching this filter'. The filter still runs and returns a different set. Nothing is corrupt and the exact set is simply gone."
+  assert diagnose("R2") == "not-recorded", \
+      "R2: no amount of compute recovers a field nobody wrote. This is 12.1's point arriving as a bill."
+  assert diagnose("R3") == "nondeterministic", \
+      "R3: the episodes are all there and pinned. Re-running them gives a different number, so the published 0.94 cannot be confirmed or refuted."
+  assert diagnose("R4") == "unit-mixture", \
+      "R4: coverage is 1.0 and the mean is computable, and averaging m/s with km/h produces a number that is wrong and looks fine."
+  assert diagnose("R5") == "stale-join", \
+      "R5: the hardware table says what each robot carries NOW. Applying it to two-year-old episodes attributes hardware to runs that predate it."
+  assert diagnose("R6") == "partially-recorded", \
+      "R6: takeover exists for 45%% of the archive. A rate computed over the records that have it describes era 2 and gets reported as the fleet."
+  assert diagnose("R7") == "answerable", \
+      "R7: full coverage, one spelling, no artifact, no join. Not everything is broken, and saying so is part of the job."
+
+  # Six distinct failures, one clean answer.
+  _labels = [diagnose(n) for n in sorted(REQUESTS)]
+  assert len(set(_labels)) == 7, "each request should land on its own diagnosis, got %s" % _labels
+hints:
+  - "coverage: a record carries the field if ANY alias in FIELD_ALIASES[field] is a key of it. Average that over ARCHIVE."
+  - "spellings_used: count the aliases that appear in at least one record. Two spellings of one concept means the values are not comparable, which is the whole hazard in R4."
+  - "resolve: filter ARCHIVE by the description — `{'tag': 'urban'}` means the tag is in rec['tags']. manifest_drifted compares len(resolve(described_as)) against n_episodes_at_build."
+  - "stale_join_fraction: for each episode, look up HARDWARE_TABLE[rec['robot']]['since'] and count the ones with rec['t'] < since. Those episodes ran on hardware the table has no record of."
+  - "diagnose: artifacts first (pinned? then deterministic?), then the field checks in order coverage==0, 0<coverage<1, spellings>1, then the join, then 'answerable'. The ordering matters: partial coverage has to be caught before you get as far as computing anything, because the computation succeeds."
+solution: |
+  def coverage(field):
+      aliases = FIELD_ALIASES[field]
+      hits = sum(1 for rec in ARCHIVE if any(a in rec for a in aliases))
+      return hits / len(ARCHIVE)
+
+  def spellings_used(field):
+      aliases = FIELD_ALIASES[field]
+      return sum(1 for a in aliases if any(a in rec for rec in ARCHIVE))
+
+  def resolve(description):
+      out = []
+      for rec in ARCHIVE:
+          if "tag" in description and description["tag"] not in rec["tags"]:
+              continue
+          out.append(rec["episode"])
+      return out
+
+  def manifest_pinned(name):
+      return MANIFESTS[name]["episode_ids"] is not None
+
+  def manifest_drifted(name):
+      m = MANIFESTS[name]
+      return len(resolve(m["described_as"])) != m["n_episodes_at_build"]
+
+  def stale_join_fraction(key="hardware"):
+      # An episode the table cannot speak to: it ran before the entry that
+      # claims to describe it was written.
+      stale = 0
+      for rec in ARCHIVE:
+          entry = HARDWARE_TABLE.get(rec["robot"])
+          if entry is None or rec["t"] < entry["since"]:
+              stale += 1
+      return stale / len(ARCHIVE)
+
+  def diagnose(name):
+      req = REQUESTS[name]
+
+      art = req["artifact"]
+      if art is not None:
+          # A description is not a dataset: it resolves to whatever the
+          # archive holds today.
+          if not manifest_pinned(art):
+              return "unpinned-manifest"
+          # Pinned and present, and still not reproducible.
+          if not MANIFESTS[art]["deterministic"]:
+              return "nondeterministic"
+          return "answerable"
+
+      field = req["field"]
+      if field is not None:
+          c = coverage(field)
+          if c == 0.0:
+              return "not-recorded"
+          if c < 1.0:
+              # Computable, and it answers a question about one era while
+              # being reported as a fact about the fleet.
+              return "partially-recorded"
+          if spellings_used(field) > 1:
+              return "unit-mixture"
+
+      if req["join"] is not None and stale_join_fraction(req["join"]) > 0.0:
+          return "stale-join"
+
+      return "answerable"
+
+  for _n in sorted(REQUESTS):
+      print("%s  %-28s %s" % (_n, diagnose(_n), REQUESTS[_n]["ask"]))

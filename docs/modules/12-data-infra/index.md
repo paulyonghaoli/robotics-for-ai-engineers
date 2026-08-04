@@ -1,6 +1,6 @@
 # Module 12 · Robot Data Infrastructure
 
-**Status:** In progress · **Course IV**
+**Status:** Complete · **Course IV**
 
 [Module 11](../11-deployment/04-telemetry-forensics.md) decided what a robot should upload. [Module 10](../10-evaluation/04-dataset-lifecycle.md) decided what to keep and how to curate it. This module is about the years afterwards, when there are two hundred thousand episodes and somebody asks a question.
 
@@ -17,7 +17,7 @@ None of this is glamorous, and [the frontier research](../../frontier.md) identi
 1. [Indexing: you can only find what you decided to record](01-indexing.md) — **available**
 2. [Replay determinism: a replay that doesn't reproduce isn't one](02-replay-determinism.md) — **available**
 3. [Schema evolution and the archive that reads wrong](03-schema-evolution.md) — **available**
-4. Lab: the dataset that could not be rebuilt — *planned*
+4. [Lab: the dataset that could not be rebuilt](04-lab-could-not-rebuild.md) — **available**
 
 ## What you'll build
 
