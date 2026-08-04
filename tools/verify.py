@@ -40,6 +40,8 @@ GATES = [
      ROOT / "projects" / "evaluation_mini"),
     ("grader:deployment", [PY, "-m", "grader", "--reference", "--seed", "1"],
      ROOT / "projects" / "deployment_mini"),
+    ("grader:learning", [PY, "-m", "grader", "--reference", "--seed", "1"],
+     ROOT / "projects" / "learning_mini"),
     ("capstone:v0", [PY, "-m", "eval", "run", "--episodes", "3", "--seed", "7"],
      ROOT / "projects" / "capstone_nav"),
     ("capstone:v3", [PY, "-m", "eval", "run", "--episodes", "3", "--seed", "1000",

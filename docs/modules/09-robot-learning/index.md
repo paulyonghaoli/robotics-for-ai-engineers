@@ -16,6 +16,8 @@ The [frontier research](../../frontier.md) is blunt about where the leverage is.
 6. [Vision-language-action models: inference and honest evaluation](06-vla-evaluation.md) — **available**
 7. [Lab: the policy that memorized](07-lab-policy-memorized.md) — **available**
 
+**Graded:** [Mini-project: four ways a learned policy lies to you](project-learning.md) — 100 pts, autograded.
+
 ## What you'll build
 
 A behavior-cloned policy on an unstable plant, where you can watch a 12% gain error produce a 0.009 validation MAE and total failure by horizon 50 — and a DAgger loop that takes the same task from 0% to 100% success in one round of relabelling.
