@@ -63,11 +63,13 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js
   - javascripts/interactive.js
+  - javascripts/progress.js
 
 nav:
   - Home: index.md
   - Curriculum map: curriculum.md
   - "The frontier (living doc)": frontier.md
+  - "My progress": progress.md
   - "Module 0 · From ML to Robotics":
       - Overview: modules/00-transition/index.md
       - "0.1 What changes": modules/00-transition/01-what-changes.md

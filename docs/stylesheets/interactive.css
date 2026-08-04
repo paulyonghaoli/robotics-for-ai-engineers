@@ -192,3 +192,70 @@ quiz-bank, code-exercise {
 .mermaid .edgeLabel {
   font-size: 13px !important;
 }
+
+/* ---- per-page progress marking ---- */
+.rfae-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin: 0 0 1.2rem;
+  padding: .5rem .7rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: .3rem;
+  background: var(--md-code-bg-color);
+  font-size: .72rem;
+}
+.rfae-progress__label {
+  color: var(--md-default-fg-color--light);
+  margin-right: .1rem;
+}
+.rfae-progress__btn {
+  cursor: pointer;
+  padding: .22rem .55rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: .25rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  font: inherit;
+  line-height: 1.4;
+}
+.rfae-progress__btn:hover {
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+.rfae-progress__btn:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 1px;
+}
+.rfae-progress__btn.is-on {
+  border-color: var(--md-primary-fg-color);
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  font-weight: 600;
+}
+.rfae-progress__btn[data-state="done"].is-on { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+.rfae-progress__btn[data-state="revisit"].is-on { background: #b26a00; border-color: #b26a00; color: #fff; }
+.rfae-progress__note {
+  margin-left: auto;
+  color: var(--md-default-fg-color--light);
+  opacity: .75;
+  font-size: .66rem;
+}
+.rfae-sum__bar {
+  display: flex;
+  height: .7rem;
+  border-radius: .35rem;
+  overflow: hidden;
+  background: var(--md-default-fg-color--lightest);
+  margin: .8rem 0 .4rem;
+}
+.rfae-sum__bar span { display: block; height: 100%; }
+.rfae-sum__bar .is-done { background: #2e7d32; }
+.rfae-sum__bar .is-reading { background: var(--md-primary-fg-color); }
+.rfae-sum__bar .is-revisit { background: #b26a00; }
+.rfae-sum__counts { margin: .2rem 0 1rem; }
+.rfae-sum__io { margin-top: 1.4rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+@media screen and (max-width: 44em) {
+  .rfae-progress__note { display: none; }
+}
