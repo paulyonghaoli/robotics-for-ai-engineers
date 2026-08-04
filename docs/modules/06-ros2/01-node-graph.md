@@ -67,7 +67,7 @@ It also tells you where to look first when the robot's CPU is saturated, and it 
 
 - **Draw the graph before writing nodes.** `rqt_graph` will show you what you built; a whiteboard shows you what you meant.
 - **A node should have one reason to exist.** The pressure is always toward one large node because sharing state is easier that way, and the cost arrives later, when you want to run half of it on a different machine or restart one piece.
-- **Never call a service synchronously from a callback.** Use an action, or a future with a callback, or a separate callback group — 6.3 is about why the naive fix deadlocks.
+- **Never call a service synchronously from a callback.** Use an action, or a future with a callback, or a separate callback group — [6.3](03-executors.md) is about why the naive fix deadlocks.
 - **Compressed image transport by default**, and intra-process composition for nodes that will always be co-located.
 - **Namespace and remap from launch, not in code.** A node with hard-coded topic names can be used once.
 

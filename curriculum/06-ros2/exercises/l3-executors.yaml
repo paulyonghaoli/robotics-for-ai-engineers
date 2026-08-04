@@ -1,0 +1,220 @@
+id: ros-l3-executors
+title: "87% utilized and missing every deadline"
+lesson: modules/06-ros2/03-executors
+description: >-
+  Five callbacks on one node. The thread is 87% utilized, which sounds fine,
+  and the 50 Hz control timer can be 77 ms late, which is not. Then work out
+  why switching to a multi-threaded executor changes nothing at all until
+  you also change something else.
+setup_code: |
+  # A callback group decides which callbacks may run AT THE SAME TIME.
+  #
+  #   mutually_exclusive  never two at once, however many threads exist
+  #   reentrant           any number at once, given threads to run them
+  #
+  # Every callback lands in one mutually-exclusive group by default, which
+  # is the safe choice and the reason a multi-threaded executor so often
+  # changes nothing.
+  GROUPS = {
+      "default": "mutually_exclusive",
+      "control": "mutually_exclusive",
+      "services": "reentrant",
+  }
+
+  CALLBACKS = {
+      "control_timer": {"group": "default", "hz": 50.0, "duration_ms": 4.0},
+      "scan_cb":       {"group": "default", "hz": 10.0, "duration_ms": 12.0},
+      "camera_cb":     {"group": "default", "hz": 30.0, "duration_ms": 18.0},
+      "diagnostics":   {"group": "default", "hz": 1.0,  "duration_ms": 2.0},
+      "map_client":    {"group": "default", "hz": 0.2,  "duration_ms": 45.0},
+  }
+
+  CONTROL_PERIOD_MS = 20.0
+
+  def regroup(callbacks, name, group):
+      """A copy of `callbacks` with one callback moved to another group."""
+      out = {k: dict(v) for k, v in callbacks.items()}
+      out[name]["group"] = group
+      return out
+starter_code: |
+  # Provided: GROUPS, CALLBACKS, CONTROL_PERIOD_MS, regroup()
+
+  def utilization(callbacks):
+      """Fraction of ONE thread the callbacks consume, on average.
+
+      Each contributes hz * duration. Below 1.0 means the work fits — and
+      whether it fits is a different question from whether it is on time.
+      """
+      # TODO
+      return 0.0
+
+  def blockers(callbacks, name, threads):
+      """Names of the callbacks that can delay `name`, sorted.
+
+      On one thread, everything else can: the executor runs one callback at
+      a time and yours waits behind whatever is already running.
+
+      On several threads, only the callbacks that cannot run concurrently
+      with yours can — the ones sharing a mutually-exclusive group with it.
+      A reentrant group blocks nothing.
+      """
+      # TODO
+      return []
+
+  def max_delay_ms(callbacks, name, threads):
+      """Worst-case wait before `name` starts: everything that can block it
+      is ready at once and runs first."""
+      # TODO
+      return 0.0
+
+  def meets_deadline(callbacks, name, period_ms, threads):
+      """Can `name` always start and finish inside its period?"""
+      # TODO
+      return True
+
+  def deadlocks(caller_group, server_group, threads):
+      """A callback makes a SYNCHRONOUS service call and waits for the
+      response. Does it wait forever?
+
+      The response can only be delivered by the executor, and the executor
+      can only deliver it by running another callback. So:
+
+        - one thread: there is no other thread to run it. Deadlock.
+        - several threads, but the caller and the server share a
+          mutually-exclusive group: the group is occupied by the caller, so
+          the server callback cannot start. Deadlock.
+        - otherwise the response gets delivered and the call returns.
+      """
+      # TODO
+      return False
+
+  print("utilization: %.3f of one thread\n" % utilization(CALLBACKS))
+  for _t in (1, 4):
+      _d = max_delay_ms(CALLBACKS, "control_timer", _t)
+      print("%d thread(s): control_timer waits up to %5.1f ms (period %.0f) -> %s" % (
+          _t, _d, CONTROL_PERIOD_MS,
+          "ok" if meets_deadline(CALLBACKS, "control_timer", CONTROL_PERIOD_MS, _t) else "MISSES"))
+  _fixed = regroup(CALLBACKS, "control_timer", "control")
+  print("4 threads, own group: %.1f ms -> %s" % (
+      max_delay_ms(_fixed, "control_timer", 4),
+      "ok" if meets_deadline(_fixed, "control_timer", CONTROL_PERIOD_MS, 4) else "MISSES"))
+tests: |
+  _C = CALLBACKS
+
+  # 1. The work fits. That is not the same as being on time.
+  _u = utilization(_C)
+  assert abs(_u - 0.871) < 0.002, "expected 0.871 of one thread, got %.3f" % _u
+  assert _u < 1.0, "there is spare capacity on the thread"
+
+  _delay1 = max_delay_ms(_C, "control_timer", 1)
+  assert abs(_delay1 - 77.0) < 1e-9, (
+      "on one thread every other callback can be ahead of yours: "
+      "12 + 18 + 2 + 45 = 77 ms, got %.1f" % _delay1)
+  assert not meets_deadline(_C, "control_timer", CONTROL_PERIOD_MS, 1), (
+      "the control timer's period is 20 ms and it can start 77 ms late. "
+      "Utilization is 87%% and the loop misses its deadline by four times over "
+      "— head-of-line blocking is the constraint, not capacity.")
+
+  assert sorted(blockers(_C, "control_timer", 1)) == [
+      "camera_cb", "diagnostics", "map_client", "scan_cb"], (
+      "on one thread, everything else blocks you")
+
+  # 2. Switching executors, and changing nothing.
+  _delay4 = max_delay_ms(_C, "control_timer", 4)
+  assert abs(_delay4 - _delay1) < 1e-9, (
+      "four threads gives exactly the same %.1f ms, because every callback is "
+      "in the SAME mutually-exclusive group and a mutually-exclusive group "
+      "never runs two of its callbacks at once however many threads exist. "
+      "This is why 'I switched to a MultiThreadedExecutor and nothing "
+      "changed' is the most common report in the module." % _delay4)
+  assert not meets_deadline(_C, "control_timer", CONTROL_PERIOD_MS, 4)
+
+  # 3. The fix is the group, not the thread count.
+  _fixed = regroup(_C, "control_timer", "control")
+  assert blockers(_fixed, "control_timer", 4) == [], (
+      "alone in its group, nothing can delay it")
+  assert max_delay_ms(_fixed, "control_timer", 4) == 0.0
+  assert meets_deadline(_fixed, "control_timer", CONTROL_PERIOD_MS, 4), (
+      "own group plus threads to run it: the timer starts on time")
+
+  # ...and the group alone is not enough either.
+  assert not meets_deadline(_fixed, "control_timer", CONTROL_PERIOD_MS, 1), (
+      "on one thread the group buys nothing — there is only ever one callback "
+      "running, so 'may run concurrently' has nothing to run with. Both "
+      "changes are required and neither is sufficient.")
+
+  # 4. The deadlock, and the fix that does not fix it.
+  assert deadlocks("default", "default", 1), (
+      "a synchronous service call on a single-threaded executor waits for a "
+      "response only that same thread could deliver")
+  assert deadlocks("default", "default", 4), (
+      "...and four threads does not help while both callbacks share one "
+      "mutually-exclusive group: the group is occupied by the caller, so the "
+      "server callback cannot start")
+  assert not deadlocks("default", "services", 4), (
+      "separate groups and threads to run them: the response is delivered and "
+      "the call returns")
+  assert deadlocks("default", "services", 1), (
+      "separate groups on one thread still deadlocks — there is no second "
+      "thread to deliver on")
+  assert not deadlocks("services", "services", 4), (
+      "a REENTRANT group can run its own callbacks concurrently, so sharing "
+      "one is safe here in a way that sharing a mutually-exclusive group is not")
+
+  # 5. And the option that needs no executor surgery at all.
+  assert max_delay_ms(regroup(
+      {k: v for k, v in _C.items() if k != "map_client"}, "control_timer", "default"),
+      "control_timer", 1) == 32.0, (
+      "delete the blocking service client and the worst case drops from 77 ms "
+      "to 32 — still over a 20 ms period, and a reminder that the executor is "
+      "not the only thing you can change")
+hints:
+  - "utilization: sum `hz * duration_ms / 1000` over the callbacks."
+  - "blockers on one thread is every other callback. On several threads it is the other callbacks whose group equals yours AND whose group is mutually_exclusive — a reentrant group blocks nothing, including itself."
+  - "max_delay_ms sums the durations of blockers(). meets_deadline is `max_delay + own duration <= period`."
+  - "deadlocks: True if threads == 1. Otherwise True only when the two groups are the same and that group is mutually_exclusive. Note the asymmetry — sharing a REENTRANT group is fine, which is what makes reentrant groups the usual answer for service clients."
+solution: |
+  def utilization(callbacks):
+      return sum(c["hz"] * c["duration_ms"] / 1000.0 for c in callbacks.values())
+
+  def blockers(callbacks, name, threads):
+      me = callbacks[name]
+      out = []
+      for other, c in callbacks.items():
+          if other == name:
+              continue
+          if threads == 1:
+              # One thread runs one callback. Everything is in front of you.
+              out.append(other)
+          elif c["group"] == me["group"] and GROUPS[me["group"]] == "mutually_exclusive":
+              # Same mutually-exclusive group: never concurrent, whatever
+              # the thread count says.
+              out.append(other)
+      return sorted(out)
+
+  def max_delay_ms(callbacks, name, threads):
+      return sum(callbacks[b]["duration_ms"] for b in blockers(callbacks, name, threads))
+
+  def meets_deadline(callbacks, name, period_ms, threads):
+      return bool(max_delay_ms(callbacks, name, threads)
+                  + callbacks[name]["duration_ms"] <= period_ms)
+
+  def deadlocks(caller_group, server_group, threads):
+      if threads == 1:
+          # Nothing else can spin the executor while this callback waits.
+          return True
+      if caller_group == server_group and GROUPS[caller_group] == "mutually_exclusive":
+          # The group is occupied by the caller, so the server cannot start.
+          return True
+      return False
+
+  print("utilization: %.3f of one thread\n" % utilization(CALLBACKS))
+  for _t in (1, 4):
+      _d = max_delay_ms(CALLBACKS, "control_timer", _t)
+      print("%d thread(s): control_timer waits up to %5.1f ms (period %.0f) -> %s" % (
+          _t, _d, CONTROL_PERIOD_MS,
+          "ok" if meets_deadline(CALLBACKS, "control_timer", CONTROL_PERIOD_MS, _t) else "MISSES"))
+  _fixed = regroup(CALLBACKS, "control_timer", "control")
+  print("4 threads, own group: %.1f ms -> %s" % (
+      max_delay_ms(_fixed, "control_timer", 4),
+      "ok" if meets_deadline(_fixed, "control_timer", CONTROL_PERIOD_MS, 4) else "MISSES"))

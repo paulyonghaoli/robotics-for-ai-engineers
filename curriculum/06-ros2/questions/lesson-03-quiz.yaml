@@ -1,0 +1,95 @@
+id: ros-l3-quiz
+title: "Quiz — executors and callback groups"
+lesson: modules/06-ros2/03-executors
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A node's callbacks total 87% of one thread and its 50 Hz control timer misses its 20 ms deadline. How?"
+    options:
+      - text: "Head-of-line blocking — on one thread every other callback can run before it, so it can start 77 ms late while the thread is 13% idle"
+        correct: true
+        explanation: "Capacity and timeliness are different questions. Utilization answers the first and says nothing about the second."
+      - text: "The utilization figure must be wrong"
+        explanation: "It is correct; it is the wrong quantity to size an executor by."
+      - text: "The control callback is too slow"
+        explanation: "It takes 4 ms of a 20 ms period. The delay is entirely other people's work."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A single-threaded executor runs callbacks of 4, 12, 18, 2 and 45 ms. What is the worst-case delay before the 4 ms one starts, in ms?"
+    answer: 77
+    tolerance: 1
+    explanation: "12 + 18 + 2 + 45 = 77 ms — everything else, all ready at once, all ahead of you. On one thread there is no priority and no preemption."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You switch from a single-threaded to a multi-threaded executor and the timing is byte-for-byte identical. Why?"
+    options:
+      - text: "Every callback is in the same mutually-exclusive group, and such a group never runs two of its callbacks at once however many threads exist"
+        correct: true
+        explanation: "The default group is mutually exclusive, so a multi-threaded executor over default grouping is more threads and the same serialization."
+      - text: "The executor change did not take effect"
+        explanation: "It did; the grouping is what constrains concurrency."
+      - text: "The GIL prevents any parallelism"
+        explanation: "A real constraint for CPU-bound Python callbacks and not the mechanism here — the same thing happens in C++."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "You give the control timer its own callback group but stay on a single-threaded executor. What changes?"
+    options:
+      - text: "Nothing. A group says callbacks MAY run concurrently; on one thread there is nothing to run concurrently with"
+        correct: true
+        explanation: "Both changes are needed and neither is sufficient — which is why each one alone is a plausible fix that does nothing, and why people try them in sequence and conclude the problem is elsewhere."
+      - text: "The timer gets priority over the other callbacks"
+        explanation: "Groups are not priorities; there is no preemption here."
+      - text: "It fixes the deadline"
+        explanation: "Only in combination with threads to run it on."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "A callback makes a synchronous service call on a single-threaded executor. What happens?"
+    options:
+      - text: "Deadlock — the response can only be delivered by the executor running another callback, and the only thread is inside the caller"
+        correct: true
+        explanation: "The caller waits forever for something it is itself preventing. This is the failure 6.1 told you to avoid by not making the call from there in the first place."
+      - text: "The call times out and returns an error"
+        explanation: "Only if you set a timeout, and then you have a slow failure instead of a hang."
+      - text: "It works but blocks other callbacks"
+        explanation: "That is the multi-threaded, separate-group case."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "It deadlocks, so you switch to four threads. It still deadlocks. What is left to change?"
+    options:
+      - text: "The groups — the caller and the server share one mutually-exclusive group, so the group is occupied by the caller and the server callback cannot start"
+        correct: true
+        explanation: "Adding threads is the obvious response, half of the correct one, and worth nothing alone. Put the service client in a reentrant group, or better, do not block at all."
+      - text: "Nothing — synchronous service calls always deadlock"
+        explanation: "Four threads plus distinct groups works fine."
+      - text: "Increase the timeout"
+        explanation: "Turns a hang into a slow hang."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Why is sharing a REENTRANT group between a caller and its server safe, when sharing a mutually-exclusive one deadlocks?"
+    options:
+      - text: "A reentrant group may run any number of its own callbacks at once, so the server callback can start while the caller is still inside its own — this asymmetry is why reentrant groups are the usual home for service clients"
+        correct: true
+        explanation: "The cost is that your callbacks are now genuinely concurrent, so shared state genuinely needs locking — a different problem you did not previously have."
+      - text: "Reentrant groups have higher priority"
+        explanation: "Groups carry no priority."
+      - text: "Reentrant groups use a separate thread pool"
+        explanation: "Same pool; the difference is the concurrency constraint, not the threads."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Two well-behaved nodes are composed into one container and start starving each other, with no code change to either. What happened?"
+    options:
+      - text: "Composed nodes share an executor, so a node boundary stopped being an isolation boundary — one node's long callbacks now delay the other's"
+        correct: true
+        explanation: "Composition is how you avoid serializing images between co-located nodes (6.1's bandwidth argument), and it silently couples their scheduling. Both are real and you have to choose knowingly."
+      - text: "The container reduced the thread count"
+        explanation: "The sharing of the executor is the mechanism, not a thread-count change."
+      - text: "Composition changes QoS"
+        explanation: "It can change transport, not the matching rules."
