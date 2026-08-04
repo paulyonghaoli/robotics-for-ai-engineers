@@ -34,7 +34,7 @@ Courses I and II are the classical stack, which is well covered elsewhere — th
 |---|---|---|
 | [**7 · Robotic perception**](modules/07-perception/index.md) | Camera models, stereo & depth, point clouds, registration, 3D detection, BEV, fusion | ✅ 6 lessons + lab + [autograded project](modules/07-perception/project-perception.md) |
 | [**8 · Manipulation**](modules/08-manipulation/index.md) | Manipulator kinematics, IK, grasp synthesis, configuration-space planning, visual servoing | ✅ 6 lessons + lab |
-| [**9 · Robot learning & embodied AI**](modules/09-robot-learning/index.md) | Imitation (ACT, diffusion policy), the data engine & human-in-the-loop, RL, sim-to-real, world models, VLA evaluation | ✅ 7 lessons + lab |
+| [**9 · Robot learning & embodied AI**](modules/09-robot-learning/index.md) | Imitation (ACT, diffusion policy), the data engine & human-in-the-loop, RL, sim-to-real, world models, VLA evaluation | ✅ 7 lessons + lab + mini-project |
 | [**Capstone III · see it, grasp it**](modules/capstone-3/index.md) | A planar manipulator with a depth sensor: perceive, synthesize a grasp, plan in configuration space, execute under Jacobian control | ✅ live, CI-gated |
 
 Capstone III is deliberately a **second robot**. Everything so far has been one differential-drive base, and a portfolio with two distinct embodiments argues something a fifth navigation stack cannot.
@@ -43,11 +43,11 @@ Capstone III is deliberately a **second robot**. Everything so far has been one 
 
 | Module | Contents | Status |
 |---|---|---|
-| [**10 · Evaluation & data systems**](modules/10-evaluation/index.md) | Statistical rigor, scenario suites, regression from logs, dataset lifecycle, drift monitoring | ✅ 7 lessons + lab |
+| [**10 · Evaluation & data systems**](modules/10-evaluation/index.md) | Statistical rigor, scenario suites, regression from logs, dataset lifecycle, drift monitoring | ✅ 7 lessons + lab + mini-project |
 | [**11 · Deployment, fleet & safety**](modules/11-deployment/index.md) | Latency budgets, edge inference, rollout/rollback, fleet telemetry, safety cases, incident forensics | ✅ 6 lessons + lab |
 | [**12 · Robot data infrastructure**](modules/12-data-infra/index.md) | Indexing and search over fleet data, replay determinism, schema evolution, dataset lineage | ✅ 4 lessons |
 | [**13 · Systems performance**](modules/13-systems-perf/index.md) | The **C++ track** (ports with parity checks against the Python references), the GPU performance model, real-time constraints | ✅ 5 lessons |
-| [**Capstone IV · ship a learned policy**](modules/capstone-2/index.md) | Build the infrastructure that decides whether a policy is safe to ship | 🔨 stages 0–1 live |
+| [**Capstone IV · ship a learned policy**](modules/capstone-2/index.md) | Build the infrastructure that decides whether a policy is safe to ship | ✅ all five stages |
 
 Modules 10 and 11 were split from a single "production robotics" module because [the 2026 frontier research](frontier.md) ranks evaluation and data infrastructure as the **highest-leverage area** for this curriculum's audience — and because the field is in a documented evaluation crisis. They were written early, out of numerical order, for the same reason.
 

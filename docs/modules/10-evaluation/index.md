@@ -16,6 +16,8 @@ It's also the module whose lab you already have: the [capstone harness](../capst
 6. [Neural real-to-sim evaluation](06-neural-real-to-sim.md) — **available**
 7. [Lab: the benchmark that lied](07-lab-benchmark-lied.md) — **available**
 
+**Graded:** [Mini-project: the evaluation harness](project-evaluation.md) — 100 pts, autograded.
+
 ## Why this is a separate module
 
 The original plan had one "production robotics" module covering evaluation, data, deployment, fleet, and safety. Two things forced the split: the 2026 research showing evaluation as the field's binding constraint, and job postings like Figure's *Helix AI Engineer, Data Infrastructure* — **$150–400k, no ML modeling required**, asking instead for Linux, Python, Postgres, SLURM/Kubernetes, and dataset tooling. Deployment, fleet operations, and safety moved to Module 11.

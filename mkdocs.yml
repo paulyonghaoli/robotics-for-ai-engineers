@@ -164,6 +164,7 @@ nav:
       - "10.5 Drift monitoring": modules/10-evaluation/05-drift-monitoring.md
       - "10.6 Neural real-to-sim evaluation": modules/10-evaluation/06-neural-real-to-sim.md
       - "10.7 Lab: the benchmark that lied": modules/10-evaluation/07-lab-benchmark-lied.md
+      - "Mini-project: The evaluation harness": modules/10-evaluation/project-evaluation.md
   - "Module 11 · Deployment, Fleet & Safety":
       - Overview: modules/11-deployment/index.md
       - "11.1 Latency budgets": modules/11-deployment/01-latency-budgets.md
