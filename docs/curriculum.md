@@ -1,6 +1,6 @@
 # Curriculum map
 
-Four courses, thirteen modules. **Courses I, II and III are complete**; Course IV has its two core modules and its capstone in progress. Today that is **67 lessons, 11 diagnostic labs, 6 autograded mini-projects, 100 in-browser exercises, 69 quiz banks and 3 capstones**, all CI-verified by 15 gates.
+Four courses, fourteen modules. **All four courses are complete.** Today that is **76 lessons, 13 diagnostic labs, 9 autograded mini-projects, 111 in-browser exercises, 78 quiz banks (498 questions) and 3 capstones**, all CI-verified by 22 gates.
 
 Courses I and II are the classical stack, which is well covered elsewhere — they are meant to be complete and polished rather than expanded. The weight goes into III and IV.
 

@@ -62,16 +62,18 @@ graph TD
 
 ## What exists today
 
-Courses I and II — the classical autonomy stack — are complete:
+All four courses are complete, and every module carries the same four rungs — in-browser exercises, a diagnostic lab where you're handed working-*looking* code with a real bug, an autograded mini-project, and a capstone.
 
-- **33 lessons** across geometry, kinematics & control, state estimation, mapping & SLAM, and planning, each with an interactive quiz and in-browser labs
-- **49 coding exercises** and **35 question banks**, every reference solution executed against its own tests in CI
-- **Three graded artifacts**: two autograded projects (`python -m grader`, randomized scenarios) and the scenario-evaluated capstone
-- **The capstone** in five versions — known map, lidar-only localization, online mapping, navigation among unmapped moving obstacles, and full SLAM with neither a map nor a pose sensor — with an [engineering log](capstone-log.md) of the thirteen debugging campaigns behind them
-- **Every module carries the same four rungs** — in-browser exercises, a diagnostic lab where you're handed working-*looking* code with a real bug, an autograded mini-project, and a capstone. 67 lessons, 11 labs, 6 mini-projects, 100 exercises, 3 capstones, all CI-verified
-- A [Course I exam](course-1-exam.md) and a researched [frontier map](frontier.md) of where the field is heading
+- **76 lessons** across fourteen modules: geometry, control, estimation, mapping & SLAM, planning, perception, manipulation, robot learning, evaluation, deployment, data infrastructure, and systems performance
+- **111 coding exercises** and **78 question banks** (498 questions), every reference solution executed against its own tests in CI
+- **13 diagnostic labs** — each one a working-looking system with a real defect, and a debrief on what the defect was evidence of
+- **9 autograded mini-projects** (`python -m grader`, randomized scenarios each run)
+- **Three capstones**, one per course from II onward: an [autonomous 2D navigation stack](modules/capstone/index.md) in five versions, a [perception-to-grasp arm](modules/capstone-3/index.md), and the [infrastructure that decides whether a policy ships](modules/capstone-2/index.md) — plus an [engineering log](capstone-log.md) of the debugging campaigns behind them
+- A [Course I exam](course-1-exam.md), a [Course II exam](course-2-exam.md), and a researched [frontier map](frontier.md) of where the field is heading
 
-Still to come: Course III (perception, manipulation, robot learning, evaluation & data systems, deployment) and the ROS 2 track.
+Everything above is verified by **22 CI gates** on every push — linting, tests, content integrity, a strict docs build, every mini-project's reference solution, and every capstone rubric.
+
+Still to come: the ROS 2 track (Module 6), which needs an environment decision, and a loop-closure version of the navigation capstone.
 
 ## Honest caveats
 
