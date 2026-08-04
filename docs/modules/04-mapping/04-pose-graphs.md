@@ -57,7 +57,7 @@ The exercise's square loop, extended: sweep the loop-closure edge's information 
 1. *(Concept)* Why does loop closure distribute the correction along the whole loop rather than snapping only the closing pose?
 2. *(Calculation)* A 4-pose 1-D chain with odometry edges of 1.0 each (measured) and a loop edge saying pose 3 is at 2.4. With equal weights and pose 0 pinned at 0: where does least squares put pose 3?
 3. *(Debugging)* After adding place recognition, maps are usually better but occasionally fold catastrophically in repetitive warehouses. Explain both halves.
-4. *(System design)* Design the capstone's v3 SLAM: what makes edges, what triggers optimization, and which of Module 3's tools guards the front-end's proposals?
+4. *(System design)* Design the capstone's v4 SLAM: what makes edges, what triggers optimization, and which of Module 3's tools guards the front-end's proposals?
 
 ??? note "Answer sketches"
     **1.** Because the objective is a sum over *all* edges, not a constraint to satisfy at one node. Snapping only the closing pose would zero the loop edge's residual at the price of one enormous residual on the odometry edge next to it, and squared cost punishes that concentration hard — \(k\) small residuals beat one \(k\)-sized residual. The stationary point instead spreads the disagreement around the cycle in inverse proportion to each edge's stiffness \(\Omega\), so every spring stretches a little and confident edges stretch least.
