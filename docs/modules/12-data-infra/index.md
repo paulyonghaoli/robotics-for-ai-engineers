@@ -15,7 +15,7 @@ None of this is glamorous, and [the frontier research](../../frontier.md) identi
 ## Lessons
 
 1. [Indexing: you can only find what you decided to record](01-indexing.md) — **available**
-2. Replay determinism — *planned*
+2. [Replay determinism: a replay that doesn't reproduce isn't one](02-replay-determinism.md) — **available**
 3. Schema evolution and the unreadable archive — *planned*
 4. Lab: the dataset that could not be rebuilt — *planned*
 

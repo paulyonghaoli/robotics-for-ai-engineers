@@ -1,0 +1,138 @@
+id: dat-l2-determinism
+title: "Four ways a replay stops reproducing"
+lesson: modules/12-data-infra/02-replay-determinism
+description: >-
+  A replay harness that is seeded, and still not deterministic. Seeding fixes
+  one of four problems here; the other three are structural and survive any
+  amount of it. Run it twice, diff, and fix what the diff finds.
+setup_code: |
+  import numpy as np
+
+  # Two sensor streams. Note the timestamps INTERLEAVE, and note that the
+  # lists are not in timestamp order — that is what a real ingest looks like
+  # when two topics arrive over different transports.
+  STREAM_A = [(0.00, "a0"), (0.20, "a1"), (0.41, "a2"), (0.60, "a3")]
+  STREAM_B = [(0.31, "b0"), (0.10, "b1"), (0.50, "b2"), (0.70, "b3")]
+
+  class Filter:
+      """A stateful stage: an exponential moving average over inputs."""
+      def __init__(self):
+          self.state = 0.0
+
+      def update(self, x):
+          self.state = 0.8 * self.state + 0.2 * x
+          return self.state
+
+  # A module-level instance, created once at import. This is the shape the
+  # bug takes in real code: a singleton that outlives the run.
+  SHARED_FILTER = Filter()
+
+  def fake_clock():
+      """Stands in for time.time(): advances on every call, so anything
+      that reads it behaves differently depending on how often it is read."""
+      fake_clock.t += 0.017
+      return fake_clock.t
+  fake_clock.t = 0.0
+starter_code: |
+  import numpy as np
+  # Provided: STREAM_A, STREAM_B, Filter, SHARED_FILTER, fake_clock()
+
+  def merge(stream_a, stream_b):
+      """Interleave two streams into one ordered sequence."""
+      return list(stream_a) + list(stream_b)            # <-- suspicious
+
+  def replay(seed=0):
+      """Replay the logged streams and return the output trace.
+
+      Must be BIT-EXACT across runs: same seed, same everything, same bytes.
+      """
+      np.random.seed(seed)                              # <-- suspicious
+      out = []
+      for i, (t, name) in enumerate(merge(STREAM_A, STREAM_B)):
+          x = len(name) + i * 0.1
+          noisy = x + np.random.normal(0.0, 0.01)       # <-- suspicious
+          filtered = SHARED_FILTER.update(noisy)        # <-- suspicious
+          stamped = fake_clock()                        # <-- suspicious
+          out.append((round(t, 3), name, round(filtered, 9), round(stamped, 6)))
+      return out
+
+  def first_divergence(a, b):
+      """Index of the first differing entry, or None."""
+      for i, (x, y) in enumerate(zip(a, b)):
+          if x != y:
+              return i
+      return None if len(a) == len(b) else min(len(a), len(b))
+
+  r1, r2 = replay(), replay()
+  print("run 1 == run 2 :", r1 == r2)
+  print("first divergence:", first_divergence(r1, r2))
+  print("ordered by time :", [e[0] for e in r1])
+tests: |
+  import numpy as np
+  # THE CHECK: run twice, diff. Exact equality, no tolerance.
+  _r1, _r2 = replay(), replay()
+  assert first_divergence(_r1, _r2) is None, "the replay is not reproducible: runs differ first at entry %s. Seeding fixed one source; three others are structural." % first_divergence(_r1, _r2)
+  assert _r1 == _r2, "two replays of the same log must be byte-identical"
+
+  # ...and a third and fourth run, since some bugs only show on repetition.
+  assert replay() == _r1 and replay() == _r1, "every subsequent run must match too — a carried-over singleton typically passes run 2 vs 3 and fails 1 vs 2"
+
+  # Messages must be ordered by TIMESTAMP, not by arrival.
+  _times = [e[0] for e in _r1]
+  assert _times == sorted(_times), "the merged stream is not in timestamp order: %s. Concatenating two streams preserves arrival order, which differs run to run in any real system." % _times
+  assert len(_r1) == len(STREAM_A) + len(STREAM_B), "every message must appear exactly once"
+
+  # The seed must actually control the noise.
+  assert replay(seed=1) != replay(seed=0), "different seeds should give different noise"
+  assert replay(seed=1) == replay(seed=1), "the same seed must reproduce"
+
+  # No wall-clock dependence: the output must not change because something
+  # else read the clock first.
+  _before = replay()
+  fake_clock()
+  fake_clock()
+  fake_clock()
+  assert replay() == _before, "the output changed because the clock advanced between runs. A replay that reads the clock produces different results depending on how fast it runs, which is the one thing a replay must not do."
+
+  # And the filter must start clean each time.
+  assert abs(_r1[0][2] - replay()[0][2]) < 1e-15, "the first filtered value differs between runs — the filter is carrying state from the previous replay"
+hints:
+  - "Run it twice and look at `first_divergence` before changing anything. Then fix one source at a time and re-run; each fix should move the divergence later or remove it."
+  - "merge: sort by timestamp — `sorted(list(a) + list(b), key=lambda e: e[0])`. Arrival order is a property of the network, not of the data."
+  - "SHARED_FILTER is created once at import and carries its state into the next replay. Construct a fresh `Filter()` inside `replay`. And `np.random.seed` sets a GLOBAL — use `np.random.default_rng(seed)` so the stream belongs to this run. The clock has no place in a replay at all: derive the timestamp from the data."
+solution: |
+  import numpy as np
+
+  def merge(stream_a, stream_b):
+      # Order by timestamp. Concatenation preserves ARRIVAL order, which is a
+      # property of the transport and differs from run to run.
+      return sorted(list(stream_a) + list(stream_b), key=lambda e: e[0])
+
+  def replay(seed=0):
+      # A local generator, not the global singleton: np.random.seed sets
+      # process-wide state that anything else can disturb between runs.
+      rng = np.random.default_rng(seed)
+      # A fresh filter per replay. The module-level instance outlives the run
+      # and silently carries state into the next one.
+      filt = Filter()
+      out = []
+      for i, (t, name) in enumerate(merge(STREAM_A, STREAM_B)):
+          x = len(name) + i * 0.1
+          noisy = x + rng.normal(0.0, 0.01)
+          filtered = filt.update(noisy)
+          # The clock is not an input to a replay. Derive the stamp from the
+          # data, so the result does not depend on how fast the replay ran.
+          stamped = t
+          out.append((round(t, 3), name, round(filtered, 9), round(stamped, 6)))
+      return out
+
+  def first_divergence(a, b):
+      for i, (x, y) in enumerate(zip(a, b)):
+          if x != y:
+              return i
+      return None if len(a) == len(b) else min(len(a), len(b))
+
+  r1, r2 = replay(), replay()
+  print("run 1 == run 2 :", r1 == r2)
+  print("first divergence:", first_divergence(r1, r2))
+  print("ordered by time :", [e[0] for e in r1])

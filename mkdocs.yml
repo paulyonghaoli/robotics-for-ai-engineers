@@ -175,5 +175,6 @@ nav:
   - "Module 12 · Robot Data Infrastructure":
       - Overview: modules/12-data-infra/index.md
       - "12.1 Indexing a fleet archive": modules/12-data-infra/01-indexing.md
+      - "12.2 Replay determinism": modules/12-data-infra/02-replay-determinism.md
   - "Capstone IV · Ship a Learned Policy":
       - Overview: modules/capstone-2/index.md

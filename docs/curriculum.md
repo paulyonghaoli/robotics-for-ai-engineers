@@ -45,7 +45,7 @@ Capstone III is deliberately a **second robot**. Everything so far has been one 
 |---|---|---|
 | [**10 · Evaluation & data systems**](modules/10-evaluation/index.md) | Statistical rigor, scenario suites, regression from logs, dataset lifecycle, drift monitoring | ✅ 7 lessons + lab |
 | [**11 · Deployment, fleet & safety**](modules/11-deployment/index.md) | Latency budgets, edge inference, rollout/rollback, fleet telemetry, safety cases, incident forensics | ✅ 6 lessons + lab |
-| [**12 · Robot data infrastructure**](modules/12-data-infra/index.md) | Indexing and search over fleet data, replay determinism, schema evolution, dataset lineage | 🔨 1 lesson |
+| [**12 · Robot data infrastructure**](modules/12-data-infra/index.md) | Indexing and search over fleet data, replay determinism, schema evolution, dataset lineage | 🔨 2 lessons |
 | 13 · Systems performance | The **C++ track** (ports with parity checks against the Python references), the GPU performance model, real-time constraints | ⬜ planned |
 | [**Capstone IV · ship a learned policy**](modules/capstone-2/index.md) | Build the infrastructure that decides whether a policy is safe to ship | 🔨 stages 0–1 live |
 

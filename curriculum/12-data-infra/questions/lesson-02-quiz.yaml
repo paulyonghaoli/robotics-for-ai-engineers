@@ -1,0 +1,95 @@
+id: dat-l2-quiz
+title: "Quiz — replay determinism"
+lesson: modules/12-data-infra/02-replay-determinism
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Why does bit-exact replay matter more for a robot than for a batch ML pipeline?"
+    options:
+      - text: "A robot is a closed loop, so a 10⁻¹² difference becomes a different action, a different state, and a different observation — the divergence grows geometrically instead of staying put"
+        correct: true
+        explanation: "In a batch pipeline a tiny numeric difference stays a tiny numeric difference. In a loop it is an initial condition."
+      - text: "Robots have stricter regulatory requirements"
+        explanation: "Sometimes true, and not the mechanism."
+      - text: "Robot data is larger"
+        explanation: "Size affects cost, not reproducibility."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A closed loop amplifies differences by 5% per step. Starting from 10⁻¹², roughly how many steps until the difference reaches 0.1?"
+    answer: 519
+    tolerance: 60
+    explanation: "≈520 steps, under a minute at 10 Hz. n = ln(0.1/1e-12)/ln(1.05) ≈ 25.3/0.0488. Nothing is broken — that is simply what exponential growth does to a rounding difference."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You set the random seed and the replay is still not reproducible. What is the most likely cause?"
+    options:
+      - text: "One of the structural sources — wall-clock reads, arrival-ordered message merging, or state carried over from the previous run — none of which seeding touches"
+        correct: true
+        explanation: "Seeding fixes one of five sources and feels like completion, which is why 'seeded but not deterministic' is the most common state for a replay harness to be in."
+      - text: "The seed was set too late"
+        explanation: "Possible, and a distant second to the structural sources."
+      - text: "Floating-point error is inherently random"
+        explanation: "It is deterministic on fixed hardware with a fixed reduction order; what varies is the order."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why order merged streams by timestamp rather than by arrival?"
+    options:
+      - text: "Arrival order is a property of the transport and differs run to run; timestamp order is a property of the data and does not"
+        correct: true
+        explanation: "The same reason 12.1 warns against indexing on receipt time: when the message got to you is not when the thing happened."
+      - text: "Timestamp order is faster to compute"
+        explanation: "It costs a sort that concatenation does not."
+      - text: "Arrival order loses messages"
+        explanation: "It keeps them all, in an order that varies."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Your replay comparison uses `atol=1e-3` so the tests aren't flaky. What have you actually done?"
+    options:
+      - text: "Made the test silent rather than robust — a drifting difference passes until it changes a discrete decision, then fails catastrophically with no history of getting worse"
+        correct: true
+        explanation: "The tolerance sets how long the test stays quiet, not whether the underlying difference exists. In a loop it is always growing."
+      - text: "Made the test appropriately tolerant of floating-point noise"
+        explanation: "That reasoning is right for a batch computation and wrong for a closed loop, where the noise is an initial condition."
+      - text: "Nothing — the comparison is equivalent"
+        explanation: "It differs precisely in the cases you needed it to catch."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "A replay diff reports 400 differing steps. Which one do you look at?"
+    options:
+      - text: "The first — it points at the cause; the rest are consequences of it"
+        correct: true
+        explanation: "Which is why the diff should report first-divergence rather than a count or a maximum."
+      - text: "The largest, since it shows the worst impact"
+        explanation: "The largest is almost always the last, and it tells you nothing about the origin."
+      - text: "All of them, to find the pattern"
+        explanation: "After the first divergence the two runs are unrelated systems."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "A replay is bit-exact on your laptop and not on the CI machine. What is the likely cause, and does it mean the code is wrong?"
+    options:
+      - text: "Different CPU, SIMD width or thread count changes the floating-point reduction ORDER, and a+(b+c) ≠ (a+b)+c — the code may be fine, but the guarantee has to be restated as 'bit-exact for a fixed machine and thread count'"
+        correct: true
+        explanation: "Pinning OMP_NUM_THREADS=1 for replay is the blunt, effective fix. The important part is being explicit about which grade of reproducibility you actually have."
+      - text: "The CI machine has a bug"
+        explanation: "It is behaving correctly; associativity is what fails, not the hardware."
+      - text: "The seed is not being propagated to CI"
+        explanation: "Worth checking, and it would usually diverge on the laptop too."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Why does 'run twice and diff' belong in CI rather than in a runbook?"
+    options:
+      - text: "Determinism decays silently — without a continuous check the first time you discover it is gone is during an incident, which is the most expensive possible moment"
+        correct: true
+        explanation: "The check is seconds of compute and catches the regression on the day it lands, which is the only day it is cheap to fix."
+      - text: "Runbooks are hard to maintain"
+        explanation: "True generally, and not the argument here."
+      - text: "CI machines are more deterministic"
+        explanation: "Often less, given varying hardware — which is itself worth knowing."

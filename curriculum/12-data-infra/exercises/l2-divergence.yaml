@@ -1,0 +1,124 @@
+id: dat-l2-divergence
+title: "Why 'close enough' is not a category"
+lesson: modules/12-data-infra/02-replay-determinism
+description: >-
+  Two replays of the same episode that differ by one part in a trillion.
+  In a batch pipeline that is noise. In a closed loop it is a countdown —
+  the difference is an action, which is a state, which is an observation,
+  and it compounds. Measure how long "identical to twelve decimal places"
+  survives, then decide what your comparison tolerance should be.
+setup_code: |
+  import numpy as np
+
+  DT = 0.1
+  LANE = 1.0
+
+  def controller(y, gain=0.2):
+      """Steer back toward the centre line — under-gained for this road."""
+      return -gain * y
+
+  def plant(y, action, camber=0.7):
+      """The road slopes away from centre faster than the controller pulls
+      back, so the closed loop grows by about 5% per step:
+
+          y_next = y * (1 + (camber - gain) * DT) = y * 1.05
+
+      A gently unstable loop, which is all it takes."""
+      return y + (action + camber * y) * DT
+
+  def run(y0, steps=600):
+      """A deterministic episode. Same input, same output, always."""
+      y, traj = float(y0), []
+      for _ in range(steps):
+          y = plant(y, controller(y))
+          traj.append(y)
+      return np.array(traj)
+starter_code: |
+  import numpy as np
+  # Provided: DT, LANE, controller(y), plant(y, action), run(y0, steps)
+
+  def first_divergence(a, b):
+      """Index of the first step at which two trajectories differ EXACTLY.
+
+      Return None if they are identical throughout.
+
+      Report the FIRST divergence, not the largest: the first one points at
+      the cause, the hundredth points at nothing.
+      """
+      # TODO
+      return None
+
+  def divergence_growth(delta0, steps=600):
+      """Run two episodes differing by `delta0` at t=0 and return the
+      per-step absolute difference between them, as an array.
+      """
+      # TODO
+      return np.zeros(steps)
+
+  def steps_until(delta0, threshold, steps=600):
+      """First step at which the two runs differ by more than `threshold`,
+      or None if they never do.
+      """
+      # TODO
+      return None
+
+  print("a difference of 1e-12 at t=0 reaches:")
+  for thr in (1e-9, 1e-6, 1e-3, 0.1):
+      n = steps_until(1e-12, thr)
+      print("   %8.0e  after %s" % (thr, "never" if n is None else "%d steps (%.1f s)" % (n, n * DT)))
+tests: |
+  import numpy as np
+  # A deterministic run really is deterministic.
+  assert first_divergence(run(0.5), run(0.5)) is None, "the same input must give the same output"
+  _a, _b = run(0.5), run(0.5 + 1e-12)
+  _fd = first_divergence(_a, _b)
+  assert _fd is not None and _fd == 0, "a difference at t=0 shows up at step 0, got %s" % _fd
+
+  # Growth is monotone and geometric, not bounded.
+  _g = divergence_growth(1e-12)
+  assert len(_g) == 600, "expected one entry per step, got %d" % len(_g)
+  assert _g[0] > 0, "the runs differ from the first step"
+  assert _g[-1] > _g[0] * 1e6, "a mildly unstable closed loop AMPLIFIES: the final gap should be many orders of magnitude larger than the initial one (%.2e -> %.2e)" % (_g[0], _g[-1])
+  assert np.all(np.diff(_g) > 0), "in this plant the gap grows every step"
+
+  # The headline: 1e-12 becomes lane-scale inside one episode.
+  _n = steps_until(1e-12, 0.1)
+  assert _n is not None, "a 1e-12 difference should reach 0.1 m within 600 steps"
+  assert 400 < _n < 600, "expected roughly 500 steps, got %d — check the growth" % _n
+
+  # Ten times the initial difference buys only a fixed number of steps,
+  # because the growth is exponential rather than linear.
+  _n_small = steps_until(1e-12, 0.1)
+  _n_big = steps_until(1e-11, 0.1)
+  _gap = _n_small - _n_big
+  assert 20 < _gap < 100, "a 10x smaller initial difference should buy a roughly CONSTANT extra number of steps (got %d), which is the signature of exponential growth" % _gap
+
+  # And the practical conclusion: a tolerance does not make the comparison
+  # robust, it just sets how long the test stays quiet.
+  assert steps_until(1e-12, 1e-6) < steps_until(1e-12, 1e-3) < steps_until(1e-12, 0.1), "a looser tolerance only delays the moment the difference becomes visible"
+hints:
+  - "first_divergence: `np.nonzero(a != b)[0]` and take the first entry, or None if empty. Exact inequality — no tolerance."
+  - "divergence_growth: `np.abs(run(y0) - run(y0 + delta0))` for some fixed y0. Use the same y0 for both."
+  - "steps_until: find the first index where the growth array exceeds the threshold. `np.argmax(g > threshold)` works but returns 0 when nothing exceeds — check that case explicitly."
+solution: |
+  import numpy as np
+
+  Y0 = 0.5
+
+  def first_divergence(a, b):
+      idx = np.nonzero(np.asarray(a) != np.asarray(b))[0]
+      return int(idx[0]) if len(idx) else None
+
+  def divergence_growth(delta0, steps=600):
+      # Same nominal episode, perturbed only in the twelfth decimal place.
+      return np.abs(run(Y0, steps) - run(Y0 + delta0, steps))
+
+  def steps_until(delta0, threshold, steps=600):
+      g = divergence_growth(delta0, steps)
+      over = np.nonzero(g > threshold)[0]
+      return int(over[0]) if len(over) else None
+
+  print("a difference of 1e-12 at t=0 reaches:")
+  for thr in (1e-9, 1e-6, 1e-3, 0.1):
+      n = steps_until(1e-12, thr)
+      print("   %8.0e  after %s" % (thr, "never" if n is None else "%d steps (%.1f s)" % (n, n * DT)))
