@@ -1,0 +1,100 @@
+id: sys-l4-quiz
+title: "Quiz — porting with parity"
+lesson: modules/13-systems-perf/04-porting-parity
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What makes a port different from every other refactor you could be asked to validate?"
+    options:
+      - text: "You already have the answer — the reference is executable and exact, so the question is not 'is this plausible' but 'does it produce the same numbers', and that has a runnable answer"
+        correct: true
+        explanation: "Which is why a port with no parity harness is a wasted opportunity: the oracle was sitting right there."
+      - text: "Ports are riskier than other refactors"
+        explanation: "Debatable, and it is not the structural difference."
+      - text: "The tests can be reused unchanged"
+        explanation: "The tests were written against the reference's interface and often cannot cross the language boundary; the fixtures can."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Your parity suite passes at a 1e-3 tolerance. Tightened to 1e-9, 186 of 200 fixtures disagree by about 1.2e-7. What is that?"
+    options:
+      - text: "A float-width difference — the port computes in float32 where the reference used float64. Not noise, not a logic defect, and a decision somebody made silently"
+        correct: true
+        explanation: "Reassociation and FMA live at 1e-15. Anything around 1e-7 is systematic and deserves a name and a decision, not a wider tolerance."
+      - text: "Ordinary floating-point noise"
+        explanation: "Noise is 1e-15. Three orders of magnitude of headroom is not rounding."
+      - text: "A logic bug in the port"
+        explanation: "The logic agrees; the precision does not. It matters because a closed loop compounds it."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "How should the parity tolerance be chosen?"
+    options:
+      - text: "As the float-noise floor for the computation — the level at which only reassociation and FMA can differ. Anything above it is a real difference that needs a name"
+        correct: true
+        explanation: "A tolerance picked so the tests pass can always be picked. It sets how long the suite stays quiet, which is 12.2's point about replay comparison in a different setting."
+      - text: "At whatever level makes the suite stable"
+        explanation: "That is the mechanism by which a 1e-7 systematic difference ships."
+      - text: "At the precision the downstream consumer needs"
+        explanation: "Reasonable-sounding, and it hides the difference between 'we verified equivalence' and 'we verified adequacy'."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "The same harness at the same tolerance finds 0 disagreements on the shipped fixtures and 60 on fixtures drawn from the robot's real operating range. What was wrong?"
+    options:
+      - text: "The fixtures, not the threshold — the suite sampled heading errors from [-1, 1] rad while the robot drives the full circle, so the defect lived entirely in untested input"
+        correct: true
+        explanation: "One line catches it: compare the range the fixtures exercise against the range the system operates in. Fixtures are a dataset and have every dataset's coverage problem."
+      - text: "The tolerance was still too loose"
+        explanation: "Same tolerance, different inputs, 60 failures. The threshold was fine."
+      - text: "The reference is wrong on those inputs"
+        explanation: "Possible in general; here the port clamps one bound and not the other."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "One fixture makes the port return NaN. Why does `abs(ref - port) > tol` report no difference?"
+    options:
+      - text: "NaN compares false against everything, so the obvious harness silently passes in exactly the case it most needed to catch"
+        correct: true
+        explanation: "A diff that returns infinity when exactly one side is NaN is three lines. This bug is as common in metric code as in parity harnesses."
+      - text: "Because NaN is treated as zero"
+        explanation: "It is not converted; the comparison itself is false."
+      - text: "Because the tolerance is too large"
+        explanation: "No tolerance makes `nan > tol` true."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Per-step parity holds to 1e-12 on every fixture. What have you NOT established?"
+    options:
+      - text: "That the two loops produce the same trajectory — the step feeds back, so after the first difference the implementations are no longer being evaluated on the same inputs at all"
+        correct: true
+        explanation: "Closed-loop parity is a separate test, run from initial conditions drawn from the field distribution, and it should report first divergence rather than final gap."
+      - text: "Nothing — per-step parity implies trajectory parity"
+        explanation: "It would in an open loop. The feedback is what breaks the implication."
+      - text: "That the port is faster"
+        explanation: "True and not the question."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "The closed-loop test passes from a -0.5 rad initial heading error and diverges by 0.30 m from -2.5 rad. What does that tell you about end-to-end tests?"
+    options:
+      - text: "That an end-to-end test inherits the coverage gap of whatever initial conditions it starts from — being end-to-end does not make it representative"
+        correct: true
+        explanation: "The initial-condition distribution is a fixture set with a different name, and it needs the same coverage argument."
+      - text: "That end-to-end tests are unreliable"
+        explanation: "This one was reliable and narrow, which is a different complaint."
+      - text: "That 0.30 m is within tolerance for a robot"
+        explanation: "0.30 m of lateral error is most of a lane."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "The port is validated and shipped. What do you do with the Python reference?"
+    options:
+      - text: "Keep it forever and run parity in CI — it is the only oracle you have, and deleting it makes the port its own specification, bugs included"
+        correct: true
+        explanation: "Its cost is a directory. Its value is that every future change to the port can be checked against something that was verified independently."
+      - text: "Delete it once parity passes, to avoid two implementations drifting"
+        explanation: "Drift is what the CI parity job detects; without the reference nothing detects anything."
+      - text: "Keep it as documentation but stop running it"
+        explanation: "A reference nobody runs stops being true within a few months."

@@ -1,0 +1,215 @@
+id: sys-l4-parity
+title: "The parity suite that passed"
+lesson: modules/13-systems-perf/04-porting-parity
+description: >-
+  A steering function has been ported. You have the Python reference, the
+  port, two hundred fixtures, and a tolerance somebody picked. The suite is
+  green. Build the harness properly and find the three ways it was green
+  without the port being correct.
+setup_code: |
+  import math
+  import numpy as np
+
+  K_P = 1.5
+  MAX_STEER = 2.0
+
+  def wrap(a):
+      return (a + math.pi) % (2 * math.pi) - math.pi
+
+  CURV = np.array([0.010, 0.020, 0.015, 0.012, 0.018, 0.011, 0.014, 0.016])
+
+  def ref_steer(heading_err, curvatures):
+      """The Python reference. Verified, boring, slow."""
+      k = float(np.mean(curvatures)) if len(curvatures) else 0.0
+      s = K_P * wrap(heading_err) + k
+      return max(-MAX_STEER, min(MAX_STEER, s))
+
+  def port_steer(heading_err, curvatures):
+      """Stand-in for the C++ port, written in Python so it runs here.
+      Three things about it differ from the reference. None of them is a
+      typo, and all three are mistakes people actually make."""
+      with np.errstate(all="ignore"):
+          k = float(np.sum(curvatures) / np.float64(len(curvatures)))
+      s = np.float32(K_P) * np.float32(wrap(heading_err)) + np.float32(k)
+      if s > MAX_STEER:
+          s = np.float32(MAX_STEER)
+      return float(s)
+
+  _rng = np.random.default_rng(11)
+
+  # The fixture suite that shipped with the port: two hundred cases drawn
+  # from "normal driving".
+  NOMINAL = [(float(e), CURV) for e in _rng.uniform(-1.0, 1.0, 200)]
+
+  # The range the robot actually operates over, including reversing.
+  FIELD = [(float(e), CURV) for e in _rng.uniform(-math.pi, math.pi, 200)]
+
+  # The cases nobody wrote down.
+  EDGE = [
+      (0.3, np.array([])),          # no path points
+      (0.3, CURV[:1]),              # one path point
+      (math.pi, CURV),              # goal directly behind
+      (-math.pi, CURV),
+  ]
+
+  SHIPPED_TOL = 1e-3               # the tolerance the port was signed off with
+starter_code: |
+  import math
+  import numpy as np
+  # Provided: ref_steer(e, curv), port_steer(e, curv), NOMINAL, FIELD, EDGE,
+  #           SHIPPED_TOL, CURV, K_P, MAX_STEER, wrap
+
+  def diff(a, b):
+      """Disagreement between two outputs.
+
+      Careful: if one side is NaN, `abs(a - b)` is NaN, and `NaN > tol` is
+      False for every tol. A harness written the obvious way reports no
+      difference at all in exactly the case you most wanted to catch."""
+      # TODO
+      return abs(a - b)
+
+  def parity(fixtures, tol):
+      """Run both implementations over `fixtures` and report.
+
+      Return {"n": total, "n_differ": count over tol, "max_diff": worst,
+              "first": index of the first disagreement or None}."""
+      # TODO
+      return {"n": 0, "n_differ": 0, "max_diff": 0.0, "first": None}
+
+  def classify(d):
+      """What kind of disagreement is this?
+        'exact'       d == 0
+        'float-noise' d <= 1e-12   — reassociation, nothing more
+        'precision'   d <= 1e-5    — a different float width somewhere
+        'defect'      otherwise    — the two functions do different things
+      """
+      # TODO
+      return "exact"
+
+  def coverage(fixtures):
+      """(min, max) heading error the fixture set actually exercises."""
+      # TODO
+      return (0.0, 0.0)
+
+  def closed_loop_gap(e0, steps=200, dt=0.05):
+      """Run the same loop twice, once with each steering function, and
+      return the largest position gap between the two trajectories.
+
+      Per-step parity is not trajectory parity: the step feeds back."""
+      # TODO
+      return 0.0
+
+  print("shipped suite, shipped tolerance: %s" % parity(NOMINAL, SHIPPED_TOL))
+  print("shipped suite, tight tolerance  : %s" % parity(NOMINAL, 1e-9))
+  print("field range,   shipped tolerance: %s" % parity(FIELD, SHIPPED_TOL))
+  print("edge cases,    shipped tolerance: %s" % parity(EDGE, SHIPPED_TOL))
+  print("coverage: nominal %s, field %s" % (coverage(NOMINAL), coverage(FIELD)))
+  for _e0 in (-0.5, -2.5):
+      print("closed loop from %.1f rad: gap %.3f m" % (_e0, closed_loop_gap(_e0)))
+tests: |
+  import math
+  import numpy as np
+
+  # 1. The suite as shipped. Two hundred fixtures, zero disagreements.
+  _shipped = parity(NOMINAL, SHIPPED_TOL)
+  assert _shipped["n"] == 200
+  assert _shipped["n_differ"] == 0, "the shipped suite passes — that is the situation you are debugging"
+
+  # Tighten the tolerance to the actual float-noise floor and 93% of the
+  # fixtures disagree.
+  _tight = parity(NOMINAL, 1e-9)
+  assert _tight["n_differ"] > 150, \
+      "at a 1e-9 tolerance %d of 200 fixtures disagree. The port computes in float32; 1e-3 was chosen for comfort and it hid a systematic 1e-7." % _tight["n_differ"]
+  assert 1e-8 < _tight["max_diff"] < 1e-6, "the disagreement is about 1.2e-7, got %.2e" % _tight["max_diff"]
+  assert classify(_tight["max_diff"]) == "precision", \
+      "1.2e-7 is not float noise (1e-12 would be) and not a logic defect — it is a different float width, and whether that is acceptable is a question about the loop, not about the function"
+
+  # 2. The suite never exercised the range the robot drives in.
+  _lo, _hi = coverage(NOMINAL)
+  assert -1.05 < _lo and _hi < 1.05, "the nominal fixtures live in [-1, 1] rad, got (%.2f, %.2f)" % (_lo, _hi)
+  _flo, _fhi = coverage(FIELD)
+  assert _flo < -3.0 and _fhi > 3.0, "the robot operates over the full circle, including reversing"
+
+  _field = parity(FIELD, SHIPPED_TOL)
+  assert _field["n_differ"] > 50, \
+      "over the real input range %d of 200 fixtures disagree at the SAME tolerance the suite passed with. The fixtures were the problem, not the threshold." % _field["n_differ"]
+  assert _field["max_diff"] > 2.5, "the worst disagreement is %.2f rad/s of commanded steer" % _field["max_diff"]
+  assert FIELD[_field["first"]][0] < -1.3, \
+      "every disagreement is at a NEGATIVE heading error: the port clamps its upper bound and not its lower one. A fixture set that only tested one sign would still be green."
+
+  # 3. The NaN hole. One fixture has no path points.
+  assert diff(0.45, float("nan")) == float("inf"), \
+      "diff must report a NaN against a number as total disagreement. `abs(0.45 - nan)` is nan, and `nan > tol` is False for every tolerance — write it the obvious way and the harness silently passes."
+  assert not (abs(0.45 - float("nan")) > SHIPPED_TOL), "which is the trap, stated as an assertion"
+  _edge = parity(EDGE, SHIPPED_TOL)
+  assert _edge["n_differ"] >= 1, "the empty-path fixture must count as a difference"
+  assert _edge["first"] == 0, "and it is the first one"
+
+  # 4. Per-step parity is not trajectory parity — and even the end-to-end
+  #    test passes if you start it somewhere nominal.
+  assert closed_loop_gap(-0.5) < 1e-6, \
+      "from a nominal initial heading error the two loops agree to %.1e m. Every test anyone would naturally write is green." % closed_loop_gap(-0.5)
+  assert closed_loop_gap(-2.5) > 0.2, \
+      "from a heading error of -2.5 rad — an ordinary condition, a goal behind and to the right — the trajectories end up %.2f m apart" % closed_loop_gap(-2.5)
+hints:
+  - "diff: if exactly one of the two is NaN, return `float('inf')`. If both are NaN, they agree. Otherwise `abs(a - b)`. `math.isnan` on each side, before the subtraction."
+  - "parity: loop the fixtures, call both functions, collect diffs. n_differ counts `d > tol`, first is the index of the first such d (or None), max_diff is the largest d seen — including the infinities."
+  - "coverage: min and max of the heading error across the fixture tuples. Comparing it against the range the robot actually operates over is the check that would have caught this before shipping."
+  - "closed_loop_gap: integrate the same simple loop twice — `w = steer(e0 - heading, CURV)`, `heading += w*dt`, `x += cos(heading)*dt`, `y += sin(heading)*dt` — and return the largest position difference between the two trajectories."
+solution: |
+  import math
+  import numpy as np
+
+  def diff(a, b):
+      na, nb = math.isnan(a), math.isnan(b)
+      if na and nb:
+          return 0.0
+      if na or nb:
+          # A number and a not-a-number do not differ by a small amount.
+          return float("inf")
+      return abs(a - b)
+
+  def parity(fixtures, tol):
+      diffs = [diff(ref_steer(e, c), port_steer(e, c)) for e, c in fixtures]
+      over = [i for i, d in enumerate(diffs) if d > tol]
+      return {
+          "n": len(diffs),
+          "n_differ": len(over),
+          "max_diff": max(diffs) if diffs else 0.0,
+          "first": over[0] if over else None,
+      }
+
+  def classify(d):
+      if d == 0.0:
+          return "exact"
+      if d <= 1e-12:
+          return "float-noise"
+      if d <= 1e-5:
+          return "precision"
+      return "defect"
+
+  def coverage(fixtures):
+      es = [e for e, _ in fixtures]
+      return (min(es), max(es))
+
+  def closed_loop_gap(e0, steps=200, dt=0.05):
+      def run(steer):
+          heading = 0.0
+          x = y = 0.0
+          traj = []
+          for _ in range(steps):
+              w = steer(e0 - heading, CURV)
+              heading += w * dt
+              x += math.cos(heading) * dt
+              y += math.sin(heading) * dt
+              traj.append((x, y))
+          return np.array(traj)
+      return float(np.abs(run(ref_steer) - run(port_steer)).max())
+
+  print("shipped suite, shipped tolerance: %s" % parity(NOMINAL, SHIPPED_TOL))
+  print("shipped suite, tight tolerance  : %s" % parity(NOMINAL, 1e-9))
+  print("field range,   shipped tolerance: %s" % parity(FIELD, SHIPPED_TOL))
+  print("edge cases,    shipped tolerance: %s" % parity(EDGE, SHIPPED_TOL))
+  print("coverage: nominal %s, field %s" % (coverage(NOMINAL), coverage(FIELD)))
+  for _e0 in (-0.5, -2.5):
+      print("closed loop from %.1f rad: gap %.3f m" % (_e0, closed_loop_gap(_e0)))

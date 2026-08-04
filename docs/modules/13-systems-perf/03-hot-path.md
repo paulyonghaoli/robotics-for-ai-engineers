@@ -32,7 +32,7 @@ And what does not change: **time already inside a vectorized kernel.** `cv2.undi
 
 Read the last two columns against each other. **`control` is the fastest port in the table and saves 0.017 ms; `undistort` is the second-largest stage and saves 0.001 ms.** The only ranking that survives contact with a frame budget is absolute milliseconds removed, and by that measure one stage of five is 91% of everything a full rewrite could ever win.
 
-**And then Amdahl sets the ceiling.** 3.15 ms of the 6.54 ms frame is vectorized work that cannot move, so the fully-ported loop is 3.29 ms and the answer to "what if we rewrote all of it in C++" is 1.99×. If the requirement had been 3 ms, no amount of C++ reaches it and the next move is a different algorithm or fewer pixels — which is worth knowing before committing a quarter, rather than after.
+**And then Amdahl sets the ceiling.** 3.22 ms of the 6.54 ms frame is vectorized work that cannot move, so the fully-ported loop is 3.29 ms and the answer to "what if we rewrote all of it in C++" is 1.99×. If the requirement had been 3 ms, no amount of C++ reaches it and the next move is a different algorithm or fewer pixels — which is worth knowing before committing a quarter, rather than after.
 
 ## C. The subset that matters
 
@@ -77,7 +77,7 @@ Take the profile of your own capstone loop and build this table for it: per stag
 - **Rewriting the loop wholesale** when two functions were 91% of the win, and taking on the memory-safety surface of the other three for nothing.
 - **Ignoring the ceiling.** If the fully-ported floor is above your requirement, the port is not the project.
 - **Porting for speed and then allocating in the hot path**, which throws away the variance win that was the better half of the argument.
-- **Losing the test harness.** A ported stage with no parity check against the Python reference is a rewrite you cannot trust — which is the subject of the next lesson.
+- **Losing the test harness.** A ported stage with no parity check against the Python reference is a rewrite you cannot trust — which is [13.4](04-porting-parity.md).
 
 ## I. Questions
 
