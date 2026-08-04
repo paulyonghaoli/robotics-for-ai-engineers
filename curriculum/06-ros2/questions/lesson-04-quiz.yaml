@@ -1,0 +1,95 @@
+id: ros-l4-quiz
+title: "Quiz — tf2"
+lesson: modules/06-ros2/04-tf2
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "What does tf2 add to the transform tree from lesson 1.3?"
+    options:
+      - text: "Time. It is not a structure but a rolling history, and every lookup takes a timestamp — which means it can be answered wrongly without failing"
+        correct: true
+        explanation: "The tree is a tree per instant. Which version you get depends on when you ask, and asking for the wrong instant produces a plausible answer rather than an error."
+      - text: "Distribution across nodes"
+        explanation: "True and secondary — the timestamp is what changes how you have to think."
+      - text: "Quaternion rotations"
+        explanation: "Lesson 1.2's subject; the tree in 1.3 already handles rotations."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "A lookup fails because the requested time is NEWER than anything received. What is the right response?"
+    options:
+      - text: "Wait — the transform is coming. `canTransform` with a short timeout wins this race, and it is a normal startup condition"
+        correct: true
+        explanation: "The opposite of the 'past' failure, which is unrecoverable. Catching both with one except and logging 'tf error' throws away the one piece of information that tells you which you have."
+      - text: "Give up; the transform does not exist"
+        explanation: "That is the 'past' case. This one has not arrived yet."
+      - text: "Fall back to Time(0)"
+        explanation: "Which is how the silent error in this lesson gets introduced."
+  - id: q3
+    type: numeric
+    difficulty: core
+    prompt: "A robot yaws at 0.8 rad/s. A detection 10 m away is transformed with a transform 80 ms too new. Roughly how far does it land from the truth, in metres?"
+    answer: 0.65
+    tolerance: 0.15
+    explanation: "About 0.65 m. The robot only drove 0.12 m in that time; the rest is rotation — 0.064 rad of yaw is 0.64 m of arc at 10 m. This failure is much worse for a lidar than for a bumper."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "The error at the sensor is 12 cm and at 10 m it is 65 cm. What does that ratio tell you about which term dominates?"
+    options:
+      - text: "Rotation. Translation error is constant with range; angular error is multiplied by it, so the further you look the more the yaw rate is the only thing that matters"
+        correct: true
+        explanation: "The same geometry as 7.1's calibration sensitivity: a small angular error is a large positional one at range."
+      - text: "Translation, since the robot is moving fast"
+        explanation: "1.5 m/s for 80 ms is 12 cm and it does not grow with range."
+      - text: "They contribute equally"
+        explanation: "Only at about 1.5 m of range; beyond that rotation runs away with it."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "Your detector takes 80 ms and looks up transforms with `Time(0)`. What is the fix?"
+    options:
+      - text: "Look the transform up at the message's timestamp. It is one argument and the error goes to exactly zero — making the detector faster does not fix a pipeline that discards the time it was given"
+        correct: true
+        explanation: "Worth separating: 'my perception needs to be faster' and 'my perception needs to be correct about time' lead to completely different quarters of work."
+      - text: "Optimize the detector until the latency is negligible"
+        explanation: "At 10 m the budget for 10 cm is 12 ms — less than one control period. You cannot optimize your way there."
+      - text: "Increase the tf buffer length"
+        explanation: "That fixes the 'past' failure, not this one."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Why should static transforms be published on `/tf_static` with `transient_local` durability?"
+    options:
+      - text: "A sensor's mounting does not change, so republishing it at 50 Hz is waste — but a node that starts late still needs it, and only a durable publication is still there for a late joiner"
+        correct: true
+        explanation: "6.2's durability argument, met in the place it most commonly bites. Publish it volatile and it works whenever the subscriber happens to start first, which is every time you test by hand."
+      - text: "Because static transforms are larger messages"
+        explanation: "They are the same size."
+      - text: "Because tf2 requires it"
+        explanation: "It does not require it; it makes it work."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Two nodes both publish `odom → base_link`. What do you see?"
+    options:
+      - text: "A tree with two answers for one edge, so lookups flicker between them — the robot appears to jitter, and nothing in either node's logs is wrong"
+        correct: true
+        explanation: "One publisher per edge is the rule. `tf2_tools view_frames` shows who publishes what and finds this in seconds."
+      - text: "An error at startup about a duplicate publisher"
+        explanation: "Nothing detects it; both publications are legitimate on their own."
+      - text: "The transforms are averaged"
+        explanation: "Whichever arrived most recently wins, per lookup."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "You replay a bag at 0.2× speed and start getting 'past' lookup failures on data that is definitely in the bag. Why?"
+    options:
+      - text: "The buffer keeps a fixed span of message time — ten seconds by default — and a slow replay lets your processing fall further behind in message time than the cache retains"
+        correct: true
+        explanation: "The transform existed; you asked too late. Lengthening the cache duration is the fix, and it is a debugging-workflow problem rather than a code bug."
+      - text: "The bag is missing transforms"
+        explanation: "The lookup would fail identically at full speed if so."
+      - text: "Replay speed changes the timestamps"
+        explanation: "It changes the wall-clock rate, not the message stamps — which is precisely why the buffer's span is unaffected and your lag is not."

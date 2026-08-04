@@ -14,7 +14,7 @@ We reference the [official ROS 2 tutorials](https://docs.ros.org/en/jazzy/Tutori
 1. [The node graph: a robot is a distributed system](01-node-graph.md) — **available**
 2. [QoS: the settings that silently drop your data](02-qos.md) — **available**
 3. [Executors and callback groups: where your callbacks actually run](03-executors.md) — **available**
-4. tf2: the transform tree as a service — *planned*
+4. [tf2: the transform tree as a service](04-tf2.md) — **available**
 5. Launch, parameters, and the configuration surface — *planned*
 6. Lab: the node that worked alone — *planned*
 

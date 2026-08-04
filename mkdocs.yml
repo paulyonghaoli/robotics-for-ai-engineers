@@ -126,6 +126,7 @@ nav:
       - "6.1 The node graph": modules/06-ros2/01-node-graph.md
       - "6.2 QoS": modules/06-ros2/02-qos.md
       - "6.3 Executors and callback groups": modules/06-ros2/03-executors.md
+      - "6.4 tf2": modules/06-ros2/04-tf2.md
   - "Capstone II · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: thirteen bugs": capstone-log.md
