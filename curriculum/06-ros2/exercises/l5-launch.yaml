@@ -1,0 +1,235 @@
+id: ros-l5-launch
+title: "The parameter file that configures nothing"
+lesson: modules/06-ros2/05-launch-params
+description: >-
+  A YAML file with the right values in it, a node that ignores all of them,
+  and a topic that does not connect because of one leading slash. Both
+  failures are silent, both are configuration rather than code, and both are
+  found by resolving names the way the middleware does.
+setup_code: |
+  # The node, as launched: a controller inside a per-robot namespace.
+  NODE = {"name": "controller", "namespace": "/robot1"}
+
+  # What the node declares, with the values it uses if nobody says otherwise.
+  DEFAULTS = {
+      "max_speed": 0.5,
+      "kp": 1.0,
+      "ki": 0.0,
+      "lookahead": 0.8,
+      "frame_id": "base_link",
+  }
+
+  # The parameter file. Each top-level key is a node's FULLY QUALIFIED name,
+  # or the wildcard "/**", which matches any node.
+  PARAM_YAML = {
+      "/controller": {                       # written before namespacing existed
+          "ros__parameters": {"max_speed": 1.5, "kp": 2.4},
+      },
+      "/robot1/controller": {
+          "ros__parameters": {"lookahead": 1.2},
+      },
+      "/**": {
+          "ros__parameters": {"ki": 0.05},
+      },
+  }
+
+  # Set in the launch file...
+  LAUNCH_OVERRIDES = {"kp": 3.0}
+  # ...and on the command line, by someone debugging.
+  CLI_OVERRIDES = {"max_speed": 2.0}
+
+  # Two endpoints that are supposed to talk to each other.
+  CONTROLLER_PUB = {"name": "cmd_vel", "node": NODE, "remappings": {}}
+  BASE_SUB = {"name": "/cmd_vel",
+              "node": {"name": "base_driver", "namespace": "/robot1"},
+              "remappings": {}}
+starter_code: |
+  # Provided: NODE, DEFAULTS, PARAM_YAML, LAUNCH_OVERRIDES, CLI_OVERRIDES,
+  #           CONTROLLER_PUB, BASE_SUB
+
+  def fq_node_name(node):
+      """The node's fully qualified name: namespace + '/' + name, with no
+      doubled slashes. A node in the root namespace '/' called 'controller'
+      is '/controller'."""
+      # TODO
+      return ""
+
+  def unreached(param_yaml, node):
+      """Top-level keys in the parameter file that match neither this
+      node's fully qualified name nor the wildcard '/**'.
+
+      Every value under such a key is silently ignored. Sorted.
+      """
+      # TODO
+      return []
+
+  def effective(defaults, param_yaml, node, launch=None, cli=None):
+      """The value each parameter actually takes, and where it came from.
+
+      Precedence, weakest first:
+
+        'default'                 what the node declared
+        'yaml:/**'                a wildcard block
+        'yaml:<fq name>'          a block naming this node exactly
+        'launch'                  set in the launch file
+        'cli'                     set on the command line
+
+      Return {param: (value, source)} for every parameter in `defaults`.
+      """
+      # TODO
+      return {}
+
+  def resolve_topic(spec):
+      """A topic's fully qualified name.
+
+      Apply the node's remappings to the written name first, then resolve:
+
+        starts with '/'   already absolute — the namespace is NOT applied
+        starts with '~'   private: namespace + '/' + node name + the rest
+        otherwise         relative: namespace + '/' + name
+      """
+      # TODO
+      return ""
+
+  def connected(pub_spec, sub_spec):
+      """Do these two endpoints resolve to the same topic?"""
+      # TODO
+      return False
+
+  print("node:", fq_node_name(NODE))
+  print("ignored blocks:", unreached(PARAM_YAML, NODE), "\n")
+  for _p, (_v, _src) in sorted(effective(DEFAULTS, PARAM_YAML, NODE,
+                                         LAUNCH_OVERRIDES, CLI_OVERRIDES).items()):
+      print("  %-10s = %-12s (%s)" % (_p, _v, _src))
+  print()
+  print("  publisher  ->", resolve_topic(CONTROLLER_PUB))
+  print("  subscriber ->", resolve_topic(BASE_SUB))
+  print("  connected  ->", connected(CONTROLLER_PUB, BASE_SUB))
+tests: |
+  # 1. Names.
+  assert fq_node_name(NODE) == "/robot1/controller"
+  assert fq_node_name({"name": "controller", "namespace": "/"}) == "/controller", (
+      "the root namespace must not produce '//controller'")
+
+  # 2. The block that does nothing.
+  assert unreached(PARAM_YAML, NODE) == ["/controller"], (
+      "the '/controller' block names a node that does not exist under this "
+      "launch — the node is '/robot1/controller'. Every value in that block "
+      "is ignored, and nothing anywhere reports it.")
+
+  _eff = effective(DEFAULTS, PARAM_YAML, NODE, LAUNCH_OVERRIDES, CLI_OVERRIDES)
+  assert set(_eff) == set(DEFAULTS), "report every declared parameter"
+
+  # 3. Precedence, one row at a time.
+  assert _eff["frame_id"] == ("base_link", "default"), "nobody set it"
+  assert _eff["ki"] == (0.05, "yaml:/**"), "the wildcard block does apply"
+  assert _eff["lookahead"] == (1.2, "yaml:/robot1/controller"), (
+      "the correctly-named block applies")
+  assert _eff["kp"] == (3.0, "launch"), (
+      "the launch file beats the parameter file — and the 2.4 in the YAML was "
+      "never in the running anyway, since it is in the ignored block")
+  assert _eff["max_speed"] == (2.0, "cli"), "the command line beats everything"
+
+  # 4. THE ONE THAT COSTS AN AFTERNOON.
+  _no_cli = effective(DEFAULTS, PARAM_YAML, NODE, LAUNCH_OVERRIDES, {})
+  assert _no_cli["max_speed"] == (0.5, "default"), (
+      "remove the command-line override somebody added while debugging and "
+      "max_speed falls back to 0.5 — the DEFAULT, not the 1.5 sitting in the "
+      "parameter file. The file has always been ignored; the CLI flag was "
+      "hiding it.")
+  assert PARAM_YAML["/controller"]["ros__parameters"]["max_speed"] == 1.5, (
+      "the value is right there in the file, which is what makes this hard to "
+      "see")
+
+  _no_launch = effective(DEFAULTS, PARAM_YAML, NODE, {}, {})
+  assert _no_launch["kp"] == (1.0, "default"), (
+      "same for kp: 2.4 is in the file and the node runs at 1.0")
+
+  # 5. One leading slash.
+  assert resolve_topic(CONTROLLER_PUB) == "/robot1/cmd_vel", (
+      "a relative name is resolved against the node's namespace")
+  assert resolve_topic(BASE_SUB) == "/cmd_vel", (
+      "an absolute name ignores the namespace entirely — that is what the "
+      "leading slash means")
+  assert not connected(CONTROLLER_PUB, BASE_SUB), (
+      "/robot1/cmd_vel and /cmd_vel are different topics. Both nodes start, "
+      "both report healthy, and the robot does not move.")
+
+  # The fix is configuration, not code.
+  _fixed = dict(BASE_SUB, remappings={"/cmd_vel": "cmd_vel"})
+  assert resolve_topic(_fixed) == "/robot1/cmd_vel"
+  assert connected(CONTROLLER_PUB, _fixed), (
+      "a remapping in the launch file fixes it without touching either node — "
+      "which is the argument for never hard-coding an absolute topic name")
+
+  # Private names.
+  _priv = {"name": "~/state", "node": NODE, "remappings": {}}
+  assert resolve_topic(_priv) == "/robot1/controller/state", (
+      "'~' means the node's own namespace, so a private topic cannot collide "
+      "with another instance of the same node")
+
+  # And two robots that do not interfere, which is the whole point of
+  # relative names.
+  _r2 = {"name": "cmd_vel", "node": {"name": "controller", "namespace": "/robot2"},
+         "remappings": {}}
+  assert resolve_topic(_r2) == "/robot2/cmd_vel"
+  assert not connected(CONTROLLER_PUB, _r2), (
+      "the same node launched twice into two namespaces publishes two "
+      "different topics — this is what namespacing is FOR, and it is also "
+      "what breaks a hard-coded absolute name")
+hints:
+  - "fq_node_name: join namespace and name with '/', but strip a trailing slash off the namespace first so the root namespace does not give '//controller'."
+  - "unreached: the keys of param_yaml that are neither fq_node_name(node) nor '/**'."
+  - "effective: start every parameter at (default, 'default'), then apply the wildcard block, the exact-name block, launch, and cli in that order — each one overwriting both the value and the source."
+  - "resolve_topic: apply `spec['remappings'].get(name, name)` first. Then a name starting with '/' is returned as-is; a name starting with '~/' becomes fq_node_name + the rest after '~'; anything else is namespace + '/' + name."
+solution: |
+  def fq_node_name(node):
+      ns = node["namespace"].rstrip("/")
+      return ns + "/" + node["name"]
+
+  def unreached(param_yaml, node):
+      fq = fq_node_name(node)
+      return sorted(k for k in param_yaml if k not in (fq, "/**"))
+
+  def effective(defaults, param_yaml, node, launch=None, cli=None):
+      launch = launch or {}
+      cli = cli or {}
+      fq = fq_node_name(node)
+
+      out = {k: (v, "default") for k, v in defaults.items()}
+
+      def apply(block, source):
+          for k, v in (block or {}).items():
+              if k in out:
+                  out[k] = (v, source)
+
+      # Weakest first; each layer overwrites the one below it.
+      apply(param_yaml.get("/**", {}).get("ros__parameters"), "yaml:/**")
+      apply(param_yaml.get(fq, {}).get("ros__parameters"), "yaml:" + fq)
+      apply(launch, "launch")
+      apply(cli, "cli")
+      return out
+
+  def resolve_topic(spec):
+      node = spec["node"]
+      name = spec["remappings"].get(spec["name"], spec["name"])
+      if name.startswith("/"):
+          # Absolute. The namespace does not participate, which is exactly
+          # what makes a hard-coded absolute name unusable on two robots.
+          return name
+      if name.startswith("~"):
+          return fq_node_name(node) + name[1:]
+      return node["namespace"].rstrip("/") + "/" + name
+
+  def connected(pub_spec, sub_spec):
+      return resolve_topic(pub_spec) == resolve_topic(sub_spec)
+
+  print("node:", fq_node_name(NODE))
+  print("ignored blocks:", unreached(PARAM_YAML, NODE), "\n")
+  for _p, (_v, _src) in sorted(effective(DEFAULTS, PARAM_YAML, NODE,
+                                         LAUNCH_OVERRIDES, CLI_OVERRIDES).items()):
+      print("  %-10s = %-12s (%s)" % (_p, _v, _src))
+  print()
+  print("  publisher  ->", resolve_topic(CONTROLLER_PUB))
+  print("  subscriber ->", resolve_topic(BASE_SUB))
+  print("  connected  ->", connected(CONTROLLER_PUB, BASE_SUB))

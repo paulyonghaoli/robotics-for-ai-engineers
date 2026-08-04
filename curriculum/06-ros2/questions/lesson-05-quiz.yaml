@@ -1,0 +1,100 @@
+id: ros-l5-quiz
+title: "Quiz — launch and parameters"
+lesson: modules/06-ros2/05-launch-params
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "A parameter file has a `/controller` block. The node is launched into the `/robot1` namespace. What happens to those values?"
+    options:
+      - text: "They are silently discarded — the node's fully qualified name is `/robot1/controller`, and a key that names no node is not an error"
+        correct: true
+        explanation: "The file is keyed by node name. Everything in that block is spelled correctly, typed correctly, and never used, and nothing anywhere reports it."
+      - text: "They apply, because the node's base name matches"
+        explanation: "Matching is on the fully qualified name; the base name is not consulted."
+      - text: "The node fails to start"
+        explanation: "It starts happily on its declared defaults."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Order these from weakest to strongest: command-line `-p`, node default, launch-file setting, `/**` wildcard block, exact-name YAML block."
+    options:
+      - text: "default → yaml:/** → yaml:exact-name → launch → cli"
+        correct: true
+        explanation: "More specific and later-applied wins. The practical consequence is that a value can be set in three places and only one of them is doing anything."
+      - text: "default → launch → yaml:exact-name → yaml:/** → cli"
+        explanation: "Launch beats both YAML layers, and the wildcard is weaker than the exact name, not stronger."
+      - text: "cli → launch → yaml → default"
+        explanation: "That is strongest-first; the question asked for weakest-first, and the wildcard/exact ordering still matters."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "`max_speed` reads 2.0 from a CLI override. Someone removes the override to tidy the launch command. What does it become?"
+    options:
+      - text: "0.5, the node's declared default — the parameter file's 1.5 was in a mis-keyed block and had never been read"
+        correct: true
+        explanation: "The CLI flag was hiding a file that has always been ignored. This is why the failure surfaces during cleanup, long after whoever wrote the YAML has moved on."
+      - text: "1.5, from the parameter file"
+        explanation: "That block names `/controller`, and the node is `/robot1/controller`."
+      - text: "It keeps 2.0 until the node restarts"
+        explanation: "The override is gone at launch; there is nothing to keep."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "How do you find out what gain a running node is actually using?"
+    options:
+      - text: "`ros2 param get` on the node. The YAML tells you what somebody intended; only the running node knows what it got"
+        correct: true
+        explanation: "`ros2 param dump` on a live node finds the whole class of problem at once. Reading the file is how the problem survives."
+      - text: "Read the parameter file"
+        explanation: "The file is intent. In this lesson it has been decorative for two parameters."
+      - text: "Read the launch file"
+        explanation: "One of five sources, and not authoritative over the others."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "A node publishes `cmd_vel` in namespace `/robot1`; another subscribes to `/cmd_vel`. Do they connect?"
+    options:
+      - text: "No — the first resolves to `/robot1/cmd_vel` and the second is absolute, so the namespace does not participate. Two topics, both nodes healthy, robot stationary"
+        correct: true
+        explanation: "One leading slash. The fix is a remapping in the launch file, touching neither node."
+      - text: "Yes, ROS 2 matches the base name"
+        explanation: "Matching is on the fully resolved name only."
+      - text: "Only if they are in the same executor"
+        explanation: "Executors govern callback scheduling, not name resolution."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "What does `~/state` resolve to for a node `controller` in namespace `/robot1`?"
+    options:
+      - text: "`/robot1/controller/state` — a private name lives under the node's own fully qualified name, so two instances of the node cannot collide"
+        correct: true
+        explanation: "Which is what private names are for: per-instance topics that need no coordination to stay distinct."
+      - text: "`/robot1/state`"
+        explanation: "That is the plain relative form, `state`."
+      - text: "`/state`"
+        explanation: "That is the absolute form, `/state`."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Why is a hard-coded absolute topic name in node code a design error rather than a style preference?"
+    options:
+      - text: "The same node launched into two namespaces is supposed to publish two different topics. An absolute name opts out of namespacing, so the node can be used exactly once"
+        correct: true
+        explanation: "Namespacing is the feature that makes a node reusable across robots and instances; an absolute name is a decision to have neither."
+      - text: "Absolute names are slower to resolve"
+        explanation: "Resolution cost is irrelevant and identical in practice."
+      - text: "It is only a problem in multi-robot systems"
+        explanation: "It is also a problem for two instances of one node on one robot, which is common."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "What is the cheapest change that would have caught both failures in this lesson?"
+    options:
+      - text: "Log the effective configuration at startup — every declared parameter with its value and source, and the resolved name of every topic. Ten lines, and the silent failures stop being silent"
+        correct: true
+        explanation: "It converts a class of invisible misconfiguration into something a reviewer sees in the logs. It is the cheapest fix here and the least commonly implemented."
+      - text: "Schema-validate the parameter file"
+        explanation: "Useful, and it cannot catch a block whose key names no node — that block is valid YAML with a valid structure."
+      - text: "Put every parameter under `/**`"
+        explanation: "It would fix this instance and gives up per-node configuration entirely, which you will need on the second robot."
