@@ -56,7 +56,7 @@ starter_code: |
   #           simulate(controller), ROBOT_R = 0.25, V_MAX = 0.8, W_MAX = 1.2.
 
   # Three parameters. Exactly one of them is wrong.
-  SAFE_MARGIN = 0.62      # required clearance for an arc to be admissible (m)
+  SAFE_MARGIN = 0.75      # required clearance for an arc to be admissible (m)
   W_CLEARANCE = 0.5       # weight on clearance in the score
   W_PROGRESS  = 2.0       # weight on progress toward the goal
 
@@ -89,12 +89,12 @@ tests: |
   assert W_CLEARANCE >= 0.0 and W_PROGRESS > 0.0, "keep both score terms sane"
 hints:
   - "Diagnose first: the gap is 1.4 m wide, so passing through its centre gives at most 0.7 m clearance to each side. Which parameter is asking for more than the world can supply?"
-  - "SAFE_MARGIN = 0.62 leaves only 0.08 m of slack at the exact centre line — with rollout curvature, no admissible arc exists. Lower it to something comfortably under 0.7 (0.4 works) while keeping it above ROBOT_R = 0.25."
+  - "The best any path can do is the centre line, which clears exactly 0.70 m to each stub. SAFE_MARGIN = 0.75 asks for more than the doorway physically contains, so EVERY arc is inadmissible and the planner correctly selects (0, 0) — forever. Lower it under 0.70 (0.4 works) while keeping it above ROBOT_R = 0.25."
   - "Note what the tests refuse to accept: setting SAFE_MARGIN below the robot radius. Freezing is fixed by making the margin *achievable*, not by removing safety."
 solution: |
   import numpy as np
 
-  SAFE_MARGIN = 0.40      # was 0.62 - unachievable in a 1.4 m gap
+  SAFE_MARGIN = 0.40      # was 0.75 - unachievable in a 1.4 m gap
   W_CLEARANCE = 0.5
   W_PROGRESS  = 2.0
 

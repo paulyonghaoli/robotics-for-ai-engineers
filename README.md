@@ -10,7 +10,7 @@ I'm a data and ML engineer teaching myself robotics. What I couldn't find was ma
 
 ## The thing I built to prove I'd understood it
 
-A differential-drive robot navigating randomized worlds. Four versions, each one removing an assumption the last one leaned on. These GIFs come from real evaluation runs — the same code path that scores it.
+A differential-drive robot navigating randomized worlds. Five versions, each one removing an assumption the last one leaned on. These GIFs come from real evaluation runs — the same code path that scores it.
 
 | Localizing with no idea where it is | Building the map while driving | Avoiding things that aren't on the map | Neither a map nor a pose |
 |---|---|---|---|
@@ -25,9 +25,11 @@ A differential-drive robot navigating randomized worlds. Four versions, each one
 | v3 | Six moving obstacles, not on the map | 18/18, 17/18 collision-free |
 | v4 | **Nothing** — no map, no pose sensor after step 0 | 18/24, 0.39 m drift |
 
-v4 is the one that stops short of the others on purpose. Giving up the pose sensor costs a quarter of the episodes, because 0.39 m of drift against a 0.5 m goal tolerance means a quarter of runs park just outside it *believing they arrived*. That gap doesn't close by tuning — it closes with loop closure — so it's published as a measured envelope rather than tuned away.
+v4 is the one that stops short of the others on purpose. Giving up the pose sensor costs a quarter of the episodes, because 0.39 m of drift against a 0.5 m goal tolerance means a quarter of runs park just outside it *believing they arrived*. That gap doesn't close by tuning, so it's published as a measured envelope rather than tuned away.
 
-The [engineering log](docs/capstone-log.md) is the part I'd actually recommend reading: thirteen ways this broke, what each one looked like from the outside, and how it was found. Most were not algorithm bugs — they were bad assumptions about what a sensor reading *meant*. One of them I found, documented, wrote a lesson about, and then committed again three stacks later.
+The obvious next move is loop closure, so I built it — scan-to-scan matching and a Gauss-Newton pose graph, with unit tests showing it takes a deliberately-drifted loop from 1.10 m of error to 0.000 m. On this capstone it changes nothing, and the reason is the useful part: **the task is a single traverse, and a single traverse never revisits anywhere it has been.** Measured revisit pairs across all six evaluation seeds: zero. There is no loop to close. Given a there-and-back tour instead, the same back end removes 39% of the error where a loop exists and exactly nothing where it doesn't. That's [note 14](docs/capstone-log.md) in the log, and it's why there's no v5.
+
+The [engineering log](docs/capstone-log.md) is the part I'd actually recommend reading: thirteen ways this broke (plus one thing that turned out not to be broken at all), what each one looked like from the outside, and how it was found. Most were not algorithm bugs — they were bad assumptions about what a sensor reading *meant*. One of them I found, documented, wrote a lesson about, and then committed again three stacks later.
 
 ## Why it's built the way it is
 
@@ -41,14 +43,15 @@ Self-teaching has one big failure mode: you read something, nod, and walk away b
 
 ## What's here
 
-- **33 lessons** — geometry, kinematics and control, state estimation, mapping and SLAM, planning. Each bridges to something you likely already know: Kalman filters as recursive Bayesian inference, costmaps as reward shaping, RRT as the same reason random search beats grid search in high dimensions.
-- **49 coding exercises** you complete in the browser. Every reference solution is executed against its own tests in CI, so a lab that doesn't work can't ship.
-- **Diagnostic labs** where you get working-looking code with a real bug in it and have to find it from the symptom alone: [frames](docs/modules/01-geometry/06-lab-frame-debugging.md), [filters](docs/modules/03-estimation/06-consistency-lab.md), [SLAM](docs/modules/04-mapping/05-lab-slam-failures.md), [planners](docs/modules/05-planning/06-lab-planner-pathologies.md).
+- **82 lessons across 14 modules** — geometry, control, state estimation, mapping and SLAM, planning, ROS 2, perception, manipulation, robot learning, evaluation, deployment, data infrastructure, systems performance. Each bridges to something you likely already know: Kalman filters as recursive Bayesian inference, costmaps as reward shaping, RRT as the same reason random search beats grid search in high dimensions.
+- **117 coding exercises** you complete in the browser, and **84 question banks** (546 questions). Every reference solution is executed against its own tests in CI, so a lab that doesn't work can't ship — and a separate check proves every *starter* fails, so an exercise can't quietly ask for nothing.
+- **14 diagnostic labs** where you get working-looking code with a real bug in it and have to find it from the symptom alone: [frames](docs/modules/01-geometry/06-lab-frame-debugging.md), [filters](docs/modules/03-estimation/06-consistency-lab.md), [SLAM](docs/modules/04-mapping/05-lab-slam-failures.md), [planners](docs/modules/05-planning/06-lab-planner-pathologies.md), [ROS 2 nodes](docs/modules/06-ros2/06-lab-worked-alone.md), [perception](docs/modules/07-perception/06-lab-perception-lied.md), and more.
+- **9 autograded mini-projects** (`python -m grader`, randomized each run) and **three capstones** — the navigation stack above, a [perception-to-grasp arm](docs/modules/capstone-3/index.md), and the [infrastructure that decides whether a policy ships](docs/modules/capstone-2/index.md).
 - **[Where the field is going](docs/frontier.md)** — a researched snapshot of the 2026 robotics frontier, with every claim marked as verified, company-claimed, or single-source, because a lot of what's written about this space doesn't survive checking.
 
 ## Honest status
 
-- **Courses I and II are complete** (geometry through planning). Course III — perception, manipulation, robot learning — is not written yet.
+- **All four courses are written**, and the ROS 2 track with them. What that means precisely: every module has lessons, exercises, a diagnostic lab and graded work, all CI-verified. It does not mean every page has been reread with fresh eyes.
 - **Simulation only.** Nothing here has touched real hardware, and the gap between the two is real.
 - **I'm a learner, not an authority.** The code is tested; the *pedagogy* is one person's opinion about what makes these ideas click, and the framing of the field is my current understanding rather than an expert consensus. Where I've had to guess, I've tried to say so.
 - **Written with AI assistance**, with every code path executed and tested in CI and every failure documented from actual debugging. I'd rather say that plainly than have you wonder.

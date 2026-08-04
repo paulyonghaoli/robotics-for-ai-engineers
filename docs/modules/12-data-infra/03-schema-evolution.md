@@ -33,7 +33,7 @@ The third row is the dangerous one, and it is invisible to every type system. Un
 A record carries its own version:
 
 ```
-{"schema_version": 2, "speed_mps": 1.4, "t_capture": 1690000000.0}
+{"schema_version": 2, "speed_kph": 5.04, "t_capture": 1690000000.0}
 ```
 
 The reader owns a chain of migrations and applies whichever it needs:

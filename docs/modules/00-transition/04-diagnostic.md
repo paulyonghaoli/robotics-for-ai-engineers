@@ -1,6 +1,6 @@
 # 0.4 Math prerequisites: a working diagnostic
 
-**Status:** Code verified · **Prereqs:** none · **Time:** ~45 min
+**Status:** Technically reviewed · **Prereqs:** none · **Time:** ~45 min
 
 ---
 

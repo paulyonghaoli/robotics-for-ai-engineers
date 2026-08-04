@@ -1,6 +1,6 @@
 # Capstone · Autonomous 2D Mobile Robot
 
-**Status:** v0–v4 live — at `projects/capstone_nav/` (`python -m eval run --stack ...`). ROS 2 packaging is planned.
+**Status:** v0–v4 live — at `projects/capstone_nav/` (`python -m eval run --stack ...`). It runs in pure Python and is not packaged for ROS 2; [Module 6](../06-ros2/index.md) teaches the architecture without requiring an installation, and packaging this stack would be a separate exercise rather than planned work.
 
 <div markdown class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0.8rem;margin:1.2rem 0;">
 <figure markdown style="margin:0">

@@ -75,7 +75,7 @@ Everything above is verified by **22 CI gates** on every push — linting, tests
 
 The ROS 2 track (Module 6) is written to run in the browser like everything else, and deliberately does not re-explain the official tutorials' mechanics — it covers why a synchronous service call stalls a control loop, why two nodes with compatible-looking QoS never connect, and where your callbacks actually run. Installing ROS 2 is optional and nothing in the module waits for it.
 
-Still to come: a loop-closure version of the navigation capstone.
+A loop-closure version of the navigation capstone was investigated and deliberately not shipped: the pose-graph back end is built and tested, and the capstone's single-traverse task never revisits anywhere, so there is no loop to close. [Note 14](capstone-log.md) has the measurement. Nothing else is outstanding.
 
 ## Honest caveats
 

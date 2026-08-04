@@ -1,6 +1,8 @@
 # Robotics for AI Engineers — Master Plan
 
-**Version:** 1.1 (open questions resolved; video + industry-tooling strategy added) · **Date:** 2026-08-01 · **Status:** governing document — supersedes the original ChatGPT outline; update this file when scope decisions change.
+**Version:** 1.2 · **Date:** 2026-08-03 · **Status:** governing document — supersedes the original ChatGPT outline; update this file when scope decisions change.
+
+**Where things stand:** all four courses and the ROS 2 track are built — 14 modules, 82 lessons, 14 labs, 9 mini-projects, 117 exercises, 84 question banks, 3 capstones, 23 CI gates. Phases A–D are complete. Capstone v5 was investigated and declined on evidence (see §5d and capstone-log note 14). No phase below is outstanding; the sections are kept as the record of how the scope was decided.
 
 ---
 
@@ -135,7 +137,7 @@ Ship order optimizes for: (a) the interaction platform proven early on existing 
 | **P1 — Interactive platform MVP** (platform ✅ 2026-08-01; Module 1 lessons 1.3–1.6 remaining) | `quiz-bank` + `code-exercise` components, YAML schemas, Pyodide worker, content-integrity CI ✅; lesson 1.1 retrofitted with all four tiers ✅; frame-transforms mini-grader ✅; lesson 1.2 quaternions ✅; still to do: lessons 1.3 transform trees, 1.4 twists, 1.5 C-space, 1.6 debugging lab | A stranger can read 1.1, answer MCQs, write+run code in the page, and locally grade a mini-project — **verified end-to-end in browser** |
 | **P2 — Course I beta** ✅ **COMPLETE 2026-08-02** | Modules 0–3 fully live (16 lessons), all with quiz banks + in-browser exercises; `robotics_ai.control` + `robotics_ai.estimation` libraries; localization autograded project; consistency lab; math diagnostic; Course I exam form A (16 cross-module questions). 25 banks / 36 exercises / 96 tests, all CI green | Course I ≈ 135 learner-hrs, all CI green — **met** |
 | **P3 — Course II / v1.0** ✅ **COMPLETE 2026-08-02** | Modules 4, 5, 9, 10, 11 live (48 lessons total across the curriculum, 56 quiz banks, 71 exercises). Capstone v0–v4 all passing: v1 PF localization 6–11 cm; v2 online mapping 20/20; v3 dynamic obstacles 18/18 at six movers; **v4 SLAM — no map and no pose sensor — 18/24, 0.387 m drift, scored on its own published envelope**. `robotics_ai.planning` + `.mapping`; thirteen debugging field notes in docs/capstone-log.md; `slam_ablation.py` reproduces v4's design decisions with the controller loop cut. Site live on Cloudflare, nine CI gates green via `tools/verify.py`. | End-to-end nav stack scored by `python -m eval`; 6-credit claim defensible — **met** |
-| **P4 — Course III** (next) | Module 7 (perception — leverages PointPillars background), Module 8 (manipulation), Module 6 (ROS 2 parallel track, needs the WSL2/devcontainer decision), **capstone v5 = loop closure + pose graph**, which is the specific thing v4's measured envelope says is missing | 9-credit program complete |
+| **P4 — Course III** ✅ | Module 7 (perception), Module 8 (manipulation), Module 6 (ROS 2 parallel track) — all complete. Capstone v5 (loop closure + pose graph) was built as a back end, measured, and **declined**: the capstone task never revisits a place, so there is no loop to close | 9-credit program complete |
 | **Continuous** | Question-bank growth, community PRs, version re-verification (pinned ROS distro checks) | — |
 
 **Not building** (unchanged from v0 plan, now with one exception): accounts, backends, LMS, certificates, forums, monetization, humanoids. *Exception:* interactivity and autograding are now in scope — but strictly in their zero-backend forms above.
@@ -277,7 +279,7 @@ interesting material.
 | **C — Course III** ✅ **COMPLETE 2026-08-03** | Module 7 (6 lessons, lab, mini-project), Module 8 (6 lessons, lab), Capstone III (`projects/capstone_grasp/`, 30/30, CI-gated). Remaining optional: Module 9 mini-project | Course III complete, capstone CI-gated on a published rubric — **met** |
 | **D — Course IV** ✅ **COMPLETE 2026-08-03** | Module 12 ✅ (4 lessons, 2026-08-03), Module 13 ✅ (5 lessons, 2026-08-03), Capstone IV all five stages ✅. Mini-projects for Modules 9, 10 and 11 ✅ | Course IV complete; four courses, three capstones (II, III, IV) — **met 2026-08-03** |
 
-Module 6 (ROS 2) content ✅ **complete 2026-08-03** — 6 browser-runnable lessons covering the architecture questions the official tutorials do not; the WSL2/devcontainer decision now gates only the optional hands-on half. Still deferred: capstone v5
+Module 6 (ROS 2) content ✅ **complete 2026-08-03** — 6 browser-runnable lessons covering the architecture questions the official tutorials do not; the WSL2/devcontainer decision now gates only the optional hands-on half. Capstone v5 investigated and declined 2026-08-03 — the pose-graph back end and its tests are in the repository; shipping it would have meant changing the capstone task and re-scoring all four earlier versions. Nothing is deferred.
 (loop closure), the ROS 2 environment decision.
 
 ## 6. Resolved questions (decided 2026-08-01)

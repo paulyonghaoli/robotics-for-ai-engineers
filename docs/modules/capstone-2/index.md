@@ -180,8 +180,8 @@ Note what is being scored. Not the policy — the *infrastructure*. A capstone w
 
 An honest note on sequencing, since the module numbers suggest otherwise.
 
-Modules 7 (perception) and 8 (manipulation) are not written yet, and a capstone that depends on them would have to wait. Modules 9, 10 and 11 **are** complete, and they are the part of this curriculum least duplicated by the dozens of existing robotics courses — perception and manipulation are extremely well covered elsewhere, and evaluation infrastructure is barely covered anywhere.
+This capstone was built before Modules 7 and 8 existed, when a capstone depending on them would have had to wait. That is no longer the constraint — both are written, and [Capstone III](../capstone-3/index.md) is the perception-and-manipulation capstone they earned. The reason this one still comes first is the one that was always the real argument: evaluation infrastructure is the part of this curriculum least duplicated by the dozens of existing robotics courses. Perception and manipulation are covered extremely well elsewhere; deciding whether a policy is safe to ship is barely covered anywhere.
 
 There is also a structural argument. This capstone's system under test is the Course II capstone, which means the two compose: the classical stack you built becomes the incumbent you must beat and the oracle you must clone from. That only works in this order.
 
-A perception/manipulation capstone remains worth building once Modules 7 and 8 land. It is not the one that should come first.
+The perception-and-manipulation capstone did get built — it is [Capstone III](../capstone-3/index.md), and it is a second embodiment rather than a fifth navigation stack. It is still not the one that should come first.
