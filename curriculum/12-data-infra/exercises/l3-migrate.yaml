@@ -1,0 +1,191 @@
+id: dat-l3-migrate
+title: "A reader that refuses to guess"
+lesson: modules/12-data-infra/03-schema-evolution
+description: >-
+  Three generations of robot software wrote this archive, and two of the
+  changes altered what a field MEANS rather than what it is called. The
+  reader below parses every record without complaining and gets some of them
+  wrong. Make the migration chain total, pure, and fail-closed.
+setup_code: |
+  import math
+
+  CURRENT_VERSION = 3
+
+  # How the format changed, twice:
+  #
+  #   v1 -> v2  `speed` (metres per second) became `speed_kph` (km/h).
+  #             The name changed AND the value changed: x 3.6.
+  #             `t` became `t_capture`.
+  #   v2 -> v3  `heading_deg` became `yaw_rad`, in radians.
+  #             Every record now names the frame it is expressed in;
+  #             all historical data was map-frame.
+  #
+  # The archive still holds records from all three eras.
+  ARCHIVE = [
+      {"schema_version": 1, "episode": "e001", "speed": 2.5, "t": 1690000000.0, "heading_deg": 90.0},
+      {"schema_version": 1, "episode": "e002", "speed": 1.5, "t": 1690000100.0, "heading_deg": 0.0},
+      {"schema_version": 2, "episode": "e101", "speed_kph": 5.4, "t_capture": 1720000000.0, "heading_deg": 45.0},
+      {"schema_version": 2, "episode": "e102", "speed_kph": 9.0, "t_capture": 1720000100.0, "heading_deg": 180.0},
+      {"schema_version": 3, "episode": "e201", "speed_kph": 7.2, "t_capture": 1750000000.0, "yaw_rad": 0.0, "frame": "map"},
+      {"schema_version": 3, "episode": "e202", "speed_kph": 3.6, "t_capture": 1750000100.0, "yaw_rad": math.pi, "frame": "map"},
+  ]
+
+  CURRENT_KEYS = {"schema_version", "episode", "speed_kph", "t_capture", "yaw_rad", "frame"}
+  LEGACY_KEYS = {"speed", "t", "heading_deg"}
+
+  # The SAME physical measurement, written twice: once by the 2024 software
+  # and once by today's. Whatever the reader does to the first must land
+  # exactly on the second — this is the only real test of a migration.
+  PAIR_V1 = {"schema_version": 1, "episode": "e900", "speed": 2.5, "t": 1690000500.0, "heading_deg": 90.0}
+  PAIR_V3 = {"schema_version": 3, "episode": "e900", "speed_kph": 9.0, "t_capture": 1690000500.0,
+             "yaw_rad": math.pi / 2, "frame": "map"}
+
+  def same_record(a, b, tol=1e-9):
+      """Exact on the key set, tolerant on float values."""
+      if set(a) != set(b):
+          return False
+      for k in a:
+          x, y = a[k], b[k]
+          if isinstance(x, float) or isinstance(y, float):
+              if abs(x - y) > tol:
+                  return False
+          elif x != y:
+              return False
+      return True
+starter_code: |
+  import math
+  # Provided: CURRENT_VERSION, ARCHIVE, CURRENT_KEYS, LEGACY_KEYS,
+  #           PAIR_V1, PAIR_V3, same_record(a, b)
+
+  def migrate_1_to_2(rec):
+      """v1 -> v2."""
+      rec["speed_kph"] = rec.pop("speed")           # <-- renamed. Is that all that changed?
+      rec["t_capture"] = rec.pop("t")
+      rec["schema_version"] = 2
+      return rec
+
+  def migrate_2_to_3(rec):
+      """v2 -> v3."""
+      rec["yaw_rad"] = rec.pop("heading_deg")       # <-- renamed. Same question.
+      rec["schema_version"] = 3
+      return rec
+
+  def read(rec):
+      """Return `rec` at CURRENT_VERSION."""
+      version = rec.get("schema_version", CURRENT_VERSION)   # <-- absent means current?
+      if version == 1:
+          rec = migrate_1_to_2(rec)
+      if version == 2:
+          rec = migrate_2_to_3(rec)
+      return rec
+
+  for _r in ARCHIVE:
+      print(read(dict(_r)))
+  print("v1 record reads the same as the native v3 record:", same_record(read(dict(PAIR_V1)), PAIR_V3))
+tests: |
+  import math, copy
+
+  # 1. TOTAL. Every record in the archive reaches the current version, with
+  #    exactly the current key set and no legacy keys left behind.
+  _out = [read(copy.deepcopy(r)) for r in ARCHIVE]
+  assert len(_out) == len(ARCHIVE), "every record must be readable; got %d of %d" % (len(_out), len(ARCHIVE))
+  for _src, _rec in zip(ARCHIVE, _out):
+      assert _rec["schema_version"] == CURRENT_VERSION, \
+          "record %s came in at v%s and came out at v%s — the chain stops early. Applying 1->2 does not make the record version 2 for the purposes of the NEXT step unless you re-read the version." % (_src["episode"], _src["schema_version"], _rec["schema_version"])
+      assert set(_rec) == CURRENT_KEYS, \
+          "record %s has keys %s, expected %s" % (_src["episode"], sorted(_rec), sorted(CURRENT_KEYS))
+      assert not (set(_rec) & LEGACY_KEYS), "record %s still carries a legacy key" % _src["episode"]
+
+  # 2. MEANING, not just names. The v1 record and the native v3 record
+  #    describe the same measurement and must land on the same numbers.
+  _migrated = read(copy.deepcopy(PAIR_V1))
+  assert same_record(_migrated, PAIR_V3), \
+      "a v1 record migrated to v3 does not match the natively-written v3 record:\n  got      %s\n  expected %s\nA rename that also changes the UNIT is two changes, and only one of them is visible in the key." % (_migrated, PAIR_V3)
+
+  # Spelled out, because this is the whole lesson: 2.5 m/s is 9.0 km/h.
+  assert abs(_migrated["speed_kph"] - 9.0) < 1e-9, \
+      "2.5 m/s became %.4f km/h. Copying the value across the rename leaves the archive wrong by a factor of 3.6, and nothing errors." % _migrated["speed_kph"]
+  assert abs(_migrated["yaw_rad"] - math.pi / 2) < 1e-9, \
+      "90 degrees became %.4f rad. Same failure, different unit." % _migrated["yaw_rad"]
+
+  # Already-current records must pass through untouched.
+  _v3 = copy.deepcopy(ARCHIVE[-1])
+  assert same_record(read(copy.deepcopy(_v3)), _v3), "a record already at the current version must be returned unchanged"
+
+  # 3. PURE. Migrating must not mutate its input, and reading twice must
+  #    give the same answer as reading once.
+  _orig = copy.deepcopy(ARCHIVE[0])
+  _arg = copy.deepcopy(_orig)
+  read(_arg)
+  assert _arg == _orig, \
+      "read() mutated the record it was handed (%s became %s). In-place migration means the second read sees different data than the first, and the archive can never be re-read from source." % (_orig, _arg)
+  _arg2 = copy.deepcopy(_orig)
+  migrate_1_to_2(_arg2)
+  assert _arg2 == _orig, "migrate_1_to_2 mutated its argument; return a new record instead"
+  _once = read(copy.deepcopy(_orig))
+  assert same_record(read(copy.deepcopy(_once)), _once), "read(read(x)) must equal read(x)"
+
+  # 4. FAIL-CLOSED. A version this reader does not know about must raise,
+  #    not fall through to a plausible-looking answer.
+  for _bad in ({"schema_version": 9, "episode": "e999", "speed_kph": 1.0},
+               {"schema_version": 0, "episode": "e998"},
+               {"episode": "e997", "speed_kph": 1.0}):
+      try:
+          _got = read(copy.deepcopy(_bad))
+      except AssertionError:
+          raise
+      except Exception:
+          pass
+      else:
+          raise AssertionError(
+              "read(%s) returned %s instead of raising. A record whose version this reader does not understand — written by newer software, or by something that forgot to stamp it — has no safe default. Guessing is exactly what puts a wrong number into a training set." % (_bad, _got))
+hints:
+  - "Two of the field changes altered the VALUE as well as the name. Read the comment block at the top of the setup and work out what each migration owes the data, not just what it owes the key."
+  - "The chain stops early because the version is read once, before any migration runs. Loop instead: while the record's version is below CURRENT_VERSION, apply the migration for whatever version it is at NOW."
+  - "Purity: start each migration with `out = dict(rec)` and mutate `out`. Fail-closed: check that `schema_version` is present and is a version you have a path from, and raise otherwise — `rec.get('schema_version', CURRENT_VERSION)` treats an unstamped record as current, which is the most confident possible way to be wrong."
+solution: |
+  import math
+
+  def migrate_1_to_2(rec):
+      # `speed` in m/s became `speed_kph` in km/h. The rename is the visible
+      # half of the change; the x3.6 is the half that fails silently.
+      out = dict(rec)
+      out["speed_kph"] = out.pop("speed") * 3.6
+      out["t_capture"] = out.pop("t")
+      out["schema_version"] = 2
+      return out
+
+  def migrate_2_to_3(rec):
+      # Degrees became radians, and the frame became explicit. Everything
+      # written before v3 was map-frame, which is a fact about history that
+      # only the migration knows.
+      out = dict(rec)
+      out["yaw_rad"] = math.radians(out.pop("heading_deg"))
+      out["frame"] = "map"
+      out["schema_version"] = 3
+      return out
+
+  # One entry per hop. A missing key here is a version of the archive that
+  # nothing can read, which is worth failing on rather than skipping.
+  MIGRATIONS = {1: migrate_1_to_2, 2: migrate_2_to_3}
+
+  def read(rec):
+      if "schema_version" not in rec:
+          raise ValueError("record has no schema_version; refusing to assume it is current")
+      version = rec["schema_version"]
+      if version > CURRENT_VERSION:
+          raise ValueError(
+              "record is v%s and this reader knows up to v%s — it was written by newer "
+              "software and there is no safe way to interpret it" % (version, CURRENT_VERSION))
+      out = dict(rec)
+      # Re-read the version each hop, so the chain composes.
+      while out["schema_version"] < CURRENT_VERSION:
+          step = MIGRATIONS.get(out["schema_version"])
+          if step is None:
+              raise ValueError("no migration from v%s; the chain has a gap" % out["schema_version"])
+          out = step(out)
+      return out
+
+  for _r in ARCHIVE:
+      print(read(dict(_r)))
+  print("v1 record reads the same as the native v3 record:", same_record(read(dict(PAIR_V1)), PAIR_V3))

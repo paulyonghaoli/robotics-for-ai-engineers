@@ -1,0 +1,95 @@
+id: dat-l3-quiz
+title: "Quiz — schema evolution"
+lesson: modules/12-data-infra/03-schema-evolution
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Which schema change is the most dangerous, and why?"
+    options:
+      - text: "Changing what a field MEANS while keeping its name — every reader still parses it, so the archive is wrong with no error anywhere"
+        correct: true
+        explanation: "Removals and renames fail loudly, which is a feature. A units or frame change fails silently and can survive into a model and a metric before anyone notices."
+      - text: "Removing a field, because old consumers break"
+        explanation: "They break immediately and visibly, which is the cheap failure."
+      - text: "Adding an optional field, because the archive becomes inconsistent"
+        explanation: "The safest change there is: old readers ignore it, new readers default it."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A field recorded 2.5 m/s. The schema changed to km/h and a migration copied the value across without converting. By what factor is that record now wrong?"
+    answer: 3.6
+    tolerance: 0.01
+    explanation: "3.6. The number is plausible, the type is right, and nothing in the pipeline can tell. This is why the unit belongs in the field NAME — `speed_mps` cannot silently become km/h."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "Your reader knows schema versions 1 through 3 and encounters a record stamped version 4. What should it do?"
+    options:
+      - text: "Raise. A record written by newer software has no safe interpretation, and a reader that guesses produces confidently wrong data instead of an error"
+        correct: true
+        explanation: "Fail-closed. The cost is a loud crash; the alternative cost is a silent corruption you find out about a quarter later."
+      - text: "Read it with the version-3 rules, since v4 is probably a superset"
+        explanation: "Probably. That word is doing all the work, and it is wrong exactly when a field's meaning changed."
+      - text: "Skip the record and continue"
+        explanation: "Better than guessing, and it silently biases every dataset built from the archive toward older robots."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "Why migrate on read rather than rewriting the archive in place?"
+    options:
+      - text: "The original bytes are the only thing that can adjudicate a later dispute, and an in-place rewrite is irreversible — including its bugs"
+        correct: true
+        explanation: "A migration with a bug, applied on read, is a code fix. The same bug applied in place is a data-loss incident."
+      - text: "Migrating on read is faster"
+        explanation: "It is slower per read, and worth it."
+      - text: "Storage is cheaper than compute"
+        explanation: "True and beside the point — in-place rewriting saves storage, which is the reason people do it."
+  - id: q5
+    type: single
+    difficulty: core
+    prompt: "A migration mutates the record it is given rather than returning a new one. What breaks?"
+    options:
+      - text: "Idempotence — running the chain twice no longer gives the same answer as running it once, and something eventually runs it twice"
+        correct: true
+        explanation: "Also: whoever handed you the record still holds a reference to it, and now their copy has silently changed underneath them."
+      - text: "Nothing, as long as the chain runs once"
+        explanation: "'As long as' is the assumption that fails — retries, caches, and re-reads all run it twice."
+      - text: "Performance, from the extra allocation"
+        explanation: "The pure version allocates more, not less."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "A new field is added and old records get it filled in with `0.0`. What has that done?"
+    options:
+      - text: "Turned 'we did not measure this' into 'we measured zero' — a claim the data never made, and one that averages, thresholds, and loss functions will all take at face value"
+        correct: true
+        explanation: "The same failure as a safe default in a controller: the absent value and the measured value must stay distinguishable. `None` says what is true."
+      - text: "Made the archive uniformly readable, which is the goal"
+        explanation: "Uniformly readable and partly fictional."
+      - text: "Nothing, since 0.0 is the natural default"
+        explanation: "There is no natural default for a measurement that was never taken."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Records exist at versions 1, 2 and 3. You have migrations 1→2 and 2→3. Someone adds version 4 and writes only a 3→4. What is the risk?"
+    options:
+      - text: "None from that gap — the chain is still total. The risk is the opposite case: if a version in the archive has no outgoing migration, records at that version are either skipped or read by the wrong path, and both are silent"
+        correct: true
+        explanation: "Totality is the property worth testing directly: for every version present in the archive, a path to current exists. Test it against real old records, not synthetic ones."
+      - text: "Version 1 records can no longer reach version 4"
+        explanation: "They can — 1→2→3→4 composes, which is the point of writing migrations as functions."
+      - text: "The chain gets slower with each version"
+        explanation: "Marginally, and it is not a correctness risk."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "How do you actually test that a migration is correct, as opposed to that it runs?"
+    options:
+      - text: "Migrate old records to current and compare against records written NATIVELY at the current version for the same measurement — agreement is the only evidence that the meaning survived"
+        correct: true
+        explanation: "Testing that the keys changed only tests the rename. The pair test catches the unit conversion, the frame, and the sign convention."
+      - text: "Assert that the output has the current key set"
+        explanation: "Necessary and nowhere near sufficient — it passes for a migration that renames a field and leaves it in the wrong units."
+      - text: "Assert that the migration does not raise on the whole archive"
+        explanation: "The dangerous failure mode is precisely the one that does not raise."
