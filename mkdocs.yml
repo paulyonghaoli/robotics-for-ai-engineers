@@ -123,6 +123,8 @@ nav:
       - "Mini-project: Planning": modules/05-planning/project-planning.md
   - "Module 6 · ROS 2":
       - Overview: modules/06-ros2/index.md
+      - "6.1 The node graph": modules/06-ros2/01-node-graph.md
+      - "6.2 QoS": modules/06-ros2/02-qos.md
   - "Capstone II · Autonomous 2D Robot":
       - Overview: modules/capstone/index.md
       - "Engineering log: thirteen bugs": capstone-log.md

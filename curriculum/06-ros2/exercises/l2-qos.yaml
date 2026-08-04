@@ -1,0 +1,256 @@
+id: ros-l2-qos
+title: "The subscriber that never receives anything"
+lesson: modules/06-ros2/02-qos
+description: >-
+  Seven endpoints, three topics, and two subscribers that will never receive
+  a single message — with no error, no warning, and both nodes reporting
+  healthy. Implement the compatibility rules, find them, and then work out
+  what queue depth actually buys you on a stream you cannot keep up with.
+setup_code: |
+  # Quality of Service is a CONTRACT. A publisher OFFERS a level of service
+  # and a subscriber REQUESTS one; the connection is made only if the offer
+  # is at least as strong as the request. Nothing is negotiated down, and
+  # nothing is reported when it fails.
+
+  # Stronger is higher. A publisher can always over-deliver.
+  RELIABILITY_RANK = {"best_effort": 0, "reliable": 1}
+  DURABILITY_RANK = {"volatile": 0, "transient_local": 1}
+
+  def endpoint(role, topic, reliability="reliable", durability="volatile",
+               depth=10, deadline_ms=None):
+      return {"role": role, "topic": topic, "reliability": reliability,
+              "durability": durability, "depth": depth, "deadline_ms": deadline_ms}
+
+  ENDPOINTS = {
+      # A lidar driver, publishing sensor data the way sensor data is
+      # normally published: fast, lossy, shallow queue.
+      "lidar_driver": endpoint("pub", "/scan", "best_effort", "volatile", 5, 150.0),
+      "slam_node":    endpoint("sub", "/scan", "reliable", "volatile", 10, 200.0),
+      "rviz":         endpoint("sub", "/scan", "best_effort", "volatile", 5, 200.0),
+
+      # A map server. The map is published once and must still be there for
+      # a node that starts an hour later.
+      "map_server":   endpoint("pub", "/map", "reliable", "transient_local", 1, None),
+      "late_planner": endpoint("sub", "/map", "reliable", "transient_local", 1, None),
+      "logger":       endpoint("sub", "/map", "reliable", "volatile", 1, None),
+
+      # Velocity commands, with a deadline on both sides.
+      "controller":   endpoint("pub", "/cmd_vel", "reliable", "volatile", 1, 25.0),
+      "base_driver":  endpoint("sub", "/cmd_vel", "reliable", "volatile", 1, 20.0),
+  }
+
+  # The camera stream from lesson 6.1, and a subscriber that is too slow.
+  CAMERA_HZ = 30.0
+  DETECTOR_MS = 60.0
+starter_code: |
+  # Provided: ENDPOINTS, endpoint(), RELIABILITY_RANK, DURABILITY_RANK,
+  #           CAMERA_HZ, DETECTOR_MS
+
+  def compatible(pub, sub):
+      """Will these two endpoints actually connect?
+
+      Three rules, all of the same shape — the offer must be at least as
+      strong as the request:
+
+        reliability   offered rank >= requested rank
+        durability    offered rank >= requested rank
+        deadline      the publisher's promised period must be no LONGER
+                      than the subscriber's required one.  None means "no
+                      deadline", which is the weakest offer and the
+                      weakest request.
+      """
+      # TODO
+      return True
+
+  def incompatible_reason(pub, sub):
+      """Which rule failed: 'reliability', 'durability', 'deadline', or
+      None if the pair connects. Check them in that order."""
+      # TODO
+      return None
+
+  def connections(endpoints):
+      """Every (pub_name, sub_name) pair on the same topic that actually
+      connects, sorted."""
+      # TODO
+      return []
+
+  def orphans(endpoints):
+      """Subscriber names that have at least one publisher on their topic
+      and are connected to none of them — the ones that will sit there
+      receiving nothing while every node reports healthy. Sorted."""
+      # TODO
+      return []
+
+  def throughput_hz(rate_hz, process_ms):
+      """Messages per second the subscriber actually handles."""
+      # TODO
+      return 0.0
+
+  def dropped_per_s(rate_hz, process_ms):
+      """Messages per second that never get processed."""
+      # TODO
+      return 0.0
+
+  def staleness_ms(rate_hz, process_ms, depth):
+      """Age of the message the subscriber is working on, relative to the
+      newest one already published.
+
+      If the subscriber keeps up there is no backlog and the answer is 0.
+      If it does not, the queue sits full, and the message at the front is
+      `depth` messages behind the newest.
+      """
+      # TODO
+      return 0.0
+
+  for _p, _s in [("lidar_driver", "slam_node"), ("lidar_driver", "rviz"),
+                 ("map_server", "logger"), ("controller", "base_driver")]:
+      print("%-13s -> %-13s %s" % (
+          _p, _s, incompatible_reason(ENDPOINTS[_p], ENDPOINTS[_s]) or "connected"))
+  print("\norphaned subscribers:", orphans(ENDPOINTS))
+  print()
+  for _d in (1, 5, 10, 30):
+      print("depth %2d: %.1f Hz processed, %.1f/s dropped, %.0f ms stale" % (
+          _d, throughput_hz(CAMERA_HZ, DETECTOR_MS), dropped_per_s(CAMERA_HZ, DETECTOR_MS),
+          staleness_ms(CAMERA_HZ, DETECTOR_MS, _d)))
+tests: |
+  _E = ENDPOINTS
+
+  # 1. The three ways a connection silently does not happen.
+  assert not compatible(_E["lidar_driver"], _E["slam_node"]), (
+      "a subscriber REQUESTING reliable cannot connect to a best-effort "
+      "publisher — the publisher cannot promise what is being asked for")
+  assert incompatible_reason(_E["lidar_driver"], _E["slam_node"]) == "reliability"
+
+  assert compatible(_E["map_server"], _E["logger"]), (
+      "the reverse direction is fine: a transient-local publisher over-delivers "
+      "for a volatile subscriber, and over-delivery is always allowed")
+  assert not compatible(
+      endpoint("pub", "/map", "reliable", "volatile"),
+      endpoint("sub", "/map", "reliable", "transient_local")), (
+      "a volatile publisher cannot satisfy a transient-local request — this is "
+      "the one that bites a node started after the map was published")
+  assert incompatible_reason(
+      endpoint("pub", "/map", "reliable", "volatile"),
+      endpoint("sub", "/map", "reliable", "transient_local")) == "durability"
+
+  assert not compatible(_E["controller"], _E["base_driver"]), (
+      "the controller offers a 25 ms period and the base driver requires 20 ms. "
+      "A promise to publish every 25 ms does not satisfy a requirement of every "
+      "20 ms, so these two never connect — and the robot has no velocity "
+      "commands at all")
+  assert incompatible_reason(_E["controller"], _E["base_driver"]) == "deadline"
+
+  # A publisher with no deadline offers the weakest possible promise.
+  assert not compatible(endpoint("pub", "/t", deadline_ms=None),
+                        endpoint("sub", "/t", deadline_ms=50.0)), (
+      "'no deadline' cannot satisfy a request for one")
+  assert compatible(endpoint("pub", "/t", deadline_ms=10.0),
+                    endpoint("sub", "/t", deadline_ms=None)), (
+      "...and a subscriber that asks for nothing accepts anything")
+
+  # 2. Who is actually connected, and who is sitting there receiving nothing.
+  _conn = connections(_E)
+  assert ("lidar_driver", "rviz") in _conn, "rviz asked for best effort and gets it"
+  assert ("map_server", "late_planner") in _conn and ("map_server", "logger") in _conn
+  assert ("lidar_driver", "slam_node") not in _conn
+  assert ("controller", "base_driver") not in _conn
+
+  assert orphans(_E) == ["base_driver", "slam_node"], (
+      "two subscribers have a publisher on their topic and no connection to it: "
+      "got %s. Both nodes start cleanly, both report healthy, both receive "
+      "nothing forever." % orphans(_E))
+
+  # 3. Queue depth: what it buys, and what it does not.
+  assert abs(throughput_hz(CAMERA_HZ, DETECTOR_MS) - 1000.0 / DETECTOR_MS) < 1e-9, (
+      "a subscriber taking 60 ms per message handles 16.7 of them a second, "
+      "whatever the queue looks like")
+  assert abs(dropped_per_s(CAMERA_HZ, DETECTOR_MS) - (30.0 - 1000.0 / 60.0)) < 1e-9, (
+      "and drops the other 13.3")
+  assert dropped_per_s(15.0, DETECTOR_MS) == 0.0, "a subscriber that keeps up drops nothing"
+  assert staleness_ms(15.0, DETECTOR_MS, 10) == 0.0, "...and works on fresh data"
+
+  # THE POINT. Depth changes the staleness and not the drop rate.
+  _shallow = staleness_ms(CAMERA_HZ, DETECTOR_MS, 1)
+  _deep = staleness_ms(CAMERA_HZ, DETECTOR_MS, 30)
+  assert abs(_deep / _shallow - 30.0) < 1e-6, (
+      "depth 30 gives %.0f ms of staleness against %.0f ms at depth 1 — thirty "
+      "times worse" % (_deep, _shallow))
+  assert _deep > 900.0, "a one-second-old detection on a moving robot is not a detection"
+
+  # Stated as the thing to remember: a deeper queue on a stream you cannot
+  # keep up with buys latency, not completeness.
+  for _d in (1, 5, 10, 30):
+      assert abs(throughput_hz(CAMERA_HZ, DETECTOR_MS) - 1000.0 / DETECTOR_MS) < 1e-9, (
+          "throughput is the same at every depth (%d)" % _d)
+hints:
+  - "compatible: compare RELIABILITY_RANK[pub] >= RELIABILITY_RANK[sub] and the same for durability. For the deadline, treat None as infinity on both sides — an infinite offer satisfies only an infinite request, and an infinite request is satisfied by anything."
+  - "incompatible_reason returns the first failing rule in the order reliability, durability, deadline, and None when everything passes. compatible() can just be `incompatible_reason(...) is None`."
+  - "connections: every pub/sub pair sharing a topic where compatible() holds. orphans: subscribers whose topic has at least one publisher and who appear in no connection."
+  - "throughput_hz is min(rate, 1000/process_ms); dropped_per_s is the difference, floored at zero. staleness_ms is 0 when the subscriber keeps up, and depth / rate * 1000 when it does not — the queue is full, so the message at the front is `depth` messages behind the newest."
+solution: |
+  def _deadline(v):
+      # No deadline is the weakest offer and the weakest request alike.
+      return float("inf") if v is None else float(v)
+
+  def incompatible_reason(pub, sub):
+      if RELIABILITY_RANK[pub["reliability"]] < RELIABILITY_RANK[sub["reliability"]]:
+          return "reliability"
+      if DURABILITY_RANK[pub["durability"]] < DURABILITY_RANK[sub["durability"]]:
+          return "durability"
+      # The publisher promises to publish at least this often; the
+      # subscriber requires at least this often. A longer promise fails.
+      if _deadline(pub["deadline_ms"]) > _deadline(sub["deadline_ms"]):
+          return "deadline"
+      return None
+
+  def compatible(pub, sub):
+      return incompatible_reason(pub, sub) is None
+
+  def connections(endpoints):
+      out = []
+      for pn, p in endpoints.items():
+          if p["role"] != "pub":
+              continue
+          for sn, s in endpoints.items():
+              if s["role"] != "sub" or s["topic"] != p["topic"]:
+                  continue
+              if compatible(p, s):
+                  out.append((pn, sn))
+      return sorted(out)
+
+  def orphans(endpoints):
+      conn = {s for _, s in connections(endpoints)}
+      out = []
+      for sn, s in endpoints.items():
+          if s["role"] != "sub":
+              continue
+          has_pub = any(p["role"] == "pub" and p["topic"] == s["topic"]
+                        for p in endpoints.values())
+          if has_pub and sn not in conn:
+              out.append(sn)
+      return sorted(out)
+
+  def throughput_hz(rate_hz, process_ms):
+      return min(float(rate_hz), 1000.0 / float(process_ms))
+
+  def dropped_per_s(rate_hz, process_ms):
+      return max(0.0, float(rate_hz) - 1000.0 / float(process_ms))
+
+  def staleness_ms(rate_hz, process_ms, depth):
+      if 1000.0 / float(process_ms) >= float(rate_hz):
+          # No backlog: the queue never fills, so nothing waits in it.
+          return 0.0
+      # The queue sits full. The message at the front is `depth` messages
+      # behind whatever was published most recently.
+      return float(depth) / float(rate_hz) * 1000.0
+
+  for _p, _s in [("lidar_driver", "slam_node"), ("lidar_driver", "rviz"),
+                 ("map_server", "logger"), ("controller", "base_driver")]:
+      print("%-13s -> %-13s %s" % (
+          _p, _s, incompatible_reason(ENDPOINTS[_p], ENDPOINTS[_s]) or "connected"))
+  print("\norphaned subscribers:", orphans(ENDPOINTS))
+  print()
+  for _d in (1, 5, 10, 30):
+      print("depth %2d: %.1f Hz processed, %.1f/s dropped, %.0f ms stale" % (
+          _d, throughput_hz(CAMERA_HZ, DETECTOR_MS), dropped_per_s(CAMERA_HZ, DETECTOR_MS),
+          staleness_ms(CAMERA_HZ, DETECTOR_MS, _d)))

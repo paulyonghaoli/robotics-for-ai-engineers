@@ -1,0 +1,219 @@
+id: ros-l1-graph
+title: "Topic, service, or action — and what the wrong answer costs"
+lesson: modules/06-ros2/01-node-graph
+description: >-
+  Six interactions from a real robot. Three of the choices are obvious and
+  three are the ones people get wrong, so work out the rule from measurable
+  properties rather than from intuition — and then measure what one wrong
+  choice does to a 50 Hz control loop.
+setup_code: |
+  # Every interaction between two nodes, with the properties you can
+  # actually measure before deciding how to implement it.
+  #
+  #   hz              how often it happens (0.0 = on demand, rarely)
+  #   needs_response  does the caller need something back?
+  #   duration_ms     how long the work takes on the far side
+  #   cancellable     would anyone ever want to abort it mid-flight?
+  #   bytes           payload size, one message
+  INTERACTIONS = {
+      "lidar_scan":  {"hz": 10.0,  "needs_response": False, "duration_ms": 0.0,
+                      "cancellable": False, "bytes": 46_000},
+      "camera_raw":  {"hz": 30.0,  "needs_response": False, "duration_ms": 0.0,
+                      "cancellable": False, "bytes": 921_600},
+      "cmd_vel":     {"hz": 50.0,  "needs_response": False, "duration_ms": 0.0,
+                      "cancellable": False, "bytes": 48},
+      "set_gain":    {"hz": 0.0,   "needs_response": True,  "duration_ms": 2.0,
+                      "cancellable": False, "bytes": 16},
+      "get_map":     {"hz": 0.05,  "needs_response": True,  "duration_ms": 45.0,
+                      "cancellable": False, "bytes": 1_000_000},
+      "navigate_to": {"hz": 0.01,  "needs_response": True,  "duration_ms": 4000.0,
+                      "cancellable": True,  "bytes": 64},
+      "dock":        {"hz": 0.0,   "needs_response": True,  "duration_ms": 25_000.0,
+                      "cancellable": True,  "bytes": 8},
+  }
+
+  LONG_MS = 1000.0          # past this, a caller should not be made to wait
+  GOAL_SUBMIT_MS = 1.0      # cost of handing an action server a goal
+
+  CONTROL_PERIOD_MS = 20.0  # a 50 Hz control loop
+  CONTROL_WORK_MS = 4.0     # what the callback does on its own
+starter_code: |
+  # Provided: INTERACTIONS, LONG_MS, GOAL_SUBMIT_MS,
+  #           CONTROL_PERIOD_MS, CONTROL_WORK_MS
+
+  def classify(interaction):
+      """'topic', 'service', or 'action'.
+
+      The rule, from the measurable properties and nothing else:
+
+        - nothing comes back           -> topic
+        - something comes back, and it is either long-running or something
+          you would want to cancel     -> action
+        - otherwise                    -> service
+
+      "Long-running" means longer than LONG_MS.
+      """
+      # TODO
+      return "topic"
+
+  def blocking_ms(interaction, pattern):
+      """Milliseconds the CALLER's thread is blocked by one interaction.
+
+      A topic publish returns immediately. A synchronous service call waits
+      for the whole thing. Submitting an action goal costs GOAL_SUBMIT_MS
+      and the result arrives later, on a callback.
+      """
+      # TODO
+      return 0.0
+
+  def loop_ok(period_ms, work_ms, blocking_ms_value):
+      """Can a periodic callback doing `work_ms` of its own work plus
+      `blocking_ms_value` of waiting still finish inside `period_ms`?"""
+      # TODO
+      return True
+
+  def achieved_hz(period_ms, work_ms, blocking_ms_value):
+      """Rate the loop actually runs at. It cannot exceed its nominal rate,
+      and once the callback overruns, the period is however long the
+      callback takes."""
+      # TODO
+      return 0.0
+
+  def bus_mbps(names):
+      """Total bus load of the named interactions, in megabits per second.
+
+      Only streaming interactions carry continuous load; use hz * bytes.
+      A megabit is 1e6 bits.
+      """
+      # TODO
+      return 0.0
+
+  def dominant(names):
+      """Name of the interaction responsible for the most bus load."""
+      # TODO
+      return ""
+
+  for _n, _i in INTERACTIONS.items():
+      _p = classify(_i)
+      print("%-12s %-8s blocks caller %8.1f ms" % (_n, _p, blocking_ms(_i, _p)))
+  print()
+  print("bus load: %.1f Mbit/s, dominated by %s" % (
+      bus_mbps(INTERACTIONS), dominant(INTERACTIONS)))
+tests: |
+  _I = INTERACTIONS
+
+  # 1. The rule, applied to all seven.
+  _expected = {
+      "lidar_scan": "topic", "camera_raw": "topic", "cmd_vel": "topic",
+      "set_gain": "service", "get_map": "service",
+      "navigate_to": "action", "dock": "action",
+  }
+  for _n, _want in _expected.items():
+      _got = classify(_I[_n])
+      assert _got == _want, "%s should be a %s, got %s" % (_n, _want, _got)
+
+  # `get_map` is the one worth arguing about: it returns something, it is
+  # slow, and it is still a service because nobody cancels a map fetch.
+  assert classify(_I["get_map"]) == "service", (
+      "45 ms is slow and it is not LONG_MS-slow, and there is no sensible "
+      "reason to abort it — cancellability is the property that separates a "
+      "slow service from an action")
+
+  # 2. What each pattern costs the caller.
+  assert blocking_ms(_I["cmd_vel"], "topic") == 0.0, "publishing returns immediately"
+  assert blocking_ms(_I["navigate_to"], "service") == 4000.0, (
+      "a synchronous service call waits for the whole thing")
+  assert blocking_ms(_I["navigate_to"], "action") == GOAL_SUBMIT_MS, (
+      "submitting a goal costs a millisecond; the result arrives on a callback")
+
+  # 3. THE CHECK. What one wrong choice does to the control loop.
+  _budget = CONTROL_PERIOD_MS - CONTROL_WORK_MS
+  assert loop_ok(CONTROL_PERIOD_MS, CONTROL_WORK_MS, 0.0), (
+      "with 4 ms of work in a 20 ms period the loop is comfortable")
+
+  assert not loop_ok(CONTROL_PERIOD_MS, CONTROL_WORK_MS,
+                     blocking_ms(_I["get_map"], "service")), (
+      "a 45 ms service call inside a 20 ms callback does not fit — and note "
+      "the map fetch itself is perfectly reasonable, it is calling it from "
+      "HERE that is the mistake")
+
+  _hz = achieved_hz(CONTROL_PERIOD_MS, CONTROL_WORK_MS,
+                    blocking_ms(_I["navigate_to"], "service"))
+  assert _hz < 0.3, (
+      "calling navigate_to as a synchronous service drops the control loop to "
+      "%.2f Hz for four seconds — the robot is not being steered while it "
+      "waits to be told it arrived" % _hz)
+
+  _hz_action = achieved_hz(CONTROL_PERIOD_MS, CONTROL_WORK_MS,
+                           blocking_ms(_I["navigate_to"], "action"))
+  assert abs(_hz_action - 50.0) < 1e-9, (
+      "the same interaction as an action leaves the loop at 50 Hz. The work "
+      "still takes four seconds; it just does not happen on this thread.")
+
+  assert abs(achieved_hz(CONTROL_PERIOD_MS, CONTROL_WORK_MS, 0.0) - 50.0) < 1e-9, (
+      "a loop that fits its period runs at its period, not faster — the rate "
+      "is set by the timer, not by how quickly the callback returns")
+  assert _budget > 0
+
+  # 4. The graph's bandwidth, and where it all is.
+  _total = bus_mbps(_I)
+  assert 200.0 < _total < 250.0, (
+      "the graph carries about 225 Mbit/s, got %.1f" % _total)
+  assert dominant(_I) == "camera_raw", "the raw camera stream is the load"
+  _without = bus_mbps({k: v for k, v in _I.items() if k != "camera_raw"})
+  assert _without < 0.02 * _total, (
+      "one topic is %.1f%% of the entire bus. Everything else on the robot "
+      "together is %.1f Mbit/s. This is why image transport is compressed and "
+      "why nodes that both live on the robot should share memory rather than "
+      "serialize." % (100 * (1 - _without / _total), _without))
+hints:
+  - "classify: check `needs_response` first — False means topic and nothing else matters. Then `cancellable or duration_ms > LONG_MS` means action; whatever is left is a service."
+  - "blocking_ms: 0.0 for a topic, the full `duration_ms` for a service, GOAL_SUBMIT_MS for an action."
+  - "loop_ok is `work + blocking <= period`. achieved_hz is `1000 / period` when it fits and `1000 / (work + blocking)` when it does not — an overrunning callback sets its own period."
+  - "bus_mbps: sum `hz * bytes * 8 / 1e6` over the interactions. On-demand interactions have hz = 0.0 and contribute nothing, which is the right answer and also why `dock` never appears in a bandwidth budget."
+solution: |
+  def classify(interaction):
+      # Nothing comes back: there is no one to wait for.
+      if not interaction["needs_response"]:
+          return "topic"
+      # Something comes back, and making the caller sit there would be a
+      # design error — either because it takes too long or because someone
+      # will want to abort it.
+      if interaction["cancellable"] or interaction["duration_ms"] > LONG_MS:
+          return "action"
+      return "service"
+
+  def blocking_ms(interaction, pattern):
+      if pattern == "topic":
+          return 0.0
+      if pattern == "service":
+          # The caller's thread is inside the call for its whole duration.
+          return float(interaction["duration_ms"])
+      return float(GOAL_SUBMIT_MS)
+
+  def loop_ok(period_ms, work_ms, blocking_ms_value):
+      return bool(work_ms + blocking_ms_value <= period_ms)
+
+  def achieved_hz(period_ms, work_ms, blocking_ms_value):
+      spent = work_ms + blocking_ms_value
+      if spent <= period_ms:
+          # The timer sets the rate, not the callback's speed.
+          return 1000.0 / period_ms
+      return 1000.0 / spent
+
+  def bus_mbps(names):
+      total = 0.0
+      for n in names:
+          i = INTERACTIONS[n]
+          total += i["hz"] * i["bytes"] * 8.0 / 1e6
+      return total
+
+  def dominant(names):
+      return max(names, key=lambda n: INTERACTIONS[n]["hz"] * INTERACTIONS[n]["bytes"])
+
+  for _n, _i in INTERACTIONS.items():
+      _p = classify(_i)
+      print("%-12s %-8s blocks caller %8.1f ms" % (_n, _p, blocking_ms(_i, _p)))
+  print()
+  print("bus load: %.1f Mbit/s, dominated by %s" % (
+      bus_mbps(INTERACTIONS), dominant(INTERACTIONS)))

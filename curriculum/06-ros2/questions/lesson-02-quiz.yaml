@@ -1,0 +1,95 @@
+id: ros-l2-quiz
+title: "Quiz — quality of service"
+lesson: modules/06-ros2/02-qos
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Your node subscribes to a lidar topic, the publisher is publishing, `ros2 topic hz` shows 10 Hz, and your callback never fires once. What is the most likely cause?"
+    options:
+      - text: "A QoS mismatch — the driver publishes best_effort and your subscriber requested reliable, so the two endpoints never match. No error is raised because an unmatched endpoint is a normal state"
+        correct: true
+        explanation: "The default profile is reliable and the sensor convention is best_effort, so any node written without thinking about QoS lands here. `rclpy.qos.qos_profile_sensor_data` is the fix."
+      - text: "The topic name is wrong"
+        explanation: "Worth checking first and ruled out by `ros2 topic list` showing the topic with both endpoints on it."
+      - text: "The callback is throwing an exception"
+        explanation: "That would log something; this failure logs nothing at all."
+  - id: q2
+    type: single
+    difficulty: core
+    prompt: "Why can a `reliable` publisher serve a `best_effort` subscriber, but not the reverse?"
+    options:
+      - text: "The publisher OFFERS and the subscriber REQUESTS; the offer must be at least as strong as the request. Over-delivery is always allowed, under-delivery is never negotiated down"
+        correct: true
+        explanation: "This asymmetry is DDS's Requested/Offered semantics, not a ROS invention, and it is the single rule behind all three ways a connection silently fails."
+      - text: "Reliable is the default so it takes precedence"
+        explanation: "Defaults decide what you get when you don't choose; they don't decide matching."
+      - text: "It's a bug in the middleware"
+        explanation: "It is specified behaviour, and the specified behaviour is the useful one — the alternative is silently giving a node less than it asked for."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "A node started an hour after the map server receives no map. Which policy is wrong?"
+    options:
+      - text: "Durability — the map server is `volatile`, so the message it published an hour ago is gone. Latched data needs `transient_local` on both sides"
+        correct: true
+        explanation: "This works whenever the subscriber happens to start first, which is every time you test it by hand, and fails on the robot where startup order is not yours to choose."
+      - text: "Reliability — the message was dropped in transit"
+        explanation: "Reliable delivery still only delivers to endpoints that exist at publish time."
+      - text: "Depth — the queue is too shallow"
+        explanation: "Depth governs the publisher's outgoing queue for late-joiners only when durability is transient_local."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A publisher offers a 25 ms deadline; a subscriber requires 20 ms. What happens?"
+    options:
+      - text: "They never connect, and the robot gets no commands at all — a promise to publish every 25 ms does not satisfy a requirement of every 20 ms"
+        correct: true
+        explanation: "Both settings look conservative and correct on their own. Deadline and liveliness are genuinely useful and add a way for a working system to stop connecting, so test the mismatch case deliberately."
+      - text: "They connect and the subscriber logs a deadline-missed event every cycle"
+        explanation: "That is what happens when a MATCHED publisher is late; an unsatisfiable request does not match in the first place."
+      - text: "The subscriber's requirement is relaxed to 25 ms"
+        explanation: "Nothing is negotiated down."
+  - id: q5
+    type: numeric
+    difficulty: core
+    prompt: "A 30 Hz camera feeds a detector that takes 60 ms per frame. With a queue depth of 30, how many frames per second are dropped?"
+    answer: 13.3
+    tolerance: 1
+    explanation: "13.3/s — exactly the same as at depth 1, 5 or 10. The detector handles 16.7 of the 30 that arrive, and no queue depth changes that arithmetic. What depth changes is how stale the survivors are: 33 ms at depth 1, 1000 ms at depth 30."
+  - id: q6
+    type: single
+    difficulty: core
+    prompt: "For a stream you process more slowly than it arrives, what is the right queue depth and why?"
+    options:
+      - text: "1 — process the newest thing available and discard the backlog, because a backlog on a robot is not pending work, it is old work"
+        correct: true
+        explanation: "A deeper queue drops exactly as many messages and makes the ones you do process older. Depth is for a bursty producer you can keep up with on average."
+      - text: "As deep as memory allows, so nothing is lost"
+        explanation: "The same number is lost either way; you have only chosen to work on stale data."
+      - text: "Match it to the publisher's depth"
+        explanation: "The two are independent queues solving different problems."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "`ros2 topic echo /scan` prints messages, and your node's callback never fires. What did echo just tell you?"
+    options:
+      - text: "Almost nothing — echo picks its own QoS defaults, so it can match a publisher your node cannot. It confirms the publisher works and says nothing about your subscription"
+        correct: true
+        explanation: "This makes echo a misleading first diagnostic for exactly the failure it feels most useful for. `ros2 topic info /scan --verbose` prints every endpoint's QoS, which is the diagnostic that actually discriminates."
+      - text: "That your node has a bug in its callback"
+        explanation: "Possible and not established; the callback is never being invoked."
+      - text: "That the QoS is compatible"
+        explanation: "It establishes that echo's QoS is compatible, which is a different question."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "Which piece of your data-pipeline intuition does NOT transfer to a sensor topic?"
+    options:
+      - text: "Backpressure. A slow consumer slows a producer in a pipeline; a lidar does not slow down, so the only question is which messages you lose"
+        correct: true
+        explanation: "Which is why `depth` is a data-loss policy rather than a buffering convenience, and why depth 1 is a real answer rather than a lazy one."
+      - text: "Retention windows"
+        explanation: "That transfers cleanly — `transient_local` is a compacted topic with retention 1."
+      - text: "Delivery guarantees"
+        explanation: "Also transfers — reliable and best_effort are at-least-once and at-most-once."

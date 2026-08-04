@@ -22,7 +22,7 @@ Courses I and II are the classical stack, which is well covered elsewhere — th
 |---|---|---|
 | [**4 · Mapping & SLAM**](modules/04-mapping/index.md) | Occupancy grids, ICP/scan matching, EKF-SLAM, pose graphs & loop closure, SLAM-failures lab | ✅ 5 lessons + [autograded project](modules/04-mapping/project-mapping.md) |
 | [**5 · Planning & decision-making**](modules/05-planning/index.md) | A*, costmaps, RRT, dynamic-window local planning, planning under uncertainty, planner-pathologies lab | ✅ 6 lessons + [autograded project](modules/05-planning/project-planning.md) |
-| [**6 · ROS 2**](modules/06-ros2/index.md) *(parallel track)* | Nodes, topics, services, actions, TF2, URDF, launch, bags, QoS | ⬜ planned |
+| [**6 · ROS 2**](modules/06-ros2/index.md) *(parallel track)* | Nodes, topics, services, actions, TF2, URDF, launch, bags, QoS | 🔨 2 lessons |
 | [**Capstone · autonomous 2D robot**](modules/capstone/index.md) | Scenario-evaluated navigation stack | ✅ v0–v4 live (v4 = SLAM) |
 | [**Course II exam**](course-2-exam.md) | 16 cross-module questions, closed-book | ✅ form A |
 

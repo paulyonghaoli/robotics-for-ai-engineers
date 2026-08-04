@@ -1,0 +1,90 @@
+id: ros-l1-quiz
+title: "Quiz — the node graph"
+lesson: modules/06-ros2/01-node-graph
+questions:
+  - id: q1
+    type: single
+    difficulty: core
+    prompt: "Which measurable property separates a slow service from an action?"
+    options:
+      - text: "Cancellability — a 45 ms map fetch is a service because nobody aborts one; a 4-second navigation goal is an action because someone will"
+        correct: true
+        explanation: "Duration alone gets it wrong in both directions. The question is whether a caller would ever want to change their mind partway."
+      - text: "Duration alone — anything over a second is an action"
+        explanation: "A useful heuristic and not the rule; it classifies a slow-but-atomic query as an action and a fast-but-abortable one as a service."
+      - text: "Payload size"
+        explanation: "Irrelevant to the pattern; it matters for transport."
+  - id: q2
+    type: numeric
+    difficulty: core
+    prompt: "A 50 Hz control callback does 4 ms of its own work and then makes a synchronous service call that takes 4 seconds. What rate does the loop run at during the call, in Hz?"
+    answer: 0.25
+    tolerance: 0.05
+    explanation: "1000 / 4004 ms ≈ 0.25 Hz. The robot is not being steered while it waits to be told it has arrived — for four seconds, at speed."
+  - id: q3
+    type: single
+    difficulty: core
+    prompt: "You convert that call from a service to an action and the loop returns to 50 Hz. What got faster?"
+    options:
+      - text: "Nothing. The navigation still takes four seconds; the waiting moved off the thread that had a deadline"
+        correct: true
+        explanation: "Worth being precise about, because it tells you the fix does not apply when the work genuinely has to complete before the next control output."
+      - text: "The navigation itself, because actions run concurrently"
+        explanation: "The server does the same work in the same time."
+      - text: "The transport, because actions use a lighter protocol"
+        explanation: "Actions are built on topics and services and are not lighter."
+  - id: q4
+    type: single
+    difficulty: core
+    prompt: "A map fetch takes 45 ms and your control period is 20 ms. What is the defect?"
+    options:
+      - text: "Calling it from the control callback. The 45 ms fetch is perfectly reasonable and no amount of optimizing the map server makes a design that cannot tolerate 45 ms work"
+        correct: true
+        explanation: "Locating the defect in the caller rather than the callee is most of the fix — the alternative is a quarter spent making the map server faster."
+      - text: "The map server is too slow"
+        explanation: "45 ms for a megabyte of occupancy grid is fine; the caller is the problem."
+      - text: "The control period is too short"
+        explanation: "50 Hz is an ordinary control rate and the reason the deadline exists."
+  - id: q5
+    type: numeric
+    difficulty: core
+    prompt: "A 640×480 RGB frame is 921,600 bytes. Published at 30 Hz, what is the bus load in Mbit/s?"
+    answer: 221
+    tolerance: 10
+    explanation: "921600 × 30 × 8 / 1e6 ≈ 221 Mbit/s. In the exercise's graph that one topic is 98% of everything the robot publishes — lidar, odometry, commands and diagnostics together are under 4 Mbit/s."
+  - id: q6
+    type: single
+    difficulty: stretch
+    prompt: "Two nodes on the same computer exchange raw camera frames over a topic. What is wrong with that, and what is the fix called?"
+    options:
+      - text: "Every frame is serialized, copied and deserialized to reach a process on the same machine. Intra-process communication or zero-copy loaned messages avoid the copy; compressed image transport avoids most of the bytes"
+        correct: true
+        explanation: "This is why ROS 2 has that machinery at all. It is not an optimization for large fleets, it is the difference between a saturated CPU and an idle one."
+      - text: "Nothing — the middleware detects co-location automatically"
+        explanation: "Only if the nodes are composed into one process and intra-process comms are enabled; across processes it serializes."
+      - text: "It works but wastes network bandwidth"
+        explanation: "No network is involved; the waste is CPU and memory bandwidth, which is scarcer on a robot."
+  - id: q7
+    type: single
+    difficulty: stretch
+    prompt: "Why is 'one node per reason to exist' worth defending against the pressure to merge?"
+    options:
+      - text: "Merging is easier because shared state is easier, and the cost lands later — when you want to run half of it elsewhere, restart one piece, or have it fail without taking the rest down"
+        correct: true
+        explanation: "The same argument as service boundaries in a backend, with the addition that on a robot the failure of the merged unit is physical."
+      - text: "Because more nodes are faster"
+        explanation: "More nodes cost discovery traffic and serialization; the argument is about failure and deployment, not speed."
+      - text: "Because ROS 2 requires it"
+        explanation: "It does not; a single node can do everything, and people ship that."
+  - id: q8
+    type: single
+    difficulty: stretch
+    prompt: "What does your distributed-systems intuition get RIGHT about ROS 2, and where does it stop being enough?"
+    options:
+      - text: "The shapes all transfer — pub/sub, RPC, discovery, event logs. What does not transfer is the deadline: a call that is merely slow in a backend has stopped steering a robot"
+        correct: true
+        explanation: "Which is why the synchronous-service mistake is so common among people who are good at distributed systems. The code is ordinary; the consequence is not."
+      - text: "Nothing transfers — robotics middleware is unrelated"
+        explanation: "Most of it transfers, which is the point of taking this track after Course I."
+      - text: "Everything transfers, including the performance assumptions"
+        explanation: "The performance assumptions are exactly what does not."
