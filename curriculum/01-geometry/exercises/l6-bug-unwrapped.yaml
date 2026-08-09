@@ -20,6 +20,16 @@ setup_code: |
       # report final heading wrapped for comparison
       wrapped = -(np.mod(-theta + np.pi, 2 * np.pi) - np.pi)
       return wrapped, total
+provided:
+  simulate_turn:
+    notes:
+      - >-
+        `controller(theta, target, k) -> angular velocity`, clipped to
+        +/-2.0 rad/s. Both angles are radians.
+      - >-
+        Returns (final heading, total rotation), the first wrapped to
+        (-pi, pi] and the second the unsigned angle swept along the way.
+    example: "simulate_turn(lambda th, tgt, k: k * (tgt - th), 0.0, 1.0)"
 starter_code: |
   import numpy as np
   # Provided: simulate_turn(controller, start, target) -> (final_heading, total_rotation)

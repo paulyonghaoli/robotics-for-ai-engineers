@@ -27,6 +27,22 @@ setup_code: |
           v = cart.step(controller.step(v, setpoint, DT))
           trace.append(v)
       return np.array(trace)
+provided:
+  V_REACHABLE:
+    summary: >-
+      The fastest the cart can physically go, in m/s — GAIN * U_MAX / DRAG.
+      Any setpoint above this can never be reached, however long you wait.
+  run:
+    notes:
+      - >-
+        `controller` is any object with
+        `step(measurement, setpoint, dt) -> command`.
+      - >-
+        Returns the cart's velocity at every step, length `steps`. The setpoint
+        is 12.0 until index `switch`, then 1.0.
+      - >-
+        The actuator saturates at +/-U_MAX, so V_REACHABLE is the fastest the
+        cart can physically go no matter what is commanded.
 starter_code: |
   import numpy as np
   # Provided: DT, U_MAX, V_REACHABLE (=3.75), Cart, run(controller)

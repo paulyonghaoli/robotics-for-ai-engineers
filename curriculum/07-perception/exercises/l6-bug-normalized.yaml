@@ -27,6 +27,22 @@ setup_code: |
       `points` happens to be expressed in."""
       p = points[idx]
       return float((p.max(axis=0) - p.min(axis=0))[:2].max())
+provided:
+  make_scene:
+    notes:
+      - >-
+        Returns (points, object_indices). `points` is (n, 3) in metres;
+        `object_indices` selects the rows belonging to the object.
+      - >-
+        `extent` changes the size of the SCENE, not of the object. A
+        pedestrian is 0.7 m wide in a 20 m scene and in a 100 m one.
+    example: "make_scene(np.random.default_rng(0), 40.0)[0].shape"
+  object_extent:
+    notes:
+      - >-
+        Largest horizontal side of the object's bounding box, in whatever
+        units `points` is currently expressed in — which is not always metres.
+    example: "object_extent(*make_scene(np.random.default_rng(0), 40.0))"
 starter_code: |
   import numpy as np
   # Provided: make_scene(rng, extent, with_pedestrian), object_extent(points, idx)

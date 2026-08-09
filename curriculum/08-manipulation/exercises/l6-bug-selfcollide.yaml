@@ -55,6 +55,20 @@ setup_code: |
   # A configuration that folds the third link back against the first.
   FOLDED = np.array([0.0, 2.7, 2.7])
   OPEN = np.array([0.27, -0.55, -1.10])
+provided:
+  seg_seg_distance:
+    notes:
+      - >-
+        Minimum distance between segment a1-a2 and segment b1-b2, in metres,
+        approximated by sampling. Two links touch when this drops below
+        2 * LINK_RADIUS.
+    example: >-
+      seg_seg_distance(np.array([0.0, 0.0]), np.array([1.0, 0.0]),
+      np.array([0.0, 0.5]), np.array([1.0, 0.5]))
+  FOLDED:
+    summary: A configuration that folds the arm back on itself.
+  OPEN:
+    summary: A configuration with the arm extended.
 starter_code: |
   import numpy as np
   # Provided: LINKS, LINK_RADIUS, OBSTACLES, joint_positions(q),

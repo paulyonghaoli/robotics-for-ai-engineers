@@ -114,7 +114,12 @@ def _summarize_value(v: object, compact: bool = False) -> str:
     if isinstance(v, bool | int | str | type(None)):
         return repr(v)
     if isinstance(v, float):
-        return f"{v:.6g}" if compact else repr(v)
+        if not compact:
+            return repr(v)
+        # Keep it a float on the page: a pixel width of 54.0 shown as "54"
+        # reads as an integer count.
+        s = f"{v:.6g}"
+        return s if any(c in s for c in ".en") else s + ".0"
     if np.isscalar(v) and hasattr(v, "item"):   # np.float64(…) is noise
         return f"{float(v):.6g}"
     shape = getattr(v, "shape", None)
@@ -122,10 +127,24 @@ def _summarize_value(v: object, compact: bool = False) -> str:
         head = ""
         try:
             if v.size <= 6:  # type: ignore[attr-defined]
-                head = " = " + np.array2string(v, precision=3, separator=", ")  # type: ignore[arg-type]
+                # suppress_small, or a rounding residue prints as -1.959e-16
+                # and reads like a real measurement.
+                head = " = " + np.array2string(  # type: ignore[arg-type]
+                    v, precision=3, separator=", ", suppress_small=True)
         except Exception:  # noqa: BLE001, S110
             pass
         return f"ndarray shape={tuple(shape)} dtype={getattr(v, 'dtype', '?')}{head}"
+    if isinstance(v, list | tuple) and len(v) <= 6 and all(
+            isinstance(x, bool | int | float) for x in v):
+        # A short tuple of numbers is a value, not a container: "tuple of 3"
+        # hides exactly the thing the learner needs (e.g. a sensor mount pose).
+        inner = ", ".join(_summarize_value(x, compact=True) for x in v)
+        return f"({inner})" if isinstance(v, tuple) else f"[{inner}]"
+    if isinstance(v, slice):
+        # Bare "slice" hides the bounds, which are the whole content.
+        stop = "" if v.stop is None else str(v.stop)
+        step = "" if v.step is None else f", {v.step}"
+        return f"slice({'' if v.start is None else v.start}, {stop}{step})"
     if isinstance(v, list | tuple | set | dict):
         return f"{type(v).__name__} of {len(v)}"
     return type(v).__name__

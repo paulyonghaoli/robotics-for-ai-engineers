@@ -25,6 +25,17 @@ setup_code: |
       T_map_lidar = se2(*robot_pose) @ se2(*MOUNT)
       R, t = T_map_lidar[:2, :2], T_map_lidar[:2, 2]
       return (np.asarray(points_map) - t) @ R
+provided:
+  MOUNT:
+    summary: >-
+      Where the lidar sits on the robot, as a pose (x, y, theta) in the robot
+      frame. It is both offset and rotated.
+  ground_truth_scan:
+    notes:
+      - >-
+        `points_map` is (n, 2) in the map frame. The return is (n, 2) in the
+        LIDAR frame — not the robot frame, and not the map frame.
+    example: "ground_truth_scan((0.0, 0.0, 0.0), [[2.0, 0.0]])"
 starter_code: |
   import numpy as np
   # Provided: se2, MOUNT = (0.4, 0.0, pi)  (backward-facing lidar!),

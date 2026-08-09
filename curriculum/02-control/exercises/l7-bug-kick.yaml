@@ -20,6 +20,15 @@ setup_code: |
           cmds.append(controller.step(m, setpoint, DT))
           meas.append(m)
       return np.array(cmds), np.array(meas)
+provided:
+  run:
+    notes:
+      - >-
+        `controller` is any object with
+        `step(measurement, setpoint, dt) -> command`.
+      - >-
+        Returns (commands, measurements), both length `steps`. The measurement
+        is a smooth ramp; only the setpoint moves abruptly, at index `switch`.
 starter_code: |
   import numpy as np
   # Provided: DT, U_MAX = 8.0, run(controller) -> (commands, measurements)

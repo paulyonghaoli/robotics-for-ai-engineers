@@ -24,6 +24,13 @@ setup_code: |
       """Total joint-space distance actually travelled along a trajectory."""
       t = np.asarray(traj, dtype=float)
       return float(np.abs(np.diff(t, axis=0)).sum())
+provided:
+  path_length:
+    notes:
+      - >-
+        Total distance travelled in JOINT space, summed over every joint and
+        every step — not the distance between the endpoints.
+    example: "path_length(np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]]))"
 starter_code: |
   import numpy as np
   # Provided: wrap(angle), path_length(traj)

@@ -42,6 +42,16 @@ setup_code: |
           pose = step_pose(pose, v, queue.popleft(), DT)
           out.append(pose.copy())
       return np.array(out)
+provided:
+  run:
+    notes:
+      - >-
+        Calls your `pure_pursuit(pose, path, v)` each tick and returns the
+        poses it produced, shape (steps, 3) of (x, y, theta).
+      - >-
+        The commanded steering reaches the wheels STEER_DELAY ticks late. That
+        lag is real hardware behaviour, not a trick.
+      - The robot starts `y0` metres off a straight path along y = 0.
 starter_code: |
   import numpy as np
   # Provided: DT, W_MAX, wrap, step_pose, STRAIGHT, run(v) -> trajectory

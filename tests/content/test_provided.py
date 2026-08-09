@@ -96,6 +96,24 @@ def test_example_output_is_computed_not_transcribed() -> None:
     assert step["example_out"] == "2.1"
 
 
+def test_example_output_stays_a_float() -> None:
+    """A pixel width of 54.0 shown as "54" reads as an integer count."""
+    spec = _spec(provided={"step": {"example": "step(0.0, 2.0, 3.0)"}})
+    step = next(i for i in build_provided(spec) if i["name"] == "step")
+    assert step["example_out"] == "3.2"
+    spec = _spec(provided={"step": {"example": "step(0.0, 10.0, 4.0)"}})
+    step = next(i for i in build_provided(spec) if i["name"] == "step")
+    assert step["example_out"] == "5.0"
+
+
+def test_short_numeric_tuple_shows_its_values() -> None:
+    """"tuple of 3" hides exactly what a sensor mount pose needs to say."""
+    setup = SETUP + "\nMOUNT = (0.4, 0.0, 3.14159)\n"
+    spec = _spec(setup_code=setup, provided={"MOUNT": {}})
+    mount = next(i for i in build_provided(spec) if i["name"] == "MOUNT")
+    assert mount["value"] == "(0.4, 0.0, 3.14159)"
+
+
 def test_broken_example_is_an_error() -> None:
     errors: list[str] = []
     build_provided(_spec(provided={"step": {"example": "step(0.0)"}}), errors)

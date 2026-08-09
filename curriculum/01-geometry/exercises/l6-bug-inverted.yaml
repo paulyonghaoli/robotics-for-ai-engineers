@@ -33,6 +33,14 @@ setup_code: |
       T_map_base = se2(*robot_pose)
       p = np.array([*TRUE_LANDMARK, 1.0])
       return (se2_inverse(T_map_base) @ p)[:2]
+provided:
+  simulate_observation:
+    notes:
+      - >-
+        Returns the landmark as a 2-vector expressed in the ROBOT frame, in
+        metres.
+      - Noise-free, so any disagreement is arithmetic rather than luck.
+    example: "simulate_observation((1.0, 0.5, 0.3))"
 starter_code: |
   import numpy as np
   # Provided: se2, se2_inverse, simulate_observation(robot_pose)

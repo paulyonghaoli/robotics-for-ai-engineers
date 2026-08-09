@@ -43,6 +43,20 @@ setup_code: |
   # The configuration the arm is already in, and a valid IK solution for
   # the first waypoint — so a correct follow_path starts exactly here.
   Q_START = np.array([-0.4262, 1.5978, -1.5791])
+provided:
+  solve_ik:
+    notes:
+      - >-
+        Damped least-squares IK. Returns a configuration (3 joint angles in
+        radians) whose tip is at `target`.
+      - >-
+        `q0` is the seed it starts from. The solver is local, so the seed
+        chooses WHICH of the many solutions you get back.
+    example: "solve_ik(TOOL_PATH[0], Q_START)"
+  TOOL_PATH:
+    summary: >-
+      A smooth arc of tool positions, shape (40, 2) in metres. Consecutive
+      targets are close together.
 starter_code: |
   import numpy as np
   # Provided: LINKS, fk(q), jacobian(q), solve_ik(target, q0), TOOL_PATH, Q_START

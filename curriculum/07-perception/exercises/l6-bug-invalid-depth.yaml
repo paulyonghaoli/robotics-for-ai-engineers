@@ -28,6 +28,20 @@ setup_code: |
       return depth, valid
 
   TRUE_WALL = slice(12, 28)        # ground truth, for scoring only
+provided:
+  sense:
+    notes:
+      - >-
+        Returns (depth, valid): depth in metres and a boolean mask, both of
+        length N_BEAMS and index-aligned.
+      - >-
+        Where the sensor could not measure, it reports a depth AND says so in
+        `valid`. Both are part of the reading.
+    example: "sense(np.random.default_rng(0))[0][:4]"
+  TRUE_WALL:
+    summary: >-
+      Ground truth for scoring only — the beams that really do see the wall.
+      Your detector must not read this.
 starter_code: |
   import numpy as np
   # Provided: MAX_RANGE, N_BEAMS, sense(rng) -> (depth, valid), TRUE_WALL

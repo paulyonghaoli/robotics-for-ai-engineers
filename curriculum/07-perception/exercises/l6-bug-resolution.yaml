@@ -24,6 +24,20 @@ setup_code: |
       scale = image_size[0] / CALIB_SIZE[0]
       fx_actual = K_CALIB[0, 0] * scale
       return fx_actual * KNOWN_WIDTH / true_Z
+provided:
+  observe:
+    notes:
+      - >-
+        Returns the object's width in PIXELS on a sensor of `image_size`,
+        given its true range in metres.
+      - >-
+        Same lens and same field of view at every resolution — a larger sensor
+        simply spreads the same scene over more pixels.
+    example: "observe(20.0, (640, 480))"
+  K_CALIB:
+    summary: >-
+      Intrinsics measured on the ORIGINAL CALIB_SIZE sensor. fx is element
+      [0, 0], in pixels.
 starter_code: |
   import numpy as np
   # Provided: K_CALIB (measured at 640x480), CALIB_SIZE, KNOWN_WIDTH,
