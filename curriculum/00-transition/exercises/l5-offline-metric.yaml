@@ -1,8 +1,8 @@
 id: tr-l5-offline-metric
-title: "Bug 1: the metric that said 97%"
+title: "Bug 1: the metric that said 100%"
 lesson: modules/00-transition/05-lab-notebook-to-robot
 description: >-
-  **Symptom:** a lane-keeping policy scores 97% action agreement on a
+  **Symptom:** a lane-keeping policy scores 100% action agreement on a
   genuinely held-out test set and is signed off. On the road it leaves the
   lane and never comes back. The expert it was cloned from drives the same
   road, through the same gust of wind, without trouble. The model is not
@@ -19,12 +19,12 @@ setup_code: |
       """The demonstrator. Gain 1.2 > CAMBER, so it recovers from anything."""
       return -1.2 * y
 
-  def policy(y, rng):
-      """The cloned policy. Matches the expert closely where it was trained
+  def policy(y):
+      """The cloned policy. Reproduces the expert exactly where it was trained
       (|y| <~ 0.7) and has no idea what to do outside that."""
       off = max(0.0, abs(y) - 0.7)
       gain = 1.2 * np.exp(-3.0 * off)
-      return -gain * y + rng.normal(0.0, 0.05)
+      return -gain * y
 
   def plant(y, action, k, rng):
       """Next lateral offset. A gust hits every run at GUST_STEP."""
@@ -47,7 +47,10 @@ provided:
       The demonstrator that the policy was cloned from. Returns a steering
       action for a lateral offset `y`.
     notes:
-      - Deterministic — no rng, same answer every time.
+      - >-
+        Deterministic. Both controllers are pure functions of `y`; the
+        randomness in this world belongs to the road, not to the driver,
+        and it lives in `plant`.
     example: expert(0.6)
   policy:
     summary: >-
@@ -57,8 +60,10 @@ provided:
       - >-
         It was trained on offsets up to about |y| = 0.7 and degrades outside
         that range. That is the physics of the situation, not the bug.
-      - Consumes one draw from `rng`, so pass the same generator throughout.
-    example: policy(0.6, np.random.default_rng(0))
+      - >-
+        Deterministic, and on its training range it returns *exactly* what the
+        expert returns. There is no approximation error to blame.
+    example: policy(0.6)
   plant:
     summary: >-
       Advance the car one timestep. Returns the next lateral offset in metres,
@@ -84,7 +89,7 @@ starter_code: |
       """Return (action agreement, worst |y| reached)."""
       rng = np.random.default_rng(seed)
       states = expert_states(rng)                   # <-- suspicious
-      agree = [abs(policy(y, rng) - expert(y)) < tol for y in states]
+      agree = [abs(policy(y) - expert(y)) < tol for y in states]
       return float(np.mean(agree)), float(np.max(np.abs(states)))
 
   score, worst = evaluate()
@@ -120,7 +125,7 @@ solution: |
       rng = np.random.default_rng(seed)
       y, agree, worst = 0.6, [], 0.0
       for k in range(150):
-          action = policy(y, rng)
+          action = policy(y)
           agree.append(abs(action - expert(y)) < tol)
           # The action determines the next state. That is the whole difference:
           # offline, the expert chose the states; here the policy does.

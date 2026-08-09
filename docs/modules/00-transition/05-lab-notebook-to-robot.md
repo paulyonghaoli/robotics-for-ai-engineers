@@ -23,7 +23,7 @@ So this lab gives you three systems that fail on a robot, each with an offline s
 
 <code-exercise src="tr-l5-offline-metric"></code-exercise>
 
-97% action agreement on a genuinely held-out set, and the car ends up 49 m outside a 1 m lane. Nothing is overfitted. The test set contains the states the *expert* drove through, and the policy will never see those once it is the one steering — its own small errors take it somewhere else, and the next state comes from there. The gust in this world is one the expert recovers from without difficulty; the policy cannot, because recovery states never appear in data collected by someone who never needed to recover.
+100% action agreement on a genuinely held-out set — not 97%, a perfect score — and the car ends up 52 m outside a 1 m lane. Nothing is overfitted. The test set contains the states the *expert* drove through, and the policy will never see those once it is the one steering — its own small errors take it somewhere else, and the next state comes from there. The gust in this world is one the expert recovers from without difficulty; the policy cannot, because recovery states never appear in data collected by someone who never needed to recover.
 
 That gap between "accurate on the data" and "competent in the loop" is the whole of [Module 9](../09-robot-learning/01-behavior-cloning.md), met here on the first day.
 

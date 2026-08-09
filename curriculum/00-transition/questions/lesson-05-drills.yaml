@@ -5,7 +5,7 @@ questions:
   - id: d1
     type: single
     difficulty: core
-    prompt: "A policy scores 97% action agreement on a genuinely held-out set and leaves the lane within seconds on the robot. There is no overfitting. What is the most likely cause?"
+    prompt: "A policy scores 100% action agreement on a genuinely held-out set and leaves the lane within seconds on the robot. There is no overfitting. What is the most likely cause?"
     options:
       - text: "It was scored on states the expert visited, not states it reaches itself — and its own errors take it somewhere the training data never went"
         correct: true
