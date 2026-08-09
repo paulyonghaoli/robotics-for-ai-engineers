@@ -38,9 +38,47 @@ setup_code: |
           out.append(y)
           y = y + (expert(y) + CAMBER * y) * DT + rng.normal(0.0, 0.01)
       return np.array(out)
+provided:
+  LANE_HALF_WIDTH:
+    summary: >-
+      Half the lane width, in metres. Leaving the lane means |y| > this.
+  expert:
+    summary: >-
+      The demonstrator that the policy was cloned from. Returns a steering
+      action for a lateral offset `y`.
+    notes:
+      - Deterministic — no rng, same answer every time.
+    example: expert(0.6)
+  policy:
+    summary: >-
+      The cloned policy under test. Returns a steering action for a lateral
+      offset `y`.
+    notes:
+      - >-
+        It was trained on offsets up to about |y| = 0.7 and degrades outside
+        that range. That is the physics of the situation, not the bug.
+      - Consumes one draw from `rng`, so pass the same generator throughout.
+    example: policy(0.6, np.random.default_rng(0))
+  plant:
+    summary: >-
+      Advance the car one timestep. Returns the next lateral offset in metres,
+      given the current offset `y` and the steering `action` applied.
+    notes:
+      - "`k` is the step index, counting from 0 — a gust hits the car at k == 40."
+      - Consumes one draw from `rng`.
+      - >-
+        This is the only function that decides where the car goes next. Nothing
+        moves unless you call it.
+    example: plant(0.6, -0.72, 0, np.random.default_rng(0))
+  expert_states:
+    summary: >-
+      The lateral offsets visited during one run **driven by `expert`**,
+      starting at y = 0.6. Returns an array of shape (steps,), in metres.
+    notes:
+      - Consumes `steps` draws from `rng`.
+    example: expert_states(np.random.default_rng(0))[:4]
 starter_code: |
   import numpy as np
-  # Provided: DT, LANE_HALF_WIDTH, expert, policy, plant, expert_states
 
   def evaluate(seed=0, tol=0.10):
       """Return (action agreement, worst |y| reached)."""

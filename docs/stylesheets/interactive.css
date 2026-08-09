@@ -149,6 +149,64 @@ quiz-bank, code-exercise {
 .rai-output .err { color: #ff8a80; }
 .rai-output .okline { color: #a5d6a7; }
 
+/* Reference for objects the learner is handed but cannot read the source of.
+ *
+ * Material styles every <details> as a collapsible admonition — accent-blue
+ * rule, info icon, 2.5em indent — via `.md-typeset details`, which outranks a
+ * bare `.rai-provided`. This is a reference table, not a note, and looking
+ * like one would compete with the lesson's actual admonitions, so the
+ * selectors below match that specificity and strip the chrome. */
+.md-typeset .rai-provided {
+  font-size: 0.85em;
+  margin: 0.6em 0 0.8em;
+  border: 1px solid var(--md-default-fg-color--lightest, #ddd);
+  border-radius: 6px;
+  background: var(--md-code-bg-color, #f5f5f5);
+  box-shadow: none;
+  padding: 0;
+}
+.md-typeset .rai-provided > summary {
+  cursor: pointer;
+  padding: 0.45em 0.8em;
+  font-weight: 600;
+  font-size: 1em;
+  background: none;
+  border: none;
+}
+.md-typeset .rai-provided > summary::before,
+.md-typeset .rai-provided > summary::after {
+  display: none;
+}
+.md-typeset .rai-provided__list { padding: 0 0.9em 0.7em; }
+.md-typeset .rai-provided__item {
+  padding: 0.55em 0 0.15em;
+  border-top: 1px solid var(--md-default-fg-color--lightest, #e4e4e4);
+}
+.md-typeset .rai-provided__item:first-child { border-top: none; }
+.md-typeset .rai-provided__sig {
+  font-size: 0.95em;
+  font-weight: 600;
+  background: none;
+  padding: 0;
+}
+.md-typeset .rai-provided__doc { margin: 0.25em 0; }
+.md-typeset .rai-provided__notes {
+  margin: 0.25em 0 0;
+  padding-left: 1.2em;
+  opacity: 0.9;
+}
+.md-typeset .rai-provided__notes li { margin: 0.1em 0; }
+.md-typeset .rai-provided__eg {
+  margin: 0.4em 0 0.2em;
+  padding: 0.45em 0.7em;
+  border-radius: 4px;
+  background: var(--md-default-bg-color, #fff);
+  border: 1px solid var(--md-default-fg-color--lightest, #e4e4e4);
+  font-size: 0.9em;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 .rai-hint {
   font-size: 0.85em;
   margin-top: 0.5em;

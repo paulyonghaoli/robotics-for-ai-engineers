@@ -10,6 +10,37 @@ Every lesson uses the same sections, in order: **A** Why this matters · **B** M
 
 See [docs/modules/01-geometry/01-coordinate-frames.md](docs/modules/01-geometry/01-coordinate-frames.md) for the reference example.
 
+## Documenting the objects an exercise hands the learner
+
+`setup_code` is hidden, so anything it defines and the starter uses arrives as
+a bare name. A learner cannot read the source to find out that `k` is a step
+index or that a function consumes a draw from `rng`, and a docstring written
+for someone who *can* read the source does not cover the gap.
+
+Every such object is therefore surfaced in a **"Provided in this exercise"**
+panel above the editor. Signatures and constant values are derived from the
+real objects at build time and cannot drift. Add the rest in the YAML:
+
+```yaml
+provided:
+  plant:
+    summary: Advance one timestep; returns the next lateral offset in metres.
+    notes:
+      - "`k` is the step index, counting from 0 — a gust hits at k == 40."
+      - Consumes one draw from `rng`.
+    example: plant(0.6, -0.72, 0, np.random.default_rng(0))
+```
+
+- `example` is **executed at build time** and its real output is baked in, so
+  a worked call cannot go stale either. A raising example fails CI.
+- `summary` overrides the docstring. Use it on `bug-*` exercises: internal
+  docstrings often name the fault outright, and `expert_states`'s did.
+- `hide: true` withholds an object whose very existence is the giveaway.
+- Naming an object `setup_code` never defines fails CI.
+
+`python tools/validate_content.py` reports every handed-over callable with no
+description at all. That count should go down, never up.
+
 ## Code standards
 
 - Python ≥ 3.11, NumPy-first; type hints everywhere; `ruff` and `mypy --strict` clean.

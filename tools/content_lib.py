@@ -8,10 +8,14 @@ exercise's reference solution is executed against its own tests.
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
+import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -100,6 +104,136 @@ def run_exercise_solution(spec: dict) -> str | None:
     return None
 
 
+def _summarize_value(v: object, compact: bool = False) -> str:
+    """One-line description of a value the learner is handed.
+
+    `compact` is for computed example output, where seventeen significant
+    digits are noise. Declared constants keep their exact repr — a lane width
+    of `1.0` should not print as `1`.
+    """
+    if isinstance(v, bool | int | str | type(None)):
+        return repr(v)
+    if isinstance(v, float):
+        return f"{v:.6g}" if compact else repr(v)
+    if np.isscalar(v) and hasattr(v, "item"):   # np.float64(…) is noise
+        return f"{float(v):.6g}"
+    shape = getattr(v, "shape", None)
+    if shape is not None:                       # numpy array
+        head = ""
+        try:
+            if v.size <= 6:  # type: ignore[attr-defined]
+                head = " = " + np.array2string(v, precision=3, separator=", ")  # type: ignore[arg-type]
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return f"ndarray shape={tuple(shape)} dtype={getattr(v, 'dtype', '?')}{head}"
+    if isinstance(v, list | tuple | set | dict):
+        return f"{type(v).__name__} of {len(v)}"
+    return type(v).__name__
+
+
+def _used_names(spec: dict) -> set[str]:
+    """Names the learner's starter and the reference solution actually read."""
+    used: set[str] = set()
+    for src in (spec.get("starter_code", ""), spec.get("solution", "")):
+        try:
+            tree = ast.parse(src or "")
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                used.add(node.id)
+    return used
+
+
+def build_provided(spec: dict, errors: list[str] | None = None) -> list[dict]:
+    """Describe the hidden objects `setup_code` hands the learner.
+
+    The learner never sees `setup_code`, so a bare `# Provided: a, b, c`
+    comment leaves them guessing at signatures — which argument is the step
+    index, whether an rng is consumed, what units come back. Everything that
+    can be derived is derived here (exact signature, constant values) so it
+    can never drift from the code; the author adds only what introspection
+    cannot know, via an optional `provided:` block in the YAML:
+
+        provided:
+          plant:
+            summary: Advance one timestep and return the new lateral offset.
+            notes:
+              - "`k` is the step index; a gust hits at k == 40."
+              - Consumes one draw from `rng`.
+            example: plant(0.6, -0.72, 0, np.random.default_rng(0))
+
+    `example` is executed at build time and its real output is baked in, so a
+    worked call cannot go stale either. Set `hide: true` to withhold an object
+    whose docstring would give away a diagnosis.
+    """
+    setup = spec.get("setup_code", "")
+    if not (setup or "").strip():
+        return []
+    ns: dict = {}
+    try:
+        exec(setup, ns)  # noqa: S102
+    except Exception as e:  # noqa: BLE001
+        if errors is not None:
+            errors.append(f"setup_code failed: {type(e).__name__}: {e}")
+        return []
+
+    authored = spec.get("provided") or {}
+    if not isinstance(authored, dict):
+        if errors is not None:
+            errors.append("'provided' must be a mapping of name -> {summary, notes, example}")
+        authored = {}
+    for name in authored:
+        if name not in ns and errors is not None:
+            errors.append(f"'provided' documents {name!r}, which setup_code never defines")
+
+    used = _used_names(spec)
+    out: list[dict] = []
+    for name, value in ns.items():          # insertion order == definition order
+        if name.startswith("__") or isinstance(value, types.ModuleType):
+            continue
+        extra = authored.get(name) or {}
+        # Author-documented names are always shown; otherwise only what the
+        # learner's own code touches, so the panel stays a reference and not
+        # a dump of the exercise's internals.
+        if name not in used and name not in authored:
+            continue
+        if extra.get("hide"):
+            continue
+        entry: dict = {"name": name}
+        if callable(value):
+            entry["kind"] = "class" if isinstance(value, type) else "function"
+            try:
+                entry["signature"] = name + str(inspect.signature(value))
+            except (TypeError, ValueError):
+                entry["signature"] = name + "(...)"
+        else:
+            entry["kind"] = "constant"
+            entry["value"] = _summarize_value(value)
+        # An authored summary wins over the docstring, which is written for
+        # someone reading the source and may name the bug outright. Constants
+        # get no docstring fallback at all: inspect.getdoc(1.0) returns
+        # float's own docstring, which is nonsense in this context.
+        summary = extra.get("summary") or ""
+        if not summary and entry["kind"] != "constant":
+            summary = inspect.getdoc(value) or ""
+        if summary:
+            entry["summary"] = " ".join(summary.split())
+        if extra.get("notes"):
+            entry["notes"] = list(extra["notes"])
+        if extra.get("example"):
+            entry["example"] = extra["example"]
+            try:
+                result = eval(extra["example"], dict(ns))  # noqa: S307
+                entry["example_out"] = _summarize_value(result, compact=True)
+            except Exception as e:  # noqa: BLE001
+                if errors is not None:
+                    errors.append(
+                        f"provided example for {name!r} raised {type(e).__name__}: {e}")
+        out.append(entry)
+    return out
+
+
 def load_all() -> ContentSet:
     cs = ContentSet()
     for path in sorted(CURRICULUM.glob("*/questions/*.yaml")):
@@ -150,6 +284,7 @@ def export_json(cs: ContentSet) -> int:
         public = {k: spec.get(k) for k in
                   ("id", "title", "description", "starter_code", "setup_code",
                    "tests", "hints", "solution")}
+        public["provided"] = build_provided(spec)
         out = json.dumps(public, indent=1)
         if _write_if_changed(GENERATED / "exercises" / f"{ex_id}.json", out):
             written += 1

@@ -47,7 +47,16 @@ Every lesson and module draws from these four tiers. This is the core product di
 
 ### Tier 3 — In-browser coding exercises (DataCamp-style)
 - A `<code-exercise>` component: CodeMirror 6 editor + **Pyodide** (CPython in WebAssembly) running in a Web Worker. NumPy, SciPy, and matplotlib (canvas backend) all run in Pyodide — which covers Modules 0–5 and parts of 7 completely.
-- Exercise spec (YAML): `starter_code, setup_code (hidden), tests (pytest-style asserts run client-side), hints[] (progressive), solution, expected_plot (optional)`.
+- Exercise spec (YAML): `starter_code, setup_code (hidden), tests (pytest-style asserts run client-side), hints[] (progressive), solution, provided (contracts for the hidden objects — see below), expected_plot (optional)`.
+- **`setup_code` being hidden has a cost**: 82 of the exercises hand the learner
+  131 callables they cannot read the source of, and a name alone does not say
+  which argument is a step index or whether a call consumes an rng draw. Each
+  exercise therefore renders a *"Provided in this exercise"* panel whose
+  signatures, constant values and worked-example outputs are **derived by
+  executing the real objects at build time**, so they cannot drift; authors add
+  units and gotchas via `provided:`, and override the docstring where it would
+  give away a `bug-*` exercise's diagnosis. `validate_content.py` reports every
+  handed-over callable still lacking a description.
 - Grading model = DataCamp's: run hidden asserts against the learner's namespace; show which assertion failed with a friendly message.
 - Hard limits acknowledged: no ROS 2, no PyTorch, no Gazebo in the browser. Anything heavier than NumPy-scale escalates to Tier 4.
 - Target: **2–3 per lesson** in Modules 1–5 (~120 exercises), fewer elsewhere.

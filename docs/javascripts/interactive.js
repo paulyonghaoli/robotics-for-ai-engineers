@@ -256,6 +256,47 @@
         });
     }
 
+    /* The learner never sees setup_code, so a name alone leaves them guessing
+     * at signatures. Generated from the real objects at build time. */
+    function providedPanel(items) {
+      var d = document.createElement("details");
+      d.className = "rai-provided";
+      var s = document.createElement("summary");
+      var nfn = items.filter(function (i) { return i.kind !== "constant"; }).length;
+      s.textContent = "Provided in this exercise — " + items.length + " object" +
+        (items.length === 1 ? "" : "s") + (nfn ? " (" + nfn + " callable)" : "");
+      d.appendChild(s);
+      var dl = el("div", "rai-provided__list");
+      items.forEach(function (it) {
+        var row = el("div", "rai-provided__item");
+        var sig = el("code", "rai-provided__sig");
+        sig.textContent = it.signature || (it.name + " = " + it.value);
+        row.appendChild(sig);
+        if (it.summary) row.appendChild(el("div", "rai-provided__doc", mdLite(it.summary)));
+        if ((it.notes || []).length) {
+          var ul = document.createElement("ul");
+          ul.className = "rai-provided__notes";
+          it.notes.forEach(function (n) {
+            var li = document.createElement("li");
+            li.innerHTML = mdLite(n);
+            ul.appendChild(li);
+          });
+          row.appendChild(ul);
+        }
+        if (it.example) {
+          var ex = el("pre", "rai-provided__eg");
+          // Output is computed at build time by actually running the call, so
+          // a worked example here can never drift from the code.
+          ex.textContent = ">>> " + it.example +
+            (it.example_out !== undefined ? "\n" + it.example_out : "");
+          row.appendChild(ex);
+        }
+        dl.appendChild(row);
+      });
+      d.appendChild(dl);
+      return d;
+    }
+
     function render(host, exId, spec) {
       var card = el("div", "rai-card");
       var header = el("div", "rai-bank-header");
@@ -264,6 +305,7 @@
       header.appendChild(status);
       card.appendChild(header);
       if (spec.description) card.appendChild(el("div", "rai-ex-desc", mdLite(spec.description)));
+      if ((spec.provided || []).length) card.appendChild(providedPanel(spec.provided));
 
       var saved = load("ex." + exId) || {};
       if (saved.passed) setStatus("pass");
