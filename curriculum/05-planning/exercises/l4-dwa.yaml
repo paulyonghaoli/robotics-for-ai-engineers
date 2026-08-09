@@ -17,9 +17,19 @@ setup_code: |
   ROBOT_R = 0.25
 
   def clearance_of(p):
+      """Distance from point `p` to the nearest obstacle surface, in metres.
+
+      Obstacle radii are already subtracted, so this is negative inside an
+      obstacle and does not yet account for the robot's own radius.
+      """
       return min(np.hypot(p[0]-cx, p[1]-cy) - r for cx, cy, r in OBSTACLES)
 
   def arc_rollout(pose, v, w):
+      """Forward-simulate a constant (v, w) command over the DWA horizon.
+
+      Returns HORIZON_STEPS poses as (x, y, theta) tuples — the arc the
+      robot would follow if it held this command.
+      """
       x, y, th = pose
       pts = []
       for _ in range(HORIZON_STEPS):

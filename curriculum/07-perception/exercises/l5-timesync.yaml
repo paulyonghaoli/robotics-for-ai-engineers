@@ -23,10 +23,17 @@ setup_code: |
   T_CAM = (BASE, np.array([0.0, 0.0, 0.10]))
 
   def rot_z(a):
+      """3x3 rotation of `a` radians about the z axis, counter-clockwise."""
       c, s = np.cos(a), np.sin(a)
       return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
   def project(points_lidar, R, t):
+      """Project lidar points into the image using extrinsics (R, t).
+
+      Applies `p @ R.T + t` then the camera matrix K. Returns shape (n, 2)
+      pixel coordinates, with NaN for anything at or behind the camera
+      plane — those points have no image position at all.
+      """
       pts = np.atleast_2d(np.asarray(points_lidar, dtype=float))
       cam = pts @ R.T + t
       hom = cam @ K.T

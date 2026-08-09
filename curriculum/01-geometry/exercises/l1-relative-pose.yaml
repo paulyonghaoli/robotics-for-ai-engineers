@@ -9,16 +9,23 @@ setup_code: |
   import numpy as np
 
   def se2(x, y, theta):
+      """Pose (x, y, theta) as a 3x3 homogeneous SE(2) transform.
+
+      Composes left-to-right: se2(*a) @ se2(*b) is a then b. Angles in
+      radians, translation in metres.
+      """
       c, s = np.cos(theta), np.sin(theta)
       return np.array([[c, -s, x], [s, c, y], [0, 0, 1.0]])
 
   def se2_to_pose(T):
+      """Unpack a 3x3 SE(2) transform back to (x, y, theta) in radians."""
       return float(T[0, 2]), float(T[1, 2]), float(np.arctan2(T[1, 0], T[0, 0]))
 starter_code: |
   import numpy as np
   # Provided helpers (already defined): se2(x, y, theta), se2_to_pose(T)
 
   def se2_inverse(T):
+      """Invert an SE(2) transform: se2_inverse(T_a_b) is T_b_a."""
       """Closed-form rigid inverse: [R t]^-1 = [R.T  -R.T @ t]."""
       # TODO (do not use np.linalg.inv)
       return T
@@ -45,6 +52,7 @@ solution: |
   import numpy as np
 
   def se2_inverse(T):
+      """Invert an SE(2) transform: se2_inverse(T_a_b) is T_b_a."""
       R, t = T[:2, :2], T[:2, 2]
       Ti = np.eye(3)
       Ti[:2, :2] = R.T

@@ -14,6 +14,11 @@ setup_code: |
                (-1,-1,SQRT2),(-1,1,SQRT2),(1,-1,SQRT2),(1,1,SQRT2)]
 
   def path_length(path):
+      """Total Euclidean length of a path given as a sequence of (row, col).
+
+      Diagonal steps count as sqrt(2), not 1 — so this measures distance
+      travelled, not number of cells.
+      """
       p = np.asarray(path, dtype=float)
       d = np.diff(p, axis=0)
       return float(np.hypot(d[:,0], d[:,1]).sum())

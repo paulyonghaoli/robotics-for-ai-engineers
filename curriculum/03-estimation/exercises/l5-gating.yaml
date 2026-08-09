@@ -17,6 +17,11 @@ setup_code: |
   gps[corrupt] += RNG.choice([-10.0, 10.0], corrupt.sum())
 
   def run_filter(update_fn):
+      """Run a scalar Kalman filter over the GPS stream and score it.
+
+      Prediction is done for you; `update_fn(x, P, z) -> (x, P)` is the
+      measurement update you supply. Returns RMSE against ground truth.
+      """
       x, P, errs = 0.0, 25.0, []
       for k in range(STEPS):
           P = P + Q                      # predict (random-walk model)

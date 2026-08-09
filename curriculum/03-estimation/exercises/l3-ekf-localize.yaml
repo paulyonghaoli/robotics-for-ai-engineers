@@ -10,6 +10,7 @@ setup_code: |
   import numpy as np
 
   def wrap(a):
+      """Wrap an angle to (-pi, pi]. Works elementwise on arrays."""
       return -(np.mod(-a + np.pi, 2 * np.pi) - np.pi)
 
   DT = 0.1
@@ -18,23 +19,39 @@ setup_code: |
   R = np.diag([0.1**2, 0.05**2])
 
   def motion(x, v=1.0, w=0.3):
+      """Noise-free unicycle motion model, one DT step.
+
+      State is (x, y, theta); the returned heading is wrapped.
+      """
       px, py, th = x
       return np.array([px + v*np.cos(th)*DT, py + v*np.sin(th)*DT, wrap(th + w*DT)])
 
   def motion_jac(x, v=1.0):
+      """Jacobian of `motion` with respect to the state — the EKF's F."""
       th = x[2]
       return np.array([[1, 0, -v*np.sin(th)*DT], [0, 1, v*np.cos(th)*DT], [0, 0, 1.0]])
 
   def obs(x, lm):
+      """Range and bearing to landmark `lm` from robot state `x`.
+
+      Returns (range in metres, bearing in radians), bearing wrapped to
+      (-pi, pi] and measured relative to the robot heading.
+      """
       d = lm - x[:2]
       return np.array([np.hypot(d[0], d[1]), wrap(np.arctan2(d[1], d[0]) - x[2])])
 
   def obs_jac(x, lm):
+      """Jacobian of `obs` with respect to the state — the EKF's H."""
       d = lm - x[:2]
       q = float(d @ d); r = np.sqrt(q)
       return np.array([[-d[0]/r, -d[1]/r, 0.0], [d[1]/q, -d[0]/q, -1.0]])
 
   def simulate(steps=200, seed=3):
+      """Generate a ground-truth trajectory and the measurements along it.
+
+      Returns (traj, zs): `traj` is shape (steps, 3); `zs[k]` is a list of
+      (landmark_index, measurement) pairs observed at step k.
+      """
       rng = np.random.default_rng(seed)
       x = np.array([2.0, 2.0, 0.0])
       traj, zs = [], []

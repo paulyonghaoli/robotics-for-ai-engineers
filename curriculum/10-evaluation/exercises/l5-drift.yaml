@@ -33,6 +33,11 @@ setup_code: |
   SUCCESS = _rng.binomial(200, _succ, N_DAYS) / 200.0
 
   def rolling_mean(x, w=7):
+      """Trailing rolling mean over a window of `w` samples.
+
+      Uses mode='valid', so the result is SHORTER than the input by w - 1
+      and element i corresponds to input day i + w - 1.
+      """
       return np.convolve(np.asarray(x, dtype=float), np.ones(w) / w, mode="valid")
 
   REFERENCE = slice(0, 35)     # a known-good baseline period

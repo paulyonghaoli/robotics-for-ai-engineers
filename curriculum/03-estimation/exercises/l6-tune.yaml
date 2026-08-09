@@ -13,6 +13,11 @@ setup_code: |
   Q_TRUE, R_TRUE = 0.09, 2.25
 
   def evaluate(q_assumed, r_assumed, seed=13):
+      """Run a scalar filter with the tuning you assume and score consistency.
+
+      Returns (mean NEES, mean NIS, RMSE) after a burn-in. NEES uses the
+      truth the filter cannot see; NIS uses only what it can.
+      """
       rng = np.random.default_rng(seed)
       x_true, x, P = 0.0, 0.0, 10.0
       nees, nis, errs = [], [], []

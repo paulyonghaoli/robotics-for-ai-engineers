@@ -49,6 +49,12 @@ setup_code: |
       return idx
 
   def query(index, terms):
+      """Episode ids matching every term in `terms` (an AND of postings).
+
+      Terms look like 'weather=rain'. Returns an empty set if `terms` is
+      empty or if any term is absent from the index — the index can only
+      answer questions about fields the schema actually recorded.
+      """
       if not terms:
           return set()
       posts = []

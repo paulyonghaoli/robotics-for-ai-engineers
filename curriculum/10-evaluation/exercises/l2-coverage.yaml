@@ -21,6 +21,11 @@ setup_code: |
       return np.column_stack([density, distance])
 
   def bin_index(value, bins):
+      """Index of the (lo, hi) bin containing `value`.
+
+      Bins are half-open [lo, hi); anything at or above the last bin falls
+      into it rather than erroring.
+      """
       for i, (lo, hi) in enumerate(bins):
           if lo <= value < hi:
               return i

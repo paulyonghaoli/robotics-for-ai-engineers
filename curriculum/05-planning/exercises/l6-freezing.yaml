@@ -22,6 +22,11 @@ setup_code: |
   ])
 
   def rollout(pose, v, w):
+      """Forward-simulate a constant (v, w) command over the horizon.
+
+      Returns shape (HORIZON, 2) of (x, y) positions. Element 0 is the
+      next step, which is what actually gets executed.
+      """
       x, y, th = pose
       pts = []
       for _ in range(HORIZON):
@@ -35,6 +40,12 @@ setup_code: |
       return np.array(pts)
 
   def simulate(controller, steps=200):
+      """Drive the robot toward GOAL with your controller and score the run.
+
+      `controller(pose, v, w) -> (v, w)` receives the current pose and the
+      command it last returned. Stops early on arrival. Returns
+      (trajectory, final distance to goal, minimum clearance).
+      """
       pose = np.array([2.0, 5.0, 0.0])
       v = w = 0.0
       traj = []

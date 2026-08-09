@@ -17,6 +17,11 @@ setup_code: |
       return any(np.hypot(p[0]-cx, p[1]-cy) < r for cx, cy, r in OBSTACLES)
 
   def segment_free(a, b, step=0.05):
+      """True if the straight segment from `a` to `b` misses every obstacle.
+
+      Sampled every `step` metres, endpoints included. Checking only the
+      endpoints is not the same thing.
+      """
       a, b = np.asarray(a, float), np.asarray(b, float)
       n = max(2, int(np.hypot(*(b - a)) / step) + 1)
       for t in np.linspace(0.0, 1.0, n):

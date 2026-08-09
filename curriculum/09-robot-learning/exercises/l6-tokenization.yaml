@@ -18,6 +18,11 @@ setup_code: |
       return 1.5 * np.sign(x) * max(0.0, abs(x) - 0.25)
 
   def plant_step(x, a, rng):
+      """Advance the plant one step under action `a`; returns the new state.
+
+      Unstable away from centre, so a coarse action grid costs more than
+      the quantization error suggests. Consumes one draw from `rng`.
+      """
       return 1.30 * x + _push(x) + a + rng.normal(0, PROC_NOISE)
 starter_code: |
   import numpy as np

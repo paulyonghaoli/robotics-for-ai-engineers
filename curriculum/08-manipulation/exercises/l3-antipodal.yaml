@@ -27,6 +27,11 @@ setup_code: |
       return np.vstack(pts), np.vstack(nrm)
 
   def disc_outline(r=0.055, n=160):
+      """Contacts sampled around a disc, with outward normals.
+
+      Returns (points, normals), both shape (n, 2) — the same contract as
+      `box_outline`, so a grasp routine can take either shape.
+      """
       a = np.linspace(0, 2*np.pi, n, endpoint=False)
       p = np.stack([r*np.cos(a), r*np.sin(a)], axis=1)
       return p, p / r

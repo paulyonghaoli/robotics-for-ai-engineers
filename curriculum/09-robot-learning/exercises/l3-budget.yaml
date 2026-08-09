@@ -20,12 +20,24 @@ setup_code: |
       return -0.45 * x - _push(x)
 
   def step(x, a, rng):
+      """Advance the plant one step under action `a`; returns the new state.
+
+      The plant is open-loop UNSTABLE — with a = 0 the offset grows every
+      step — so a slightly-wrong policy drifts away instead of settling.
+      Consumes one draw from `rng`.
+      """
       return 1.30 * x + _push(x) + a + rng.normal(0, NOISE)
 
   def bin_of(x):
+      """Index of the state bin containing `x`, clamped to the valid range."""
       return int(np.clip(np.digitize(x, BINS) - 1, 0, len(BINS) - 2))
 
   def fit(states):
+      """Label `states` with the expert and average per bin — the policy.
+
+      Returns one action per bin, NaN where no state fell in that bin.
+      Calling this is what costs labelling budget.
+      """
       n = len(BINS) - 1
       sums, counts = np.zeros(n), np.zeros(n)
       for x in states:
@@ -46,6 +58,11 @@ setup_code: |
       return 0.0
 
   def rollout(policy, seed, horizon=60):
+      """Run `policy` from the deployment start state for one seeded episode.
+
+      Returns (survived, states visited). `survived` is False as soon as
+      |x| exceeds LANE_LIMIT.
+      """
       rng = np.random.default_rng(seed)
       x, visited = DEPLOY_X0, []
       for _ in range(horizon):
@@ -56,6 +73,7 @@ setup_code: |
       return True, visited
 
   def success_rate(policy, n=100):
+      """Fraction of `n` seeded rollouts that stay in lane for the horizon."""
       return sum(rollout(policy, s)[0] for s in range(n)) / n
 
   def expert_demo_states(n, seed=0):

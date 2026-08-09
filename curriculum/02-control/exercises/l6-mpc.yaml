@@ -22,6 +22,11 @@ setup_code: |
       return np.array(xs), np.array(vs)
 
   def run_closed_loop(controller, steps=120):
+      """Run the double integrator in closed loop with your controller.
+
+      `controller(x, v) -> acceleration`, clipped to +/-U_MAX. Returns shape
+      (steps, 2), each row (position, velocity).
+      """
       x, v, hist = 0.0, 0.0, []
       for _ in range(steps):
           u = float(np.clip(controller(x, v), -U_MAX, U_MAX))

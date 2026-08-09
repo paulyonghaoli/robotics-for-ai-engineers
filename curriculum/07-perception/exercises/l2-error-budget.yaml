@@ -14,6 +14,11 @@ setup_code: |
   SIGMA_D = 0.25                # pixels of disparity uncertainty
 
   def sigma_z(Z, baseline, fx=FX, sigma_d=SIGMA_D):
+      """Depth uncertainty of a stereo rig at range `Z`, in metres.
+
+      Grows with the SQUARE of range, so doubling the distance quadruples
+      the error. Accepts a scalar or an array of ranges.
+      """
       Z = np.asarray(Z, dtype=float)
       return Z ** 2 * sigma_d / (fx * baseline)
 

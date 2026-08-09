@@ -38,8 +38,10 @@ provided:
 - `hide: true` withholds an object whose very existence is the giveaway.
 - Naming an object `setup_code` never defines fails CI.
 
-`python tools/validate_content.py` reports every handed-over callable with no
-description at all. That count should go down, never up.
+A handed-over callable with **no** description fails CI. Usually the fix is a
+docstring on the function in `setup_code`, which flows into the panel by
+itself; reach for `provided:` when the contract needs more than that, or when
+the docstring would spoil the exercise.
 
 ## Code standards
 

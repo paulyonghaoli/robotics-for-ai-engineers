@@ -12,6 +12,12 @@ setup_code: |
   L1, L2 = 1.0, 0.8
 
   def arm_points(theta1, theta2, n=25):
+      """Sample points along both links of the two-link arm.
+
+      Returns shape (2n, 2): n points along link 1 from the base to the
+      elbow, then n along link 2 from the elbow to the hand. Use it to
+      test a whole arm configuration against obstacles, not just the tip.
+      """
       elbow = np.array([L1 * np.cos(theta1), L1 * np.sin(theta1)])
       hand = elbow + np.array([L2 * np.cos(theta1 + theta2), L2 * np.sin(theta1 + theta2)])
       t = np.linspace(0.0, 1.0, n)[:, None]

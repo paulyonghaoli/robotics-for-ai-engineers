@@ -11,10 +11,19 @@ setup_code: |
   L1, L2 = 1.0, 0.8
 
   def fk(theta):
+      """Forward kinematics of the two-link planar arm.
+
+      `theta` is (theta1, theta2) in radians; returns the (x, y) tip
+      position in metres. Link lengths are L1 and L2.
+      """
       t1, t12 = theta[0], theta[0] + theta[1]
       return np.array([L1*np.cos(t1) + L2*np.cos(t12), L1*np.sin(t1) + L2*np.sin(t12)])
 
   def jacobian(theta):
+      """Analytic 2x2 Jacobian d(tip position) / d(joint angles).
+
+      Row 0 is dx, row 1 is dy; column j is the derivative w.r.t. joint j.
+      """
       t1, t12 = theta[0], theta[0] + theta[1]
       return np.array([
           [-L1*np.sin(t1) - L2*np.sin(t12), -L2*np.sin(t12)],

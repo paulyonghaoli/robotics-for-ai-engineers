@@ -15,6 +15,11 @@ setup_code: |
   RNG = np.random.default_rng(11)
 
   def nearest_door_dist(x):
+      """Distance from each position in `x` to the nearest door.
+
+      Accepts a scalar or an array of positions and always returns a 1-D
+      array, so it can score every particle at once.
+      """
       return np.min(np.abs(np.atleast_1d(x)[:, None] - DOORS[None, :]), axis=1)
 
   # Simulate the true robot and its sensor readings for 30 steps:

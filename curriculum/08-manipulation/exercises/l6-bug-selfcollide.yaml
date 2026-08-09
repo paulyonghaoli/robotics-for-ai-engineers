@@ -17,6 +17,11 @@ setup_code: |
   OBSTACLES = np.array([[1.60, 0.90, 0.25]])
 
   def joint_positions(q, links=LINKS):
+      """Cartesian positions of the base, every joint, and the tip.
+
+      Returns shape (len(q) + 1, 2) starting at the origin. Joint angles
+      are relative to the previous link, so they accumulate.
+      """
       q = np.asarray(q, dtype=float)
       ang = np.cumsum(q)
       seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)

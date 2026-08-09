@@ -9,6 +9,11 @@ setup_code: |
   import numpy as np
 
   def bresenham(y0, x0, y1, x1):
+      """Grid cells on the line from (y0, x0) to (y1, x1), endpoints included.
+
+      Note the argument order: row first, then column — these are array
+      indices, not (x, y) coordinates. Returns a list of (row, col).
+      """
       cells = []
       dy, dx = abs(y1 - y0), abs(x1 - x0)
       sy, sx = (1 if y1 >= y0 else -1), (1 if x1 >= x0 else -1)

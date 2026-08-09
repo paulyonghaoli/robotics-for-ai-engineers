@@ -21,6 +21,11 @@ setup_code: |
                         [1.35,  0.00, 0.22]])
 
   def joint_positions(q, links=LINKS):
+      """Cartesian positions of the base, every joint, and the tip.
+
+      Returns shape (len(q) + 1, 2) starting at the origin. Joint angles
+      are relative to the previous link, so they accumulate.
+      """
       q = np.asarray(q, dtype=float)
       ang = np.cumsum(q)
       seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
@@ -43,6 +48,12 @@ setup_code: |
       return False
 
   def edge_collides(q1, q2, obstacles=OBSTACLES, resolution=0.05):
+      """True if the straight path in JOINT space from q1 to q2 collides.
+
+      Sampled every `resolution` radians of the largest joint motion. A
+      straight line in joint space is a curve in Cartesian space, so two
+      collision-free configurations can still have a colliding edge.
+      """
       q1 = np.asarray(q1, dtype=float); q2 = np.asarray(q2, dtype=float)
       n = max(2, int(np.ceil(float(np.max(np.abs(q2 - q1))) / resolution)))
       for t in np.linspace(0.0, 1.0, n + 1):

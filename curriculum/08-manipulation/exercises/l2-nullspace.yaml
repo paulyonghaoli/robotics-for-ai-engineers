@@ -18,15 +18,27 @@ setup_code: |
   Q_SPAN = Q_MAX - Q_MIN
 
   def joint_positions(q, links=LINKS):
+      """Cartesian positions of the base, every joint, and the tip.
+
+      Returns shape (len(q) + 1, 2) starting at the origin. Joint angles
+      are relative to the previous link, so they accumulate.
+      """
       q = np.asarray(q, dtype=float)
       ang = np.cumsum(q)
       seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
       return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
 
   def fk(q):
+      """Forward kinematics: the (x, y) tip position for configuration `q`."""
       return joint_positions(q)[-1]
 
   def jacobian(q):
+      """2x3 Jacobian d(tip position) / dq for the planar chain.
+
+      Column j is how the tip moves when joint j rotates. It is wider than
+      it is tall, so it has a null space — joint motions that leave the
+      tip exactly where it is.
+      """
       pts = joint_positions(q)
       d = pts[-1] - pts[:-1]
       return np.stack([-d[:, 1], d[:, 0]])

@@ -19,6 +19,12 @@ setup_code: |
       return np.array([c * d[0] - s * d[1], s * d[0] + c * d[1]])
 
   def rollout(controller, pose, path, steps=300, v=1.0, dt=0.05):
+      """Drive the unicycle with your controller and return where it went.
+
+      `controller(pose, path) -> angular velocity`, clipped to +/-2.5 rad/s.
+      Forward speed is fixed at `v`. Returns poses of shape (steps, 3),
+      each row (x, y, theta).
+      """
       poses = []
       for _ in range(steps):
           w = float(np.clip(controller(np.array(pose), path), -2.5, 2.5))

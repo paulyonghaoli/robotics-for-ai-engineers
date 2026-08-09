@@ -13,6 +13,11 @@ setup_code: |
   LINKS = np.array([1.0, 0.8, 0.6])
 
   def wrap(a):
+      """Wrap an angle to (-pi, pi].
+
+      Returns a float for scalar input and an array for array input, so
+      it can be used on one joint or a whole configuration.
+      """
       w = np.mod(-np.asarray(a, dtype=float) + np.pi, 2.0 * np.pi)
       r = -(w - np.pi)
       return float(r) if np.ndim(a) == 0 else r

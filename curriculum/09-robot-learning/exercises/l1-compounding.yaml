@@ -24,6 +24,12 @@ setup_code: |
       return -EXPERT_GAIN * x
 
   def step(x, a, rng):
+      """Advance the plant one step under action `a`; returns the new state.
+
+      The plant is open-loop UNSTABLE — with a = 0 the offset grows every
+      step — so a slightly-wrong policy drifts away instead of settling.
+      Consumes one draw from `rng`.
+      """
       return PLANT * x + a + rng.normal(0, NOISE)
 
   def collect_demos(n_episodes=60, horizon=40, seed=0):

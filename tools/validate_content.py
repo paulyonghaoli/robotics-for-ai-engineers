@@ -35,8 +35,9 @@ def main() -> int:
             failures.append(ContentError(f"exercise {ex_id}", err))
 
         # The learner cannot read setup_code, so anything it hands them has to
-        # carry its own contract. A wrong name or a broken worked example here
-        # is a hard failure; a callable with no description at all is reported.
+        # carry its own contract: a name and a signature do not say what the
+        # arguments mean or whether a call consumes an rng draw. Give the
+        # function a docstring, or describe it under `provided:` in the YAML.
         perrs: list[str] = []
         for item in build_provided(spec, perrs):
             if item["kind"] != "constant" and not item.get("summary"):
@@ -45,10 +46,11 @@ def main() -> int:
 
     n = export_json(cs)
     print(f"quiz banks: {len(cs.quizzes)}  exercises: {len(cs.exercises)}  json rewritten: {n}")
-    if undocumented:
-        print(f"provided-object descriptions missing: {len(undocumented)}")
-        for u in undocumented:
-            print(f"  · {u}")
+    failures.extend(
+        ContentError(f"exercise {u.split(':')[0]}",
+                     f"{u.split(': ')[1]} is handed to the learner with no "
+                     f"description: give it a docstring or a `provided:` summary")
+        for u in undocumented)
 
     if failures:
         print(f"\n{len(failures)} content error(s):", file=sys.stderr)

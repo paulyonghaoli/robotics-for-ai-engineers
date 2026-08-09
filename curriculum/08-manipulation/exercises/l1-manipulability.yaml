@@ -13,15 +13,26 @@ setup_code: |
   LINKS = np.array([1.0, 0.8, 0.6])
 
   def joint_positions(q, links=LINKS):
+      """Cartesian positions of the base, every joint, and the tip.
+
+      Returns shape (len(q) + 1, 2) starting at the origin. Joint angles
+      are relative to the previous link, so they accumulate.
+      """
       q = np.asarray(q, dtype=float)
       ang = np.cumsum(q)
       seg = np.stack([links * np.cos(ang), links * np.sin(ang)], axis=1)
       return np.vstack([np.zeros(2), np.cumsum(seg, axis=0)])
 
   def fk(q, links=LINKS):
+      """Forward kinematics: the (x, y) tip position for configuration `q`."""
       return joint_positions(q, links)[-1]
 
   def jacobian(q, links=LINKS):
+      """2xN Jacobian d(tip position) / dq for the planar chain.
+
+      Column j is how the tip moves when joint j rotates, which is the
+      lever arm from that joint to the tip, rotated 90 degrees.
+      """
       pts = joint_positions(q, links)
       d = pts[-1] - pts[:-1]
       return np.stack([-d[:, 1], d[:, 0]])

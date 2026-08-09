@@ -11,10 +11,17 @@ setup_code: |
   import numpy as np
 
   def rot2(t):
+      """2x2 rotation matrix for `t` radians, counter-clockwise."""
       c, s = np.cos(t), np.sin(t)
       return np.array([[c, -s], [s, c]])
 
   def kabsch(A, B):
+      """Least-squares rigid transform aligning point set B onto A.
+
+      Both are shape (n, 2) and already **correspondence-ordered** — row i
+      of B is the same physical point as row i of A. Returns (R, t) with
+      A ~= B @ R.T + t. Reflections are corrected, so det(R) is +1.
+      """
       ca, cb = A.mean(0), B.mean(0)
       H = (B - cb).T @ (A - ca)
       U, S, Vt = np.linalg.svd(H)
