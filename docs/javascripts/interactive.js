@@ -39,8 +39,23 @@
   function mdLite(text) {
     var h = String(text)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Emphasis must not reach inside code: the asterisks in `a * b` are
+    // multiplication and `se2(*MOUNT)` is unpacking. So lift code spans out
+    // first and put them back afterwards.
+    //
+    // The placeholder can safely use angle brackets: every literal "<" in the
+    // input became "&lt;" on the line above, so "<0>" cannot collide with
+    // anything the author wrote.
+    var spans = [];
+    h = h.replace(/`([^`]+)`/g, function (_, inner) {
+      spans.push(inner);
+      return "<" + (spans.length - 1) + ">";
+    });
     h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    h = h.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+    h = h.replace(/<(\d+)>/g, function (_, i) {
+      return "<code>" + spans[i] + "</code>";
+    });
     return h.replace(/\n/g, "<br>");
   }
 
@@ -55,6 +70,80 @@
     if (cls) e.className = cls;
     if (html !== undefined) e.innerHTML = html;
     return e;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Diagrams
+   *
+   *  Material's built-in mermaid support replaces the <pre> with an empty
+   *  <div class="mermaid"> and never inserts the SVG, so every diagram on
+   *  the site rendered as a blank gap. mermaid itself is fine — calling
+   *  render() by hand returns a valid SVG — so we load a pinned mermaid and
+   *  drive it here, off a fence class Material does not claim.
+   * ------------------------------------------------------------------ */
+
+  var diagramSeq = 0;
+
+  function renderDiagrams() {
+    var blocks = [].slice.call(document.querySelectorAll("pre.rai-diagram > code"));
+    if (!blocks.length || !window.mermaid) return;
+    var slate = document.body.getAttribute("data-md-color-scheme") === "slate";
+    try {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: slate ? "dark" : "default",
+        flowchart: { curve: "basis" }
+      });
+    } catch (e) { return; }
+
+    blocks.forEach(function (code) {
+      var host = el("div", "mermaid");
+      // Keep the source: the palette toggle does not reload the page, so a
+      // theme flip has to re-render from something.
+      host.dataset.src = code.textContent;
+      code.parentNode.parentNode.replaceChild(host, code.parentNode);
+      drawDiagram(host);
+    });
+  }
+
+  function drawDiagram(host) {
+    var id = "rai-mmd-" + (diagramSeq++);
+    try {
+      var out = window.mermaid.render(id, host.dataset.src);
+      // mermaid 10 returns a promise; guard in case a future build does not.
+      if (out && typeof out.then === "function") {
+        out.then(function (r) { host.innerHTML = r.svg; })
+           .catch(function (err) { host.textContent = "Diagram failed: " + err.message; });
+      } else if (typeof out === "string") {
+        host.innerHTML = out;
+      }
+    } catch (err) {
+      host.textContent = "Diagram failed: " + err.message;
+    }
+  }
+
+  /* Material's palette toggle swaps colours without reloading, which would
+   * otherwise leave light diagrams on a dark page. */
+  function watchDiagramTheme() {
+    if (!window.MutationObserver) return;
+    var last = document.body.getAttribute("data-md-color-scheme");
+    new MutationObserver(function () {
+      var now = document.body.getAttribute("data-md-color-scheme");
+      if (now === last) return;
+      last = now;
+      var hosts = [].slice.call(document.querySelectorAll("div.mermaid[data-src]"));
+      if (!hosts.length || !window.mermaid) return;
+      try {
+        window.mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: now === "slate" ? "dark" : "default",
+          flowchart: { curve: "basis" }
+        });
+      } catch (e) { return; }
+      hosts.forEach(drawDiagram);
+    }).observe(document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
   }
 
   /* ------------------------------------------------------------------ *
@@ -273,6 +362,32 @@
         sig.textContent = it.signature || (it.name + " = " + it.value);
         row.appendChild(sig);
         if (it.summary) row.appendChild(el("div", "rai-provided__doc", mdLite(it.summary)));
+        // A signature names the parameters; it does not say what they mean
+        // or what units they are in, and the source is hidden.
+        if ((it.params || []).length || it.returns) {
+          var tbl = document.createElement("table");
+          tbl.className = "rai-provided__params";
+          var addRow = function (label, type, doc, cls) {
+            var tr = tbl.insertRow();
+            if (cls) tr.className = cls;
+            var c0 = tr.insertCell();
+            var code = document.createElement("code");
+            code.textContent = label;
+            c0.appendChild(code);
+            var c1 = tr.insertCell();
+            if (type) {
+              var em = document.createElement("em");
+              em.textContent = type;
+              c1.appendChild(em);
+            }
+            tr.insertCell().innerHTML = mdLite(doc);
+          };
+          (it.params || []).forEach(function (pm) {
+            addRow(pm.name, pm.type, pm.doc, "");
+          });
+          if (it.returns) addRow("returns", it.returns.type, it.returns.doc, "is-return");
+          row.appendChild(tbl);
+        }
         if ((it.notes || []).length) {
           var ul = document.createElement("ul");
           ul.className = "rai-provided__notes";
@@ -430,6 +545,8 @@
   /* ------------------------------------------------------------------ */
 
   function init() {
+    renderDiagrams();
+    watchDiagramTheme();
     [].slice.call(document.querySelectorAll("quiz-bank")).forEach(QuizBank.attach);
     [].slice.call(document.querySelectorAll("code-exercise")).forEach(CodeExercise.attach);
   }

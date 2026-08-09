@@ -30,6 +30,8 @@ Discrete form with the three production guards (exactly what `robotics_ai.contro
 2. **Anti-windup:** clamp (or conditionally freeze) the integral, else a saturated actuator lets the integral grow unboundedly and the system massively overshoots when the error finally reverses.
 3. **No derivative kick:** the first sample has no history — define its derivative as zero (or differentiate the *measurement* instead of the error so setpoint steps don't spike D).
 
+The **plant** is the system being controlled — the motor, the arm, the car — as opposed to the controller acting on it. The term is inherited from process control, where the plant really was a chemical or power plant, and it is used throughout the control literature for anything you can influence only through actuators.
+
 Why P alone leaves steady-state error, in one line: at equilibrium a first-order plant needs \(u = y\) to hold position; \(u = k_p (r - y)\) gives \(y = \frac{k_p}{1 + k_p} r < r\). The integral supplies the missing constant.
 
 ## D. From ML to robotics

@@ -37,8 +37,12 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences:
       custom_fences:
+        # class is deliberately NOT "mermaid": Material's own diagram glue
+        # claims that class, empties the container and never inserts the SVG
+        # (mermaid itself renders fine when called directly). We load and run
+        # mermaid ourselves in interactive.js instead.
         - name: mermaid
-          class: mermaid
+          class: rai-diagram
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight
   - pymdownx.inlinehilite
@@ -62,6 +66,7 @@ extra_javascript:
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
   - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js
+  - https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js
   - javascripts/interactive.js
   - javascripts/progress.js
 

@@ -196,6 +196,30 @@ quiz-bank, code-exercise {
   opacity: 0.9;
 }
 .md-typeset .rai-provided__notes li { margin: 0.1em 0; }
+.md-typeset .rai-provided__params {
+  width: 100%;
+  margin: 0.35em 0 0.2em;
+  font-size: 0.95em;
+  border-collapse: collapse;
+  display: table;
+}
+.md-typeset .rai-provided__params td {
+  border: none;
+  border-top: 1px solid var(--md-default-fg-color--lightest, #eee);
+  padding: 0.22em 0.5em 0.22em 0;
+  vertical-align: top;
+}
+.md-typeset .rai-provided__params tr:first-child td { border-top: none; }
+.md-typeset .rai-provided__params td:first-child { width: 1%; white-space: nowrap; }
+.md-typeset .rai-provided__params td:nth-child(2) {
+  width: 1%;
+  white-space: nowrap;
+  opacity: 0.75;
+  padding-right: 0.8em;
+}
+.md-typeset .rai-provided__params tr.is-return td { font-weight: 600; }
+.md-typeset .rai-provided__params tr.is-return td:nth-child(3) { font-weight: 400; }
+
 .md-typeset .rai-provided__eg {
   margin: 0.4em 0 0.2em;
   padding: 0.45em 0.7em;

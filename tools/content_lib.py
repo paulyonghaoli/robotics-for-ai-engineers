@@ -86,6 +86,18 @@ def _validate_exercise(spec: dict, path: str, errors: list[ContentError]) -> Non
             errors.append(ContentError(path, f"exercise missing '{key}'"))
 
 
+def _exec(src: str, ns: dict) -> None:
+    """Run exercise code the way the browser does.
+
+    `exec` inherits __future__ flags from the calling frame, and this module
+    uses `from __future__ import annotations`. Left alone, that silently runs
+    every exercise under a different language mode than Pyodide uses — most
+    visibly turning annotations into strings. dont_inherit=True removes the
+    difference.
+    """
+    exec(compile(src or "", "<exercise>", "exec", dont_inherit=True), ns)  # noqa: S102
+
+
 def run_exercise_solution(spec: dict) -> str | None:
     """Execute setup + reference solution + tests. Returns error text or None.
 
@@ -94,9 +106,9 @@ def run_exercise_solution(spec: dict) -> str | None:
     """
     ns: dict = {}
     try:
-        exec(spec.get("setup_code", ""), ns)  # noqa: S102
-        exec(spec["solution"], ns)  # noqa: S102
-        exec(spec["tests"], ns)  # noqa: S102
+        _exec(spec.get("setup_code", ""), ns)
+        _exec(spec["solution"], ns)
+        _exec(spec["tests"], ns)
     except AssertionError as e:
         return f"reference solution FAILS its own tests: {e}"
     except Exception as e:  # noqa: BLE001
@@ -150,6 +162,36 @@ def _summarize_value(v: object, compact: bool = False) -> str:
     return type(v).__name__
 
 
+def _type_name(t: object) -> str:
+    """Short, readable name for an annotation.
+
+    inspect's default repr gives `numpy.random._generator.Generator`, which
+    puts a private module path in front of a learner.
+    """
+    if t is inspect.Parameter.empty:
+        return ""
+    return getattr(t, "__name__", str(t)).replace("numpy.", "np.")
+
+
+def _render_signature(name: str, value: object) -> str:
+    try:
+        sig = inspect.signature(value)
+    except (TypeError, ValueError):
+        return f"{name}(...)"
+    parts = []
+    for p in sig.parameters.values():
+        s = p.name
+        ann = _type_name(p.annotation)
+        if ann:
+            s += f": {ann}"
+        if p.default is not inspect.Parameter.empty:
+            s += f" = {p.default!r}" if ann else f"={p.default!r}"
+        parts.append(s)
+    out = f"{name}({', '.join(parts)})"
+    ret = _type_name(sig.return_annotation)
+    return f"{out} -> {ret}" if ret else out
+
+
 def _used_names(spec: dict) -> set[str]:
     """Names the learner's starter and the reference solution actually read."""
     used: set[str] = set()
@@ -191,7 +233,7 @@ def build_provided(spec: dict, errors: list[str] | None = None) -> list[dict]:
         return []
     ns: dict = {}
     try:
-        exec(setup, ns)  # noqa: S102
+        _exec(setup, ns)
     except Exception as e:  # noqa: BLE001
         if errors is not None:
             errors.append(f"setup_code failed: {type(e).__name__}: {e}")
@@ -222,10 +264,7 @@ def build_provided(spec: dict, errors: list[str] | None = None) -> list[dict]:
         entry: dict = {"name": name}
         if callable(value):
             entry["kind"] = "class" if isinstance(value, type) else "function"
-            try:
-                entry["signature"] = name + str(inspect.signature(value))
-            except (TypeError, ValueError):
-                entry["signature"] = name + "(...)"
+            entry["signature"] = _render_signature(name, value)
         else:
             entry["kind"] = "constant"
             entry["value"] = _summarize_value(value)
@@ -240,6 +279,40 @@ def build_provided(spec: dict, errors: list[str] | None = None) -> list[dict]:
             entry["summary"] = " ".join(summary.split())
         if extra.get("notes"):
             entry["notes"] = list(extra["notes"])
+        # A signature gives parameter NAMES. It does not say that `k` is an
+        # integer step index or that the return is metres, and the learner
+        # cannot open the source to find out. Types come from annotations
+        # where the author added them; meaning and units are authored here.
+        if extra.get("params") or extra.get("returns"):
+            ann = getattr(value, "__annotations__", {}) or {}
+
+            def _type_of(name: str, ann: dict = ann) -> str:
+                t = ann.get(name)
+                if t is None:
+                    return ""
+                return getattr(t, "__name__", str(t))
+
+            try:
+                real = set(inspect.signature(value).parameters)
+            except (TypeError, ValueError):
+                real = set()
+            for k in extra.get("params") or {}:
+                if real and k not in real and errors is not None:
+                    errors.append(
+                        f"provided.{name}.params documents {k!r}, which is not "
+                        f"a parameter of {entry.get('signature', name)}")
+            for k in sorted(real):
+                if k not in (extra.get("params") or {}) and errors is not None:
+                    errors.append(
+                        f"provided.{name}.params omits {k!r}; document every "
+                        f"parameter or none")
+            entry["params"] = [
+                {"name": k, "type": _type_of(k), "doc": v}
+                for k, v in (extra.get("params") or {}).items()
+            ]
+            if extra.get("returns"):
+                entry["returns"] = {"type": _type_of("return"),
+                                    "doc": extra["returns"]}
         if extra.get("example"):
             entry["example"] = extra["example"]
             try:
