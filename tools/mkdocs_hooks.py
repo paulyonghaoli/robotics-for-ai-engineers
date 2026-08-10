@@ -69,3 +69,9 @@ def on_pre_build(config, **kwargs):  # noqa: ANN001, ARG001
         raise SystemExit(f"interactive content invalid:\n{details}")
     export_json(cs)
     _write_lesson_manifest()
+    # Lesson figures are computed, not drawn, so they cannot disagree with the
+    # mathematics they illustrate. Regenerated here for the same reason the
+    # exercise JSON is: the source of truth is code.
+    from tools.figures import render_all
+
+    render_all()

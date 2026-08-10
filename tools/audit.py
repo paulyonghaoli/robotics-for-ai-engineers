@@ -90,6 +90,24 @@ def main() -> int:
             if qid not in cs.quizzes:
                 problems.append(f"{rel}: <quiz-bank src={qid!r}> does not exist")
 
+    # 1b. Every local asset a lesson points at actually exists.
+    #
+    # `mkdocs build --strict` rewrites and validates markdown-syntax paths but
+    # passes raw HTML through verbatim, so a broken <img src> in a hand-written
+    # <figure> block ships silently as a broken image. That happened.
+    asset_re = re.compile(
+        r'(?:!\[[^\]]*\]\(([^)\s]+)\)|<img[^>]+src="([^"]+)")')
+    for p in docs:
+        text = p.read_text(encoding="utf-8")
+        rel = p.relative_to(ROOT).as_posix()
+        for md_src, html_src in asset_re.findall(text):
+            src = md_src or html_src
+            if src.startswith(("http://", "https://", "data:", "#", "/")):
+                continue
+            target = (p.parent / src.split("#")[0].split("?")[0]).resolve()
+            if not target.exists():
+                problems.append(f"{rel}: asset {src!r} does not exist")
+
     # 2. Orphans: content nothing links to.
     for eid in sorted(set(cs.exercises) - referenced_ex):
         problems.append(f"exercise {eid}: no lesson embeds it")

@@ -149,6 +149,26 @@ quiz-bank, code-exercise {
 .rai-output .err { color: #ff8a80; }
 .rai-output .okline { color: #a5d6a7; }
 
+/* ---- generated lesson figures ----
+   Each figure is emitted twice; show whichever matches the palette. */
+.md-typeset .rai-fig {
+  margin: 1.4em 0;
+  text-align: center;
+}
+.md-typeset .rai-fig img {
+  max-width: 100%;
+  height: auto;
+}
+.md-typeset .rai-fig .fig-dark { display: none; }
+[data-md-color-scheme="slate"] .md-typeset .rai-fig .fig-light { display: none; }
+[data-md-color-scheme="slate"] .md-typeset .rai-fig .fig-dark { display: inline; }
+.md-typeset .rai-fig figcaption {
+  font-size: 0.8em;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.5em;
+  text-align: left;
+}
+
 /* Reference for objects the learner is handed but cannot read the source of.
  *
  * Material styles every <details> as a collapsible admonition — accent-blue

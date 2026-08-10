@@ -6,94 +6,105 @@
 
 ## A. Why this matters
 
-In 2D, an orientation is one number. You saw in lesson 1.1 how much machinery
-that one number already needs — wrapping, conventions, careful subtraction.
+In two dimensions an orientation is a single number, and lesson 1.1 showed
+that even that single number needs care: it has to be wrapped, subtracted
+carefully, and kept to a documented convention. In three dimensions the
+situation is qualitatively worse, because an orientation is a point on a
+curved three-dimensional surface called \(SO(3)\), and there is a topological
+obstruction that shapes everything else in this lesson.
 
-In 3D, an orientation is a point on a curved three-dimensional surface called
-\(SO(3)\), and here is the uncomfortable fact that shapes this entire lesson:
-**there is no way to represent it with three numbers without introducing a
-singularity.** Not "no convenient way" — no way at all. It is a topological
-fact about spheres, and it is why the field settled on a four-number
-representation with a constraint attached.
+The obstruction is this: **you cannot represent a 3D orientation with three
+numbers without introducing a singularity somewhere.** This is not a statement
+that nobody has found a convenient scheme yet, but a fact about the geometry
+of the space, closely related to the reason every flat map of the Earth
+distorts something. Any three-parameter description of orientation must
+therefore break down at some orientations, and the field's response was to
+adopt a four-number representation carrying one constraint.
 
-Every representation is therefore a compromise:
+Every representation is consequently a compromise, and it is worth seeing them
+side by side before committing to one.
 
-| Representation | Numbers | Main problem |
-|---|---|---|
-| Rotation matrix | 9 | Six constraints to maintain; drifts out of \(SO(3)\) under composition |
-| Euler angles | 3 | **Gimbal lock**, plus 24 different ordering conventions in the wild |
-| Axis–angle | 3 (or 4) | Clean to state, awkward to compose |
-| **Unit quaternion** | **4** | Double cover; unfamiliar arithmetic |
+| Representation | Numbers | Constraints | Main problem |
+|---|---|---|---|
+| Rotation matrix | 9 | 6 | Many constraints to maintain; expensive to repair when violated |
+| Euler angles | 3 | 0 | **Gimbal lock**, plus roughly 24 different ordering conventions in circulation |
+| Axis–angle | 3 or 4 | 0 or 1 | Clean to state, awkward to compose |
+| **Unit quaternion** | **4** | **1** | Double cover; unfamiliar arithmetic |
 
-Robotics runs on the last one. Your IMU integrates orientation as a
-quaternion. TF2 ships quaternions on the wire. Every attitude estimator and
-every 3D pose message in ROS is a quaternion. When a drone flips upside down
-because someone routed Euler angles through ±90° of pitch, this lesson is the
-postmortem.
+Robotics settled on the last row, and the consequences are everywhere you
+look: your IMU integrates orientation as a quaternion, TF2 puts quaternions on
+the wire, and every attitude estimator and 3D pose message in ROS is a
+quaternion. When a drone flips upside down because somebody routed Euler
+angles through ±90° of pitch, this lesson is the postmortem.
 
 !!! note "Terms defined here"
 
-    **DOF (degrees of freedom)** — the number of independent numbers needed
-    to specify a configuration. A 3D orientation has 3 DOF, which is why the
-    4-number quaternion needs exactly one constraint.
+    **DOF (degrees of freedom)** — the number of independent numbers required
+    to specify a configuration. A 3D orientation has 3 DOF, which is why a
+    four-number quaternion needs exactly one constraint to remove the extra.
 
-    **\(SO(3)\)** — the set of all 3D rotations. Formally the 3×3 matrices
-    with \(R^\top R = I\) and \(\det R = +1\), exactly as in lesson 1.1 but
-    one dimension up.
+    **\(SO(3)\)** — the set of all 3D rotations, formally the 3×3 matrices
+    with \(R^\top R = I\) and \(\det R = +1\). Exactly the definition from
+    lesson 1.1, one dimension higher.
 
-    **Manifold** — a space that looks flat locally but is curved globally.
-    The surface of the Earth is a 2D manifold; \(SO(3)\) is a 3D one. The
-    practical consequence: you cannot cover it with one flat coordinate chart
-    without something going wrong somewhere.
+    **Manifold** — a space that looks flat when you examine a small patch of
+    it but is curved globally. The surface of the Earth is a two-dimensional
+    manifold and \(SO(3)\) is a three-dimensional one, and in both cases you
+    cannot cover the whole thing with a single flat chart without something
+    going wrong somewhere.
 
-    **Gimbal lock** — the singularity in Euler angles: at certain
-    orientations two of the three axes align, one degree of freedom
-    disappears, and the representation cannot express a rotation the robot
-    can physically perform.
+    **Gimbal lock** — the singularity in Euler angles, occurring at
+    orientations where two of the three rotation axes align so that one degree
+    of freedom disappears from the representation even though the physical
+    system can still move in that direction.
 
-    **Attitude** — orientation, in the aerospace and IMU literature. Same
-    thing; different vocabulary.
+    **Attitude** — orientation, in the aerospace and inertial-navigation
+    literature. The same quantity under a different name.
 
 ## B. Mental model
 
-**A unit quaternion is axis–angle in disguise.** To rotate by angle
-\(\theta\) about the unit axis \(\hat n\):
+### A quaternion is axis–angle in disguise
+
+To rotate by an angle \(\theta\) about a unit axis \(\hat n\), the quaternion
+is
 
 \[
 q = \left[\cos\tfrac{\theta}{2},\; \sin\tfrac{\theta}{2}\,\hat{n}\right] = [w, x, y, z]
 \]
 
-That is the whole construction. The mysterious part is the halving, and it
-has a precise reason we will come back to in the questions: rotating a vector
-is a **two-sided** product, \(v' = q\,v\,q^{*}\), so the quaternion's angle
-gets applied twice, and the half is what makes the sandwich come out to
-\(\theta\).
+and that is the entire construction. The part that looks arbitrary is the
+halving of the angle, and it has a precise cause that we return to in question
+1: rotating a vector with a quaternion is a **two-sided** operation,
+\(v' = q\,v\,q^{*}\), so the quaternion's angle is applied twice, once by each
+factor, and the half-angle is exactly what makes the sandwich come out to
+\(\theta\) rather than \(2\theta\).
 
-What you buy for that oddity:
+What you buy for that oddity is worth the trouble. Composing two rotations
+becomes multiplying two quaternions, with no trigonometry and no special
+cases. The representation is smooth at every orientation, so there is no
+configuration at which the arithmetic degenerates and no equivalent of gimbal
+lock. And interpolation becomes natural, because a unit quaternion lives on
+the unit sphere in four dimensions, so interpolating between two orientations
+amounts to walking the great-circle arc between two points on that sphere at
+constant speed, an operation known as **slerp**, for spherical linear
+interpolation.
 
-- **Composing rotations is multiplying quaternions.** No trigonometry, no
-  special cases.
-- **The representation is smooth everywhere.** No gimbal lock, no orientation
-  at which the arithmetic degenerates.
-- **Interpolation is natural.** A quaternion lives on the unit sphere in 4D,
-  and interpolating between two orientations is walking the great-circle arc
-  between two points on that sphere at constant speed. That operation is
-  called **slerp** (spherical linear interpolation).
+### The double cover, which is genuinely strange
 
-### The one genuine oddity: the double cover
+A quaternion \(q\) and its negation \(-q\) encode **the same rotation**, and
+this is not a convention that could have been chosen differently. The sphere
+in four dimensions wraps twice around the space of three-dimensional
+rotations, so every orientation has exactly two quaternion representations
+that differ only in sign.
 
-\(q\) and \(-q\) encode **the same rotation**.
-
-This is not a convention you can choose away; it is structural. The sphere in
-4D wraps twice around the space of 3D rotations. A physical consequence you
-can check: rotate an object by 360° and it returns to where it started, but
-its quaternion has flipped sign. You need 720° to get the quaternion back.
-
-This is harmless right up until you average, interpolate, or compare
-quaternions naively — and then it produces spectacular bugs. Averaging \(q\)
-and \(-q\) gives **zero**, which is not a rotation at all. A tracking filter
-that does not sign-align consecutive estimates sees phantom 360° flips.
-Failure mode 2 in section H is exactly this.
+There is a physical consequence you can verify: rotating an object through
+360° returns it to where it started, but its quaternion has flipped sign, and
+only after 720° does the quaternion return to its original value. This is
+harmless right up until the moment you average, interpolate or compare
+quaternions without accounting for it, at which point it produces spectacular
+failures. Averaging \(q\) and \(-q\) yields zero, which is not a rotation at
+all, and a tracking filter that does not sign-align consecutive estimates
+reports phantom 360° flips while the physical sensor moved smoothly.
 
 ## C. Mathematical formulation
 
@@ -106,15 +117,17 @@ w_1 \mathbf{v}_2 + w_2 \mathbf{v}_1 + \mathbf{v}_1 \times \mathbf{v}_2
 \end{bmatrix}
 \]
 
-with \(\mathbf v\) the vector part. This matches matrix order:
-\(R(q_1 q_2) = R(q_1)\,R(q_2)\), so **\(q_1 q_2\) applies \(q_2\) first** —
-the same right-to-left reading as lesson 1.1's subscript cancellation.
+where \(\mathbf v\) denotes the vector part. This product is defined so that
+it matches matrix order, meaning \(R(q_1 q_2) = R(q_1)\,R(q_2)\), and
+therefore \(q_1 q_2\) applies \(q_2\) **first**, which is the same
+right-to-left reading as the subscript cancellation in lesson 1.1.
 
-For a unit quaternion the inverse is simply the conjugate,
-\(q^{*} = [w, -\mathbf{v}]\): negate the vector part. Like the transpose
-trick for rotation matrices, inverting is free.
+For a unit quaternion the inverse is simply the conjugate
+\(q^{*} = [w, -\mathbf{v}]\), obtained by negating the vector part, so
+inverting a rotation is free in exactly the same way that transposing an
+orthogonal matrix was free.
 
-### Converting to a matrix
+### Converting to a rotation matrix
 
 \[
 R(q) = \begin{bmatrix}
@@ -124,9 +137,11 @@ R(q) = \begin{bmatrix}
 \end{bmatrix}
 \]
 
-Every entry is quadratic in the components. This is why an unnormalised
-quaternion is dangerous: if \(\|q\| = 1.01\), the resulting matrix carries
-about 2% of scale, and it is still *almost* a rotation, so nothing throws.
+Every entry is quadratic in the components, which is why an unnormalised
+quaternion is quietly dangerous. If \(\|q\| = 1.01\) then the resulting matrix
+carries roughly 2% of scale, and because it is still very nearly a rotation
+nothing anywhere throws an error; the only observable consequence is that
+transformed point clouds slowly grow.
 
 ### Interpolation: slerp
 
@@ -134,63 +149,73 @@ about 2% of scale, and it is still *almost* a rotation, so nothing throws.
 \mathrm{slerp}(q_0, q_1, t) = \frac{\sin((1-t)\Omega)}{\sin\Omega}\, q_0 + \frac{\sin(t\Omega)}{\sin\Omega}\, q_1
 \]
 
-where \(\Omega = \arccos(q_0 \cdot q_1)\), **after** flipping the sign of
-\(q_1\) if the dot product is negative. That sign flip is the double cover
-again: without it you interpolate the long way round, up to 358° of
-unnecessary rotation.
+with \(\Omega = \arccos(q_0 \cdot q_1)\), computed **after** flipping the sign
+of \(q_1\) when the dot product is negative. That sign flip is the double
+cover again, and omitting it makes the interpolation take the long way round,
+which can mean up to 358° of unnecessary rotation.
 
-Two practical notes the formula does not show. When \(\Omega \to 0\) the
-denominator vanishes and you must fall back to plain linear interpolation
-plus normalisation — the two agree to first order, so the seam is invisible.
-And slerp gives *constant angular velocity*, which is what makes it correct
-for replaying recorded motion; naive linear interpolation of the four
-components speeds up in the middle of the arc.
+The formula conceals two practical details. As \(\Omega \to 0\) the
+denominator vanishes, so an implementation must fall back to ordinary linear
+interpolation followed by normalisation, and because the two agree to first
+order the seam is invisible. More importantly, slerp produces **constant
+angular velocity**, which is what makes it the correct choice for replaying
+recorded motion, whereas naive linear interpolation of the four components
+speeds up in the middle of the arc.
+
+<figure class="rai-fig" markdown>
+![Left: equally spaced lerp samples bunch at the ends of the arc while slerp samples are evenly spaced. Right: degrees per step is constant for slerp and peaks in the middle for lerp.](../../assets/generated/figures/slerp-vs-lerp-light.svg){.fig-light}
+![Left: equally spaced lerp samples bunch at the ends of the arc while slerp samples are evenly spaced. Right: degrees per step is constant for slerp and peaks in the middle for lerp.](../../assets/generated/figures/slerp-vs-lerp-dark.svg){.fig-dark}
+<figcaption markdown>Interpolating 140° with eleven equally spaced values of t. Slerp turns by the same amount every step, while lerp crawls at the ends and accelerates through the middle — which is the "pinch" you see in animation when someone has used the wrong one.</figcaption>
+</figure>
 
 ## D. From ML to robotics
 
-**Unit quaternions are normalised embeddings.** Both live on a hypersphere,
-both compare by dot product, and both need re-normalisation after arithmetic
-or they silently degrade. Slerp is exactly the geodesic interpolation you may
-already know as the right way to interpolate in a latent space — and naive
-lerp is wrong here for the same reason it is wrong there.
+A unit quaternion behaves very much like a normalised embedding, in that both
+live on a hypersphere, both are compared by dot product, and both require
+renormalisation after arithmetic or they degrade silently. Slerp is precisely
+the geodesic interpolation that you may already know as the correct way to
+interpolate in a latent space, and naive linear interpolation is wrong here
+for the same reason it is wrong there.
 
-**Why four numbers for a three-DOF quantity?** For the same reason
-over-parameterisation often helps in machine learning: the minimal
-three-parameter charts necessarily contain singularities. This is a theorem,
-not an engineering failure — you cannot smoothly cover a sphere with a single
-flat chart, which is also why every world map distorts something. The fourth
-dimension buys a globally smooth, singularity-free representation, and the
-price is one constraint (\(\|q\| = 1\)) plus the double cover.
+The question of why a three-DOF quantity needs four numbers has a familiar
+flavour too, because it is the same trade that over-parameterisation makes in
+machine learning. Minimal three-parameter charts necessarily contain
+singularities, which is a theorem rather than an engineering failure, and
+spending a fourth dimension buys a globally smooth, singularity-free
+representation at the cost of one constraint plus the double cover.
 
-**Convention chaos is schema drift.** Scalar-first `[w,x,y,z]` (this
-curriculum, Eigen, most of the literature) versus scalar-last `[x,y,z,w]`
-(ROS messages, SciPy). Both are correct. Mixing them is the robotics
-equivalent of a silently reordered CSV column: everything runs, nothing is
-right, and the error is a scramble rather than a small offset — which
-perversely makes it easier to spot than a subtle one.
+Convention chaos, finally, is schema drift wearing different clothes.
+Scalar-first ordering `[w,x,y,z]` is used by this curriculum, by Eigen and by
+most of the literature, while scalar-last `[x,y,z,w]` is used by ROS messages
+and by SciPy, and both are entirely correct. Mixing them is the robotics
+equivalent of a silently reordered CSV column, where everything runs and
+nothing is right, although the resulting error is at least a scramble rather
+than a subtle offset, which perversely makes it easier to notice.
 
-### Gimbal lock, concretely
+### Gimbal lock, made concrete
 
-Worth making tangible, because "a singularity in the parameterisation" is easy
-to nod along to and hard to picture.
+It is easy to nod along to "a singularity in the parameterisation" without
+being able to picture it, so it is worth walking through a specific case.
 
-Take the common aerospace convention: yaw about \(z\), then pitch about the
-new \(y\), then roll about the new \(x\). Now pitch the nose up to exactly
-90°. The aircraft's \(x\)-axis now points along the world \(z\)-axis — which
-is the *same axis* the yaw rotation used. Yaw and roll have become the same
-motion. You have three knobs and only two independent effects: one degree of
-freedom has vanished.
+Take the common aerospace convention, in which you rotate first about \(z\)
+for yaw, then about the new \(y\) for pitch, then about the new \(x\) for
+roll. Now pitch the nose up to exactly 90°. The aircraft's x-axis is now
+pointing along the world's z-axis, which is the very axis that the yaw
+rotation used, so yaw and roll have become the same physical motion. You still
+have three knobs, but they now produce only two independent effects, and one
+degree of freedom has vanished from the representation.
 
-The robot can still physically rotate in that lost direction. The
-*representation* cannot express it, so a controller working in Euler angles
-either stalls or produces an enormous correction as the parameterisation
-snaps. That is the drone flipping.
+The aircraft can of course still rotate in the direction that was lost, since
+nothing has happened to the physics. It is the *description* that has
+degenerated, so a controller working in Euler angles either stalls or produces
+an enormous correction as the parameterisation snaps through the singularity,
+and that is the mechanism by which a drone flips.
 
 ## E. Minimal implementation
 
-Library:
-[`robotics_ai/geometry/rotations3d.py`](https://github.com/paulyonghaoli/robotics-for-ai-engineers/blob/main/robotics_ai/geometry/rotations3d.py).
-The essential core:
+The library lives at
+[`robotics_ai/geometry/rotations3d.py`](https://github.com/paulyonghaoli/robotics-for-ai-engineers/blob/main/robotics_ai/geometry/rotations3d.py),
+and the essential core is three functions.
 
 ```python
 import numpy as np
@@ -220,18 +245,20 @@ def quat_rotate(q, v):
 
 ### A worked example
 
-Rotate the vector \((1, 0, 0)\) by 90° about the \(z\)-axis. By hand:
+Consider rotating the vector \((1, 0, 0)\) by 90° about the z-axis, and work
+it through by hand before running anything. The angle is 90°, so the
+half-angle appearing in the quaternion is 45°, and since the axis is
+\((0,0,1)\) the quaternion is
+\(q = [\cos 45°, 0, 0, \sin 45°] \approx [0.7071, 0, 0, 0.7071]\). A 90°
+rotation about \(z\) should carry \(+x\) onto \(+y\), so we expect the answer
+\((0, 1, 0)\), and `quat_rotate(q, [1,0,0])` returns exactly that to machine
+precision.
 
-1. \(\theta = 90°\), so the half-angle is 45°.
-2. \(q = [\cos 45°,\; 0,\; 0,\; \sin 45°] \approx [0.7071, 0, 0, 0.7071]\).
-3. A 90° rotation about \(z\) takes \(+x\) to \(+y\), so we expect
-   \((0, 1, 0)\).
-
-`quat_rotate(q, [1,0,0])` returns `[0, 1, 0]` to machine precision. Note that
-neither the axis nor the angle appears directly in the quaternion — the axis
-is scaled by \(\sin(\theta/2)\) and the angle is buried in a cosine. Reading a
-quaternion by eye is a skill you will not develop and do not need; convert to
-axis–angle when debugging.
+Notice that neither the axis nor the angle appears directly in the four
+numbers, because the axis has been scaled by \(\sin(\theta/2)\) and the angle
+is buried inside a cosine. Reading a quaternion by eye is a skill you will not
+develop and do not need, so when you are debugging, convert to axis–angle and
+look at that instead.
 
 ### Practice — write and run code here
 
@@ -241,9 +268,10 @@ axis–angle when debugging.
 
 ## F. Robotics-framework implementation
 
-ROS 2 sends orientation as `geometry_msgs/Quaternion` with fields
-`x, y, z, w` — **scalar-last**. Convert at the boundary, in exactly one
-place, and never in application code:
+ROS 2 sends orientation as `geometry_msgs/Quaternion`, whose fields are
+ordered `x, y, z, w`, making it **scalar-last**. The only sustainable response
+is to convert at the boundary, in exactly one place, and never in application
+code:
 
 ```python
 def to_ros(q_wxyz):                      # our convention -> wire format
@@ -251,96 +279,119 @@ def to_ros(q_wxyz):                      # our convention -> wire format
     return Quaternion(x=x, y=y, z=z, w=w)
 ```
 
-SciPy's `Rotation.from_quat` is also scalar-last by default. Eigen and this
-curriculum are scalar-first. There is no winning this argument; there is only
-converting in one place and validating at ingest.
+SciPy's `Rotation.from_quat` is also scalar-last by default, while Eigen and
+this curriculum are scalar-first, and there is no prospect of winning that
+argument. There is only converting in one place and validating at ingest.
+Module 6 revisits the question when we build a real TF tree, and the
+[frame-debugging lab](06-lab-frame-debugging.md) contains a deliberately
+mixed-convention bug for you to find.
 
-Module 6 revisits this when we build a real TF tree, and the
-[frame-debugging lab](06-lab-frame-debugging.md) includes a deliberately
-mixed-convention bug to find.
+## G. Experiment — measuring drift, and what it actually shows
 
-## G. Experiment — which representation rots faster
+The standard justification for quaternions is that rotation matrices drift out
+of \(SO(3)\) under repeated composition, so it is worth measuring the effect
+rather than repeating the claim, because the size of it determines whether it
+should influence any decision you make.
 
-Compose a small rotation — 1° about a tilted axis — with itself 100,000
-times, once with rotation matrices and once with quaternions, renormalising
-**neither**. Measure two things over time:
+Compose a small rotation with itself 100,000 times, once as a matrix and once
+as a quaternion, renormalising neither, and track \(\|R R^\top - I\|\) for the
+matrix and \(\bigl|\,\|q\| - 1\,\bigr|\) for the quaternion.
 
-- for the matrix, \(\|R R^\top - I\|\);
-- for the quaternion, \(\bigl|\,\|q\| - 1\,\bigr|\).
+<figure class="rai-fig" markdown>
+![Log-scale plot of constraint violation against number of compositions; both grow linearly and remain around 1e-12 after 100000 steps, with the matrix roughly three times larger than the quaternion.](../../assets/generated/figures/rotation-drift-light.svg){.fig-light}
+![Log-scale plot of constraint violation against number of compositions; both grow linearly and remain around 1e-12 after 100000 steps, with the matrix roughly three times larger than the quaternion.](../../assets/generated/figures/rotation-drift-dark.svg){.fig-dark}
+<figcaption markdown>Measured, not asserted. After 100,000 compositions the matrix violates orthonormality by 5.5×10⁻¹² and the quaternion violates its norm by 2.0×10⁻¹². The quaternion is about three times better, and both are negligible.</figcaption>
+</figure>
 
-Then repeat *with* renormalisation each step. For the quaternion that is one
-line, `q /= np.linalg.norm(q)`. For the matrix it is an SVD or a Gram–Schmidt
-pass — orders of magnitude more expensive.
+The result is more interesting than the folklore. In double precision, drift
+from composition alone is **not** a practical problem for either
+representation, since parts in \(10^{12}\) after a hundred thousand steps is
+several orders of magnitude below the noise of any real sensor. If you have
+been told that matrices rot and quaternions do not, the data does not support
+the strong form of that claim.
 
-You will find two things, and the second matters more than the first. The
-quaternion drifts more slowly, because it has one constraint to violate rather
-than six. And **fixing the quaternion is trivially cheap while fixing the
-matrix is not**, which is the practical reason estimators integrate
-orientation as quaternions and convert to matrices only when they need to
-transform a batch of points.
+So the real argument for quaternions in an estimator is not the magnitude of
+the drift but two other things. The first is the cost of repair: restoring a
+quaternion's constraint is a single division by its norm, whereas restoring a
+matrix's six constraints requires Gram–Schmidt or an SVD, which is orders of
+magnitude more expensive and therefore gets skipped in the inner loop. The
+second, and more important in practice, is that real systems do not compose
+clean rotations at all; they *update* orientation from noisy gyroscope
+measurements, and those updates inject errors vastly larger than floating-point
+rounding. Under that regime the constraint is violated constantly, the repair
+happens every step, and its cost is what decides the design.
 
 ## H. Failure modes
 
-- **Convention mismatch** (scalar-first vs scalar-last). Rotations come out
-  scrambled rather than slightly wrong. Code full of internal round-trips can
-  appear to work until it crosses a library boundary — which is why the bug
-  usually surfaces during integration, far from its cause.
-- **Forgetting the double cover.** Averaging \(q\) and \(-q\) gives zero. A
-  tracking filter that does not enforce \(q_k \cdot q_{k-1} \ge 0\) reports
-  phantom 360° jumps while the physical sensor moved smoothly.
-- **Unnormalised quaternions.** After long integration \(\|q\| \neq 1\), and
-  `quat_to_matrix` silently produces a matrix carrying scale. Point clouds
-  slowly grow or shrink — the same symptom as matrix drift in lesson 1.1, from
-  a different cause.
-- **Naive lerp instead of slerp** across large angular differences. The
-  interpolated orientation speeds up mid-arc and the norm dips, visible as a
-  "pinch" in animation.
-- **Euler angles as internal state.** Fine as human-readable input and
-  output. Catastrophic in the core of a pipeline near ±90° pitch, where
-  gimbal lock collapses a degree of freedom.
+**Convention mismatch** between scalar-first and scalar-last orderings
+produces rotations that are scrambled rather than slightly wrong, and code
+full of internal round-trips can appear to work correctly until it crosses a
+library boundary, which is why the bug usually surfaces during integration far
+from its cause.
+
+**Forgetting the double cover** shows up as phantom 360° jumps in a filter
+whose consecutive estimates are not sign-aligned, and averaging \(q\) with
+\(-q\) produces zero, which is not a rotation.
+
+**Unnormalised quaternions** arise after long integration, and because
+`quat_to_matrix` is quadratic in the components, the resulting matrix silently
+carries scale and transformed point clouds slowly grow or shrink. The symptom
+matches matrix drift from lesson 1.1 while the cause is entirely different.
+
+**Naive lerp in place of slerp** across large angular differences makes the
+interpolated orientation accelerate through the middle of the arc while its
+norm dips, which is visible in animation as a pinch.
+
+**Euler angles as internal state** are perfectly acceptable as human-readable
+input and output and catastrophic in the core of a pipeline near ±90° of
+pitch, where gimbal lock collapses a degree of freedom.
 
 ## I. Questions
 
-1. *(Concept)* Why do quaternions use half-angles? What specifically goes
+1. *(Concept)* Why do quaternions use half-angles, and what specifically goes
    wrong with \(q = [\cos\theta, \sin\theta\,\hat{n}]\)?
 2. *(Calculation)* Compute the quaternion for a 180° rotation about the
-   \(z\)-axis, and verify it by rotating \((1, 0, 0)\).
-3. *(Debugging)* An attitude estimator's output occasionally "spins" 360° in
-   a single frame while the physical IMU moved smoothly. What is the bug?
+   z-axis, and verify it by rotating \((1, 0, 0)\).
+3. *(Debugging)* An attitude estimator's output occasionally spins 360° in a
+   single frame while the physical IMU moved smoothly. What is the bug?
 4. *(System design)* Your logging format stores orientations. Choose a
-   representation and justify it against: interpolation for replay, storage
+   representation and justify it against interpolation for replay, storage
    size, human debuggability, and convention safety across three consumer
    teams.
 
 ??? note "Answer sketches"
     **1.** Rotation is the two-sided product \(v' = q\,v\,q^{*}\), so the
-    quaternion's angle is applied twice — once by \(q\) and once by
-    \(q^{*}\) — and the half-angle is exactly what makes the sandwich come out
-    to \(\theta\). With \(q = [\cos\theta, \sin\theta\,\hat n]\) the sandwich
-    rotates by \(2\theta\), so every rotation doubles and, worse, quaternion
-    multiplication no longer corresponds to composing the rotations that the
-    factors name — the algebra stops being useful.
+    quaternion's angle is applied twice, once by \(q\) and once by \(q^{*}\),
+    and the half-angle is what makes the sandwich come out to \(\theta\). With
+    \(q = [\cos\theta, \sin\theta\,\hat n]\) the sandwich rotates by
+    \(2\theta\), so every rotation doubles, and worse, quaternion
+    multiplication no longer corresponds to composing the rotations that its
+    factors name, which destroys the property that made the algebra useful.
 
-    **2.** \(\theta = 180°\) about \(\hat n = (0,0,1)\) gives half-angle 90°,
-    so \(q = [\cos 90°, 0, 0, \sin 90°] = [0, 0, 0, 1]\). Rotating
-    \((1,0,0)\): the first column of \(R(q)\) with \(w = x = y = 0, z = 1\) is
-    \([1-2(y^2+z^2),\; 2(xy+wz),\; 2(xz-wy)] = [1-2,\;0,\;0] = (-1,0,0)\).
-    So \(+x\) flips to \(-x\), as a 180° turn about \(z\) must.
+    **2.** A 180° rotation about \(\hat n = (0,0,1)\) has half-angle 90°, so
+    \(q = [\cos 90°, 0, 0, \sin 90°] = [0, 0, 0, 1]\). Rotating \((1,0,0)\)
+    means reading the first column of \(R(q)\) with \(w = x = y = 0\) and
+    \(z = 1\), which is
+    \([1-2(y^2+z^2),\; 2(xy+wz),\; 2(xz-wy)] = [1-2,\;0,\;0] = (-1,0,0)\), so
+    \(+x\) flips to \(-x\) as a half-turn about \(z\) must.
 
-    **3.** Consecutive estimates crossed the double cover: the filter, or its
-    output serialiser, is not enforcing \(q_k \cdot q_{k-1} \ge 0\). Sign-align
-    each output against the previous one. Note the giveaway in the symptom —
-    *exactly* 360°, and in a *single* frame. Physical motion cannot do that,
-    so the bug is in the representation, not the sensor.
+    **3.** Consecutive estimates have crossed the double cover, because the
+    filter or its output serialiser is not enforcing
+    \(q_k \cdot q_{k-1} \ge 0\), and the fix is to sign-align each output
+    against the previous one. The giveaway is in the symptom itself: the jump
+    is *exactly* 360° and occupies a *single* frame, and no physical motion
+    can do that, so the fault must lie in the representation rather than in
+    the sensor.
 
     **4.** Store unit quaternions, scalar-first, with the ordering and the
-    frame pair named in the schema header and validated at ingest: 4 floats,
-    directly slerp-able for replay, no gimbal lock, and one documented
-    convention is what stops three consumer teams each guessing. Canonicalise
-    the sign on write (\(w \ge 0\)) so the double cover never reaches a
-    consumer, and normalise on write so no reader inherits a scale-carrying
-    rotation matrix. Human debuggability is the only real loss — recover it in
-    the log *viewer* by printing derived roll–pitch–yaw beside the raw
+    frame pair named in the schema header and validated at ingest. That gives
+    four floats, direct slerp-ability for replay, no gimbal lock, and one
+    documented convention, which is what prevents three consumer teams from
+    each guessing differently. Canonicalise the sign on write so that
+    \(w \ge 0\) and the double cover never reaches a consumer, and normalise
+    on write so that no reader inherits a scale-carrying rotation matrix.
+    Human debuggability is the only genuine loss, and you recover it in the
+    log *viewer* by displaying derived roll–pitch–yaw beside the raw
     quaternion, never by storing Euler angles as the source of truth.
 
 ### Interactive quiz
@@ -351,18 +402,19 @@ transform a batch of points.
 
 | Reference | Type | Difficulty | Why read it |
 |---|---|---|---|
-| Lynch & Park, *Modern Robotics*, ch. 3.2–3.3 | book | introductory | Rotation matrices and exponential coordinates, cleanly and free |
-| Sola, *"Quaternion kinematics for the error-state Kalman filter"* (2017) | paper | intermediate | The reference every estimation engineer keeps open. Read §1–2 now and the rest during Module 3 |
-| Shoemake, *"Animating rotation with quaternion curves"* (1985) | paper | intermediate | The original slerp paper — short, readable, and the source of the technique |
-| [REP 103 — Standard Units and Coordinate Conventions](https://www.ros.org/reps/rep-0103.html) | docs | introductory | ROS's conventions, including quaternion ordering. Two pages |
+| Lynch & Park, *Modern Robotics*, ch. 3.2–3.3 | book | introductory | Rotation matrices and exponential coordinates, cleanly presented and free |
+| Sola, *"Quaternion kinematics for the error-state Kalman filter"* (2017) | paper | intermediate | The reference every estimation engineer keeps open; read §1–2 now and the remainder during Module 3 |
+| Shoemake, *"Animating rotation with quaternion curves"* (1985) | paper | intermediate | The original slerp paper, short and readable, and the source of the technique |
+| [REP 103 — Standard Units and Coordinate Conventions](https://www.ros.org/reps/rep-0103.html) | docs | introductory | ROS's conventions including quaternion ordering, about two pages long |
 
 ## K. Graded work and portfolio extension
 
 **Graded:** the [frame-transforms mini-project](project-frames.md) covers this
-module's 2D core; quaternion tasks join the Module 1 final assignment.
+module's 2D core, and quaternion tasks join the Module 1 final assignment.
 
-**Portfolio:** turn the section G drift experiment into a short plotted
-write-up — matrix versus quaternion drift, with and without renormalisation,
-and cost per step for each. It makes a strong short blog post precisely
-because the conclusion is quantitative and mildly surprising, and it
-demonstrates that you measure before claiming.
+**Portfolio:** turn the section G experiment into a short written analysis
+comparing matrix and quaternion drift with and without renormalisation,
+including the cost per step of each repair. It makes a strong short piece
+precisely because the honest conclusion contradicts the folklore, and
+demonstrating that you measured before claiming is worth more than agreeing
+with the received wisdom.
