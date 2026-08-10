@@ -323,6 +323,239 @@ def _rotation_drift(p):
     return fig
 
 
+# --------------------------------------------------------------------------
+# 1.3 — why REP 105 splits the pose across two edges
+# --------------------------------------------------------------------------
+@figure("odom-drift-correction")
+def _odom_drift_correction(p):
+    rng = np.random.default_rng(3)
+    n = 500
+    truth = np.zeros(n)
+    drift = np.cumsum(rng.normal(0.0, 0.012, n))      # odometry random walk
+    odom_base = truth + drift
+
+    # The localiser corrects every 100 steps, so the correction edge holds
+    # whatever offset is needed to make map->base agree with truth.
+    correction = np.zeros(n)
+    fix = 0.0
+    for k in range(n):
+        if k % 100 == 0 and k > 0:
+            fix = -drift[k]
+        correction[k] = fix
+    map_base = odom_base + correction
+
+    fig, ax = plt.subplots(figsize=(6.6, 3.2))
+    fig.patch.set_alpha(0.0)
+    ax.patch.set_alpha(0.0)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    for s in ("left", "bottom"):
+        ax.spines[s].set_color(p["grid"])
+    ax.tick_params(colors=p["muted"], labelsize=8)
+
+    ax.axhline(0, color=p["grid"], lw=1, ls="--")
+    ax.plot(odom_base, color=p["a4"], lw=1.8, label="odom → base  (smooth, drifts)")
+    ax.plot(map_base, color=p["a1"], lw=1.8, label="map → base  (accurate, jumps)")
+    ax.set_xlabel("step", color=p["muted"], fontsize=9)
+    ax.set_ylabel("error vs truth (m)", color=p["muted"], fontsize=9)
+    ax.legend(frameon=False, fontsize=9, labelcolor=p["fg"], loc="upper left")
+    ax.set_title("The localiser's jump lands in the edge controllers do not read",
+                 color=p["fg"], fontsize=10, pad=8)
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 1.4 — a constant twist traces an arc; Euler cuts the chord
+# --------------------------------------------------------------------------
+@figure("arc-vs-euler")
+def _arc_vs_euler(p):
+    v, omega = 1.0, 1.2
+
+    def run(dt, steps, exact):
+        x, y, th = 0.0, 0.0, 0.0
+        out = [(x, y)]
+        for _ in range(steps):
+            if exact and abs(omega) > 1e-9:
+                r = v / omega
+                x += r * (np.sin(th + omega * dt) - np.sin(th))
+                y -= r * (np.cos(th + omega * dt) - np.cos(th))
+            else:
+                x += v * np.cos(th) * dt
+                y += v * np.sin(th) * dt
+            th += omega * dt
+            out.append((x, y))
+        return np.array(out)
+
+    fine = run(0.005, 1200, True)
+    arc = run(0.4, 15, True)
+    euler = run(0.4, 15, False)
+
+    fig, ax = _axes(p, figsize=(6.2, 3.6))
+    ax.plot(fine[:, 0], fine[:, 1], color=p["grid"], lw=3,
+            label="true path (constant twist)")
+    ax.plot(arc[:, 0], arc[:, 1], "o-", color=p["a3"], ms=4, lw=1.5,
+            label="arc model, dt = 0.4 s")
+    ax.plot(euler[:, 0], euler[:, 1], "o-", color=p["a2"], ms=4, lw=1.5,
+            label="Euler, dt = 0.4 s")
+    ax.legend(frameon=False, fontsize=9, labelcolor=p["fg"], loc="lower left")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title("Euler cuts every corner the same way, so the error accumulates",
+                 color=p["fg"], fontsize=10, pad=8)
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 1.4 — measured integration error against rate
+# --------------------------------------------------------------------------
+@figure("integration-error")
+def _integration_error(p):
+    v, omega = 1.0, 0.5
+
+    def run(steps, T, exact):
+        dt = T / steps
+        x = y = th = 0.0
+        for _ in range(steps):
+            if exact:
+                r = v / omega
+                x += r * (np.sin(th + omega * dt) - np.sin(th))
+                y -= r * (np.cos(th + omega * dt) - np.cos(th))
+            else:
+                x += v * np.cos(th) * dt
+                y += v * np.sin(th) * dt
+            th += omega * dt
+        return np.array([x, y])
+
+    def truth(T):
+        r = v / omega
+        return np.array([r * np.sin(omega * T), r * (1 - np.cos(omega * T))])
+
+    T = (2 * np.pi / omega) * 0.75          # three quarters of a circle
+    rates = np.array([2.5, 5, 10, 20, 40, 80])
+    target = truth(T)
+    e_arc, e_eul = [], []
+    for rate in rates:
+        n = int(round(T * rate))
+        e_arc.append(max(float(np.linalg.norm(run(n, T, True) - target)), 1e-16))
+        e_eul.append(float(np.linalg.norm(run(n, T, False) - target)))
+
+    fig, ax = plt.subplots(figsize=(6.2, 3.2))
+    fig.patch.set_alpha(0.0)
+    ax.patch.set_alpha(0.0)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    for s in ("left", "bottom"):
+        ax.spines[s].set_color(p["grid"])
+    ax.tick_params(colors=p["muted"], labelsize=8)
+    ax.loglog(rates, e_eul, "o-", color=p["a2"], lw=2, ms=5,
+              label="Euler (halves when the rate doubles)")
+    ax.loglog(rates, e_arc, "o-", color=p["a3"], lw=2, ms=5,
+              label="arc model (machine precision)")
+    ax.set_xlabel("integration rate (Hz)", color=p["muted"], fontsize=9)
+    ax.set_ylabel("position error (m)", color=p["muted"], fontsize=9)
+    ax.legend(frameon=False, fontsize=9, labelcolor=p["fg"], loc="center left")
+    ax.set_title("Error after three quarters of a circle at 1 m/s, 0.5 rad/s",
+                 color=p["fg"], fontsize=10, pad=8)
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 1.5 — the disk robot collapses to a point when obstacles are inflated
+# --------------------------------------------------------------------------
+@figure("cspace-inflation")
+def _cspace_inflation(p):
+    fig, (a0, a1) = plt.subplots(1, 2, figsize=(7.0, 3.4))
+    fig.patch.set_alpha(0.0)
+    obstacles = [(1.0, 1.0, 0.45), (2.4, 1.8, 0.35)]
+    r = 0.35
+    for ax, inflate, title in ((a0, False, "workspace: a disk of radius r"),
+                               (a1, True, "C-space: obstacles grown by r")):
+        ax.patch.set_alpha(0.0)
+        ax.set_aspect("equal")
+        for s in ax.spines.values():
+            s.set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for (cx, cy, rad) in obstacles:
+            ax.add_patch(plt.Circle((cx, cy), rad, color=p["muted"], alpha=0.55))
+            if inflate:
+                ax.add_patch(plt.Circle((cx, cy), rad + r, color=p["a2"],
+                                        alpha=0.20))
+                ax.add_patch(plt.Circle((cx, cy), rad + r, fill=False,
+                                        color=p["a2"], lw=1.2, ls="--"))
+        if inflate:
+            ax.plot(1.9, 0.75, "o", color=p["a1"], ms=6)
+        else:
+            ax.add_patch(plt.Circle((1.9, 0.75), r, color=p["a1"], alpha=0.35))
+            ax.add_patch(plt.Circle((1.9, 0.75), r, fill=False, color=p["a1"], lw=1.4))
+            ax.plot(1.9, 0.75, "o", color=p["a1"], ms=4)
+        ax.set_xlim(0, 3.2)
+        ax.set_ylim(0, 2.6)
+        ax.set_title(title, color=p["fg"], fontsize=10)
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 1.5 — the two-link arm's C-space obstacle map, computed
+# --------------------------------------------------------------------------
+@figure("cspace-map")
+def _cspace_map(p):
+    l1, l2 = 1.0, 0.8
+    circles = [(1.15, 0.45, 0.30), (-0.30, 1.05, 0.28)]
+
+    def arm_points(t1, t2, n=20):
+        elbow = np.array([l1 * np.cos(t1), l1 * np.sin(t1)])
+        hand = elbow + np.array([l2 * np.cos(t1 + t2), l2 * np.sin(t1 + t2)])
+        t = np.linspace(0, 1, n)[:, None]
+        return np.vstack([t * elbow, elbow + t * (hand - elbow)])
+
+    def hit(t1, t2):
+        pts = arm_points(t1, t2)
+        return any(np.min(np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)) < rad
+                   for cx, cy, rad in circles)
+
+    grid = np.linspace(-np.pi, np.pi, 140)
+    occ = np.array([[hit(a, b) for b in grid] for a in grid])
+
+    fig, (a0, a1) = plt.subplots(1, 2, figsize=(7.2, 3.6))
+    fig.patch.set_alpha(0.0)
+    for ax in (a0, a1):
+        ax.patch.set_alpha(0.0)
+        for s in ax.spines.values():
+            s.set_color(p["grid"])
+        ax.tick_params(colors=p["muted"], labelsize=8)
+
+    a0.set_aspect("equal")
+    for (cx, cy, rad) in circles:
+        a0.add_patch(plt.Circle((cx, cy), rad, color=p["a2"], alpha=0.45))
+    for t1, t2, col in ((0.5, 0.8, p["a1"]), (2.2, -1.1, p["a3"])):
+        elbow = np.array([l1 * np.cos(t1), l1 * np.sin(t1)])
+        hand = elbow + np.array([l2 * np.cos(t1 + t2), l2 * np.sin(t1 + t2)])
+        a0.plot([0, elbow[0], hand[0]], [0, elbow[1], hand[1]], "-o",
+                color=col, lw=2, ms=4)
+        a0.plot(0, 0, "o", color=p["fg"], ms=4)
+    a0.set_xlim(-2.0, 2.0)
+    a0.set_ylim(-2.0, 2.0)
+    a0.set_xticks([])
+    a0.set_yticks([])
+    a0.set_title("workspace: two obstacles, two arm poses",
+                 color=p["fg"], fontsize=10)
+
+    a1.imshow(occ.T, origin="lower", extent=[-np.pi, np.pi, -np.pi, np.pi],
+              cmap="Greys", alpha=0.85, aspect="auto")
+    a1.plot(0.5, 0.8, "o", color=p["a1"], ms=7)
+    a1.plot(2.2, -1.1, "o", color=p["a3"], ms=7)
+    a1.set_xlabel(r"$\theta_1$", color=p["muted"], fontsize=10)
+    a1.set_ylabel(r"$\theta_2$", color=p["muted"], fontsize=10)
+    a1.set_title("C-space: the same obstacles, in joint angles",
+                 color=p["fg"], fontsize=10)
+    fig.tight_layout()
+    return fig
+
+
 def render_all() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     written = 0
