@@ -151,6 +151,102 @@ with inertia, meaning arms, drones and gimbals, need the D term or a
 cascaded inner velocity loop that provides the same damping in a different
 place, which is what question 4 is about.
 
+### From the continuous equation to code
+
+The integral and derivative in section C are continuous, and a controller runs
+on samples, so somebody has to choose how to approximate them. That choice is
+usually made by accident and occasionally matters a great deal.
+
+For the integral, the three candidates are the rectangle rule taken at the
+start of the interval, the rectangle rule at the end, and the trapezoidal rule
+averaging the two:
+
+\[
+I_k = I_{k-1} + e_{k-1}\,\Delta t, \qquad
+I_k = I_{k-1} + e_{k}\,\Delta t, \qquad
+I_k = I_{k-1} + \tfrac{1}{2}(e_{k-1} + e_{k})\,\Delta t
+\]
+
+At the sample rates used in robot control the difference between them is
+almost always below the noise floor, and the honest advice is to use the
+middle one and stop thinking about it. It matters when \(\Delta t\) is large
+relative to the plant's time constant, which is the regime where you should be
+raising the rate rather than improving the quadrature.
+
+What *does* matter, and what people get wrong constantly, is that
+\(\Delta t\) must be the **measured** elapsed time rather than the nominal
+period. A loop that nominally runs at 100 Hz and occasionally takes 14 ms
+while using a hard-coded `dt = 0.01` is silently mis-scaling both the integral
+and the derivative in proportion to the jitter, which shows up as a controller
+whose behaviour depends on system load. That is failure mode 4 in lesson 2.7,
+and it is one of the few control bugs that a unit test will never find because
+the test loop has no jitter.
+
+### Anti-windup, compared rather than asserted
+
+Section C said to guard the integral, and there are three standard ways to do
+it. They are not equivalent, and the differences are visible in a single
+experiment: a cart whose actuator saturates at \(\pm 1\), asked for an
+unreachable 12 and then a reachable 1.
+
+| Strategy | Peak after the switch | Undershoot | Settling to ±2% |
+|---|---|---|---|
+| No guard | 3.75 | 3.72 | **8.00 s** |
+| Freeze while saturated | 3.60 | 0.88 | **3.64 s** |
+| Clamp \(I\) to \(u_{max}/k_i\) | 3.60 | 0.86 | 3.80 s |
+| Back-calculation, \(k_t = 2\) | 3.60 | **0.31** | 5.92 s |
+
+Read the first row against the others: without a guard the controller takes
+eight seconds to recover from a setpoint change it should have handled
+immediately, and for most of that time the cart is at 3.7 m/s while being
+asked for 1. That is the loan from section H being repaid.
+
+Among the three guards, **conditional freezing** is the simplest to implement
+correctly and the fastest here, and it is the one the library uses.
+**Clamping** the integral to \(u_{max}/k_i\) is nearly identical in effect and
+marginally easier to reason about, since the bound is explicit rather than
+emergent. **Back-calculation**, which feeds the saturation error
+\(u - u_{raw}\) back into the integral with its own gain \(k_t\), unwinds the
+integral fastest and therefore undershoots least, at the cost of a longer
+settle because it removes accumulated authority the controller partly still
+wanted. It is the right choice when overshoot is expensive and settling time
+is not, which describes most manipulators and few vehicles.
+
+### Filtering the derivative, and what it costs
+
+Section B said the derivative amplifies noise, and this is where the claim
+gets a number. Take the mass plant from earlier, add 1 cm of measurement
+noise, and pass the derivative through a first-order filter
+\(d_k \leftarrow \alpha\, d^{raw}_k + (1-\alpha)\, d_{k-1}\), where
+\(\alpha = 1\) means no filtering at all.
+
+| \(\alpha\) | Command chatter | Overshoot |
+|---|---|---|
+| 1.0 (unfiltered) | 9.91 | 17.3% |
+| 0.3 | 2.02 | 16.7% |
+| 0.1 | 0.65 | 15.3% |
+| **0.03** | **0.23** | **12.3%** |
+| 0.01 | 0.12 | 33.9% |
+| 0.003 | 0.13 | 185.7% |
+| no derivative at all | — | 553% |
+
+The shape of that table is worth more than the numbers. Filtering buys an
+enormous reduction in actuator chatter — a factor of forty between
+\(\alpha = 1\) and \(\alpha = 0.03\) — and for a while it costs nothing at
+all, because what the filter removes in that range is noise the derivative
+should never have been responding to.
+
+Then it turns. Below about \(\alpha = 0.03\) the filter is slow enough that
+the derivative stops tracking genuine motion, the damping it was providing
+disappears, and overshoot climbs steeply toward the 553% of having no
+derivative whatsoever. The trade is therefore not linear and there is a
+defensible optimum, which is the useful thing to know: tune \(\alpha\) by
+finding the knee rather than by picking a round number.
+
+On hardware the symptom of sitting at \(\alpha = 1\) is audible. The actuator
+buzzes, the motor runs warm, and the mechanism wears, which is why this is one
+of the few controller settings with a maintenance-budget consequence.
+
 ## D. From ML to robotics
 
 Tuning gains resembles tuning learning rates more than it resembles anything
