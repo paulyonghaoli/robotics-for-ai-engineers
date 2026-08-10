@@ -11,7 +11,12 @@ dist/
 
 # Docs
 site/
-docs/assets/generated/
+# Exercise/quiz JSON is regenerated on every build and would churn the
+# tree. The figures are tracked instead, so a build environment without
+# matplotlib (Cloudflare's installs only mkdocs-material and pyyaml)
+# still has them, and any drift shows up as a reviewable diff.
+docs/assets/generated/*
+!docs/assets/generated/figures/
 
 # Evaluation outputs
 projects/capstone_nav/results.json
@@ -38,3 +43,6 @@ projects/capstone_ship/gate_results.json
 projects/capstone_ship/data_engine_results.json
 projects/capstone_ship/rollout_results.json
 projects/capstone_ship/DECISION.md
+
+# Cloudflare wrangler local state (contains account identifiers)
+.wrangler/

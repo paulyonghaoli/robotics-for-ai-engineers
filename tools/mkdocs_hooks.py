@@ -69,9 +69,14 @@ def on_pre_build(config, **kwargs):  # noqa: ANN001, ARG001
         raise SystemExit(f"interactive content invalid:\n{details}")
     export_json(cs)
     _write_lesson_manifest()
-    # Lesson figures are computed, not drawn, so they cannot disagree with the
-    # mathematics they illustrate. Regenerated here for the same reason the
-    # exercise JSON is: the source of truth is code.
-    from tools.figures import render_all
-
-    render_all()
+    # Lesson figures are computed, not drawn, so they cannot disagree with
+    # the mathematics they illustrate. They are also committed, so a build
+    # environment without matplotlib -- Cloudflare's installs only
+    # mkdocs-material and pyyaml -- serves the tracked copies instead of
+    # failing. Regenerate only where the tooling actually exists.
+    try:
+        from tools.figures import render_all
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        print(f"figures: not regenerated ({exc}); using the committed SVGs")
+    else:
+        render_all()

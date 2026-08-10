@@ -18,6 +18,9 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
+# Keep text as text rather than converting every glyph to a path: it cuts
+# the SVGs by roughly an order of magnitude and keeps them diffable.
+matplotlib.rcParams["svg.fonttype"] = "none"
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
