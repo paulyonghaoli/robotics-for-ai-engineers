@@ -113,8 +113,43 @@ is precisely what the integral does.
 <figure class="rai-fig" markdown>
 ![Three step responses on a first-order plant. P alone settles below the setpoint, PI reaches it with overshoot, and PID reaches it with the overshoot damped.](../../assets/generated/figures/pid-terms-light.svg){.fig-light}
 ![Three step responses on a first-order plant. P alone settles below the setpoint, PI reaches it with overshoot, and PID reaches it with the overshoot damped.](../../assets/generated/figures/pid-terms-dark.svg){.fig-dark}
-<figcaption markdown>Measured, not sketched. With k_p = 4 the proportional controller settles at exactly 0.80, which is k_p/(1+k_p) as derived above. Adding the integral reaches the setpoint; adding the derivative damps the overshoot on the way.</figcaption>
+<figcaption markdown>Measured, not sketched. With k_p = 4 the proportional controller settles at exactly 0.80, which is k_p/(1+k_p) as derived above, and adding the integral reaches the setpoint. Note what the derivative does here: overshoot goes from 3.6% to 9.5%, so on this plant it makes things *worse*. Section C explains why, and it is not a tuning failure.</figcaption>
 </figure>
+
+### When the derivative earns its place, and when it does not
+
+The figure above shows the derivative term making the response *worse*, which
+contradicts the usual description of D as a damping term, so it is worth
+resolving rather than leaving as a curiosity.
+
+Damping opposes momentum, and a first-order plant has none. Its output
+responds directly to the command with no stored energy, so there is nothing
+for the derivative to brake against, and all it contributes is a term
+proportional to the rate of error change that arrives slightly too early. On
+this plant the honest measurement is that adding \(k_d = 0.6\) raises
+overshoot from 3.6% to 9.5% and extends the two-percent settling time from
+1.70 s to 2.57 s.
+
+Now give the plant some mass, so that the command sets acceleration rather
+than velocity and the output carries momentum:
+
+| Plant | PI | PID |
+|---|---|---|
+| First order, \(k_d = 0.6\) | 3.6% overshoot | 9.5% overshoot |
+| Mass, \(k_d = 4.0\) | **554% overshoot, never converges** | 17.2% overshoot, settles at 1.003 |
+
+On the mass, the integral-only controller is not merely worse but genuinely
+unstable, winding up and oscillating away, while the derivative term is what
+makes the loop stable at all. That is the correct statement about D: it is not
+a general-purpose improvement but specifically a way of opposing stored
+momentum, and its value therefore depends on whether the plant has any.
+
+The practical rule follows directly. Velocity loops and thermal loops, which
+are first-order in character, usually run as PI, and you will see exactly that
+in `diff_drive_controller`'s wheel-velocity loops. Position loops on anything
+with inertia, meaning arms, drones and gimbals, need the D term or a
+cascaded inner velocity loop that provides the same damping in a different
+place, which is what question 4 is about.
 
 ## D. From ML to robotics
 
