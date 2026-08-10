@@ -6,26 +6,66 @@
 
 ## A. Why this lab exists
 
-Module 3's through-line has been that a filter's *accuracy* and its *honesty* are different properties. This lab makes you the auditor. You get filters that all look fine by RMSE; your job is to read their consistency statistics and name the lie — the estimation counterpart of Module 1's frame-debugging gauntlet.
+Module 3's through-line has been that a filter's **accuracy** and its
+**honesty** are different properties, and that the second one is what
+downstream consumers actually depend on. A planner deciding whether it has
+room to pass through a gap is not using your position estimate; it is using
+your position estimate *and* the covariance you attached to it, and if that
+covariance is a fiction then every decision built on it inherits the fiction.
 
-**The two instruments:**
+This lab makes you the auditor. You are handed filters that all look
+respectable by RMSE, and your job is to read their consistency statistics and
+name the lie. It is the estimation counterpart of Module 1's frame-debugging
+gauntlet, and it shares that lab's defining property: every filter here is
+*correct* in the sense of implementing its equations faithfully.
 
-- **NEES** (normalized estimation error squared), \((x - \hat{x})^\top P^{-1} (x - \hat{x})\): needs ground truth → simulation-time tool. Should average the state dimension.
-- **NIS** (normalized innovation squared), \(y^\top S^{-1} y\): needs only the measurements → runtime tool, your production dashboard. Should average the measurement dimension.
+!!! note "The two instruments"
 
-Both are χ²-distributed for a consistent filter. **Above the band: overconfident** (P too small — the dangerous direction: downstream consumers trust a lie). **Below the band: pessimistic** (P too large — wasteful, masks real information). And a *biased* innovation mean signals a modeling error no covariance tuning can fix (lesson 3.1, section H).
+    **NEES** (normalised estimation error squared),
+    \((x - \hat{x})^\top P^{-1} (x - \hat{x})\), measures whether the actual
+    error matches the claimed covariance. It requires ground truth, so it is a
+    simulation-time tool, and for a consistent filter it averages the state
+    dimension.
+
+    **NIS** (normalised innovation squared), \(y^\top S^{-1} y\), measures
+    whether measurements are as surprising as the filter expected. It needs
+    only the measurements themselves, so it is a *runtime* tool and belongs on
+    your production dashboard, and for a consistent filter it averages the
+    measurement dimension.
+
+Both are chi-squared distributed for a consistent filter, which gives you an
+actual band rather than a vibe. Sitting above the band means the filter is
+**overconfident**, with \(P\) too small, and this is the dangerous direction
+because downstream consumers are trusting a lie. Sitting below means it is
+**pessimistic**, with \(P\) too large, which is wasteful and masks real
+information but harms nobody. A *biased* innovation mean is a third thing
+entirely, signalling a modelling error that no amount of covariance tuning can
+repair.
+
+<figure class="rai-fig" markdown>
+![A horizontal bar chart on a log axis comparing mean NEES for three filters: a tuned one sitting at about 1, an overconfident one far above it, and an underconfident one far below, with a dashed reference line at 1.](../../assets/generated/figures/nees-consistency-light.svg){.fig-light}
+![A horizontal bar chart on a log axis comparing mean NEES for three filters: a tuned one sitting at about 1, an overconfident one far above it, and an underconfident one far below, with a dashed reference line at 1.](../../assets/generated/figures/nees-consistency-dark.svg){.fig-dark}
+<figcaption markdown>The same scalar filter run three times against identical data, differing only in the Q and R it assumes. Understating both by a factor of eight and overstating both by a factor of eight are both visible immediately in NEES, and neither is visible in a casual look at the state estimate.</figcaption>
+</figure>
 
 ## B. The diagnostic table
 
 | Observation | Diagnosis |
 |---|---|
-| NEES ≈ n, NIS ≈ m, innovations zero-mean & white | Healthy — leave it alone |
-| NEES ≫ n while RMSE looks fine | Overconfident (Q or R too small) — the deferred failure |
-| NEES ≪ n | Pessimistic (Q or R too large) — laggy, wasteful |
-| NEES bad, **NIS perfectly fine** | The state is wrong in a way the measurements *cannot reveal* — an unobservable error (e.g. a constant sensor offset the filter absorbed). **Runtime monitoring will never catch this**; only ground truth does. The single strongest argument for simulation-time auditing. |
-| NIS fine, NEES bad, process-driven | Measurement trust OK; *process* model at fault (Q) |
-| Innovation mean ≠ 0, persistent | Bias: sensor offset, wrong H, frame bug — go to Module 1, not the tuning knobs |
-| Innovations autocorrelated (not white) | Unmodeled dynamics — the filter is systematically late |
+| NEES ≈ n, NIS ≈ m, innovations zero-mean and white | Healthy. Leave it alone |
+| NEES ≫ n while RMSE looks fine | Overconfident, with \(Q\) or \(R\) too small. The deferred failure |
+| NEES ≪ n | Pessimistic, with \(Q\) or \(R\) too large. Laggy and wasteful |
+| NEES bad but **NIS perfectly fine** | The state is wrong in a way the measurements *cannot reveal* — an unobservable error, such as a constant sensor offset the filter has absorbed into its state. Runtime monitoring will never catch this, and only ground truth will |
+| NIS fine, NEES bad, and the error is process-driven | Measurement trust is fine; the *process* model is at fault, so look at \(Q\) |
+| Innovation mean persistently non-zero | A bias: sensor offset, wrong \(H\), or a frame bug. Go to Module 1, not to the tuning knobs |
+| Innovations autocorrelated rather than white | Unmodelled dynamics; the filter is systematically late rather than merely noisy |
+
+The fourth row is the one worth dwelling on, because it is the strongest
+argument in the curriculum for simulation-time auditing. There exist errors
+that runtime monitoring is structurally incapable of detecting, since the
+measurements are exactly as surprising as expected while the state is
+nonetheless wrong, and the only way to find them is to compare against a truth
+you can only have in simulation.
 
 ## C. The gauntlet
 
@@ -33,7 +73,7 @@ Both are χ²-distributed for a consistent filter. **Above the band: overconfide
 
 <code-exercise src="est-l6-nees"></code-exercise>
 
-### Case 2: fix the tuning to pass the bands
+### Case 2: fix the tuning until it passes the bands
 
 <code-exercise src="est-l6-tune"></code-exercise>
 
@@ -41,12 +81,43 @@ Both are χ²-distributed for a consistent filter. **Above the band: overconfide
 
 <quiz-bank src="estimation-l6-drills"></quiz-bank>
 
-## E. Debrief
+## E. Debrief: the auditor's procedure
 
-The auditor's procedure, portable to any filter you ever meet: (1) compute NIS from logs — no ground truth needed; (2) check mean against the χ² band *and* check for bias and autocorrelation; (3) only then touch Q/R — and remember the asymmetry: pessimism costs performance, overconfidence costs *trust*, and every consumer downstream of P inherits the lie. In simulation, add NEES; on hardware, NIS is what you have — which is why `robot_localization` exposes innovation monitoring and why Module 10's fleet dashboards chart it.
+The procedure below is portable to any filter you will ever meet, and it is
+worth running in this order rather than the order instinct suggests.
 
-## F. Graded work & portfolio extension
+**Compute NIS from the logs first**, because it requires no ground truth and
+can therefore be done on data from a real robot rather than only in
+simulation. **Check the mean against the chi-squared band, and separately
+check for bias and autocorrelation**, because those three failures have
+different causes and different fixes, and a mean that looks acceptable can
+hide a systematically drifting innovation. **Only then touch \(Q\) and
+\(R\)**, having established which of them is implicated.
 
-**Graded:** the localization project's consistency stretch goal uses exactly these bands.
+Keep the asymmetry in mind throughout: pessimism costs performance while
+overconfidence costs trust, and every consumer downstream of \(P\) inherits
+the lie. Given a choice between a filter that is slightly too cautious and one
+that is slightly too confident, take the cautious one, because its failure
+mode is visible and the other's is not.
 
-**Portfolio:** wire NIS monitoring into the capstone's PF stack and plot it through the field-note failures (the max-range bug would have *screamed* on this chart, long before the 16 m divergence) — monitoring that would have caught a real bug is the best possible demo of why monitoring matters.
+In simulation, add NEES to the picture. On hardware you have only NIS, which
+is why `robot_localization` exposes innovation monitoring as a first-class
+output and why Module 10's fleet dashboards chart it continuously.
+
+## F. Graded work and portfolio extension
+
+**Graded:** the localisation project's consistency stretch goal uses exactly
+these bands, so a filter that is accurate but dishonest does not pass.
+
+**Portfolio:** wire NIS monitoring into the capstone's particle-filter stack
+and plot it across the failures recorded in the field notes. The max-range bug
+documented there would have screamed on this chart long before it produced
+sixteen metres of divergence, and monitoring that demonstrably would have
+caught a real bug is the most persuasive possible argument for monitoring.
+
+## G. Annotated references
+
+| Reference | Type | Difficulty | Why read it |
+|---|---|---|---|
+| Bar-Shalom et al., *Estimation with Applications to Tracking*, ch. 5 | book | advanced | The professional reference for NEES, NIS and gating, including the exact chi-squared bands |
+| Thrun et al., *Probabilistic Robotics*, ch. 3 | book | intermediate | The filtering background these statistics test |

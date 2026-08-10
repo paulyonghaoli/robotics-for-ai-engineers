@@ -6,83 +6,234 @@
 
 ## A. Why this matters
 
-You know the filters (3.1–3.3) and the sensors (3.4). Fusion architecture is the *system design* between them: which sensor updates which states, at what rate, with what protection against each other's bad days. This is where estimation stops being an algorithm and becomes engineering — and where your distributed-systems instincts (rates, queues, timestamps, defensive boundaries) earn their robotics keep.
+By now you know the filters from lessons 3.1 to 3.3 and the sensors from
+lesson 3.4. Fusion architecture is the system design that sits between them,
+deciding which sensor updates which states, at what rate, and with what
+protection against each other's bad days.
+
+This is the point at which estimation stops being an algorithm and becomes
+engineering, and it is also where your distributed-systems instincts earn
+their keep, because the hard parts are rates, queues, timestamps and defensive
+boundaries rather than mathematics.
+
+!!! note "Terms defined here"
+
+    **Innovation gating** — testing a measurement's surprise against a
+    threshold before allowing it into the filter, and discarding it if it is
+    too surprising to be credible.
+
+    **Mahalanobis distance** — distance measured in units of the covariance,
+    so that "far" means far relative to how uncertain you were. NIS is its
+    square.
+
+    **Graceful degradation** — losing a sensor and continuing with honestly
+    widened uncertainty, rather than either failing outright or continuing to
+    claim the old precision.
+
+    **Sequential update** — folding sensors in one at a time rather than
+    stacking them into a single measurement vector.
 
 ## B. Mental model
 
-One filter, many observers. The state vector is the **single source of truth**; each sensor is a *partial, asynchronous witness* contributing only the rows of \(H\) it can actually testify about: wheel odometry speaks to velocity, GPS to absolute position, the gyro to angular rate, landmarks to pose. The filter's predict step runs at the fastest rhythm (usually IMU-driven); each measurement, whenever it arrives, updates only what it knows.
+One filter, many observers. The state vector is the single source of truth,
+and each sensor is a partial, asynchronous witness that contributes only the
+rows of \(H\) it can genuinely testify about. Wheel odometry speaks to
+velocity, GPS to absolute position, the gyroscope to angular rate, and
+landmark observations to pose. The predict step runs at the fastest available
+rhythm, usually driven by the IMU, and each measurement updates only what it
+knows about, whenever it happens to arrive.
 
-Three architectural defenses do most of the real-world work:
+The reason this works at all is that each sensor is typically sharp in some
+directions and vague in others, and the filter can take each one seriously
+exactly where it is sharp.
 
-1. **Innovation gating** — before accepting a measurement, check its NIS (lesson 3.1) against a χ² threshold. A GPS multipath jump 8σ from the prediction isn't "unlikely data" — it's a lying sensor; reject it. Three lines of code, the single highest-value robustness mechanism in estimation.
-2. **Delay handling** — sensors report the past (camera pipelines: 50–150 ms). Fusing a stale measurement as if current smears the estimate exactly like lesson 1.1's stale-timestamp bug. Production filters keep a short state history and re-apply updates at the right moment.
-3. **Health monitoring** — per-sensor innovation statistics over time. A sensor whose innovations grow biased or inflated is failing; the fusion layer should notice before the robot does.
+<figure class="rai-fig" markdown>
+![Three covariance ellipses. One estimate is long in x and narrow in y, another is narrow in x and long in y, and the fused result is a small ellipse near the intersection of their sharp directions.](../../assets/generated/figures/covariance-fusion-light.svg){.fig-light}
+![Three covariance ellipses. One estimate is long in x and narrow in y, another is narrow in x and long in y, and the fused result is a small ellipse near the intersection of their sharp directions.](../../assets/generated/figures/covariance-fusion-dark.svg){.fig-dark}
+<figcaption markdown>Two estimates with complementary weaknesses. Neither is good on its own, and the fused result is sharper than either in both directions because information adds where the estimates are independent. This is the two-dimensional version of the precision-weighted average from lesson 3.1.</figcaption>
+</figure>
+
+Three architectural defences do most of the real-world work.
+
+**Innovation gating** checks a measurement's NIS against a chi-squared
+threshold before accepting it. A GPS multipath jump sitting eight standard
+deviations from the prediction is not unlikely data, it is a lying sensor, and
+rejecting it is three lines of code that constitute probably the single
+highest-value robustness mechanism in estimation.
+
+**Delay handling** matters because sensors report the past, with camera
+pipelines typically running 50 to 150 ms behind. Fusing a stale measurement as
+though it were current smears the estimate in exactly the way lesson 1.1's
+stale-timestamp bug smears a map, and production filters keep a short history
+of states so that updates can be applied at the moment they actually refer to.
+
+**Health monitoring** tracks per-sensor innovation statistics over time,
+because a sensor whose innovations become biased or inflated is failing, and
+the fusion layer should notice that before the robot does.
 
 ## C. Mathematical formulation
 
-Nothing new — that's the point. Per sensor \(s\): its own \(h_s, H_s, R_s\); the gate is
+There is deliberately nothing new here, which is the point of the lesson. Each
+sensor \(s\) brings its own \(h_s\), \(H_s\) and \(R_s\), and the gate is
 
 \[
 y_s^\top S_s^{-1} y_s \;\le\; \chi^2_{d_s}(0.99)
 \]
 
-(e.g. 9.21 for a 2-D measurement). Sequential updates: process each sensor's measurement through the same filter one after another — for independent sensor noises this equals the batched joint update, which is what makes the one-filter-many-observers architecture legitimate rather than a hack.
+which for a two-dimensional measurement means a threshold of 9.21.
+
+Sequential updating means processing each sensor's measurement through the
+same filter one after another, and for independent sensor noises this gives
+exactly the same posterior as a single batched update with all measurements
+stacked. That equivalence is what makes the one-filter-many-observers
+architecture legitimate rather than a convenient hack, and question 1 works
+through both the proof and the assumption that breaks it.
 
 ## D. From ML to robotics
 
-- **The fusion filter is a streaming feature store with schema enforcement**: heterogeneous producers, one consistent materialized state, per-producer validation at the boundary. Gating is input validation; health monitoring is data-quality dashboards; the χ² threshold is your anomaly-detection cutoff with actual theory behind it.
-- **Rates and staleness are your event-time vs processing-time problem.** The measurement-delay fix (buffer, reorder, re-apply) is watermarking, roughly — robotics just has harder deadlines.
-- **Graceful degradation is ensemble thinking**: lose GPS and the system doesn't fail, it *widens* — covariance grows honestly along now-unobserved directions. A fusion stack that keeps reporting tight covariance after losing its absolute sensor is lesson 3.1's overconfident filter at system scale.
+The fusion filter is a streaming feature store with schema enforcement:
+heterogeneous producers, one consistent materialised state, and per-producer
+validation at the boundary. Gating is input validation, health monitoring is
+a data-quality dashboard, and the chi-squared threshold is an anomaly-detection
+cutoff that happens to have actual theory behind it rather than a percentile
+someone picked.
 
-## E. Minimal implementation & practice
+Rates and staleness are the event-time against processing-time problem in
+another costume, and the measurement-delay fix of buffering, reordering and
+re-applying is roughly watermarking, with harder deadlines.
+
+Graceful degradation is ensemble thinking. Lose GPS and the system does not
+fail; it *widens*, with covariance growing honestly along the directions that
+are no longer observed. A fusion stack that continues to report tight
+covariance after losing its absolute sensor is lesson 3.1's overconfident
+filter at system scale, and it is considerably more dangerous there because
+more consumers are downstream of it.
+
+## E. Minimal implementation and practice
 
 <code-exercise src="est-l5-gating"></code-exercise>
 
 ## F. Robotics-framework implementation
 
-`robot_localization` is this lesson shipped: two EKF instances by convention (an `odom`-frame filter fusing only continuous sensors, a `map`-frame filter adding absolute ones — REP 105's two-guarantee split from lesson 1.3, now at the estimation layer), per-sensor `*_config` matrices choosing rows of \(H\), and `*_rejection_threshold` parameters that are exactly our χ² gates.
+`robot_localization` is this lesson shipped as a package. By convention it
+runs two EKF instances, one in the `odom` frame fusing only continuous sensors
+and one in the `map` frame that adds the absolute ones, which is REP 105's
+two-guarantee split from lesson 1.3 reappearing at the estimation layer rather
+than the transform layer. Per-sensor `*_config` matrices choose which rows of
+\(H\) each sensor contributes, and the `*_rejection_threshold` parameters are
+precisely the chi-squared gates of section C.
 
-## G. Experiment
+## G. Experiment — find the gate's sweet spot
 
-On the exercise's setup: sweep the gate threshold from 2σ to 10σ under (a) clean data and (b) 5% multipath corruption. Plot RMSE vs threshold for both. Clean: looser is (slightly) better — you're throwing away real information at 2σ. Corrupted: a U-curve with the sweet spot near 3σ. Then kill the absolute sensor entirely mid-run and verify covariance *grows* — the honest-widening check.
+On the exercise's setup, sweep the gate threshold from two to ten standard
+deviations under two conditions: clean data, and data with five per cent
+multipath corruption. Plot RMSE against threshold for both.
+
+On clean data a looser gate is slightly better, because at two sigma you are
+discarding real information for no reason. On corrupted data the curve is a
+U, with the sweet spot near three sigma, and seeing both curves together is
+what turns "gate your measurements" from a rule into an engineering decision
+with a defensible setting.
+
+Then kill the absolute sensor entirely partway through a run and verify that
+the covariance *grows*. That is the honest-widening check, and a fusion stack
+that fails it is lying in the most consequential way available to it.
 
 ## H. Failure modes
 
-- **Gating your way to blindness**: a too-tight gate rejects real measurements after any transient, and a filter that rejects everything coasts on dead reckoning while reporting... whatever its covariance says. Gate rejections must be *monitored*, not just counted.
-- **The chicken-and-egg gate death spiral**: filter diverges → all measurements gated as outliers → filter diverges harder. Production systems cap consecutive rejections and force-accept or reinitialize.
-- **Double-counting correlated sensors**: two "independent" estimates derived from the same wheel encoders fused as independent → overconfidence (the spinning-robot map bug from lesson 4.1, at fusion scale).
-- **Frame mixing**: fusing a `map`-frame position into an `odom`-frame filter — Module 1's conventions, final boss form.
+**Gating your way to blindness** happens when a too-tight gate rejects real
+measurements after any transient, and a filter that rejects everything coasts
+on dead reckoning while continuing to report whatever its covariance says.
+Gate rejections must therefore be *monitored* rather than merely counted.
+
+**The gate death spiral** is the chicken-and-egg version: the filter diverges,
+so all measurements look like outliers and are gated, so the filter diverges
+further. Production systems cap consecutive rejections and then either
+force-accept or reinitialise.
+
+**Double-counting correlated sensors** occurs when two supposedly independent
+estimates derived from the same wheel encoders are fused as if independent,
+which produces overconfidence for the reason question 1 identifies.
+
+**Frame mixing**, such as fusing a `map`-frame position into an `odom`-frame
+filter, is Module 1's convention discipline in its final boss form, and it
+produces an error that grows with however far the two frames have diverged.
 
 ## I. Questions
 
-1. *(Concept)* Why does sequential per-sensor updating equal the joint batched update — and what assumption breaks it?
-2. *(Calculation)* A 2-D GPS innovation has NIS = 14. Gate at χ²(0.99) = 9.21: accept or reject, and what does 14 *mean* in σ terms?
-3. *(Debugging)* After a hard bump, your robot's filter rejects every GPS fix for 30 s, then snaps 2 m sideways. Reconstruct the sequence.
-4. *(System design)* Design the fusion for the capstone robot gaining a magnetometer: which states does it update, what gate, and what happens near the loading dock's steel door (lesson 3.4, Q3)?
+1. *(Concept)* Why does sequential per-sensor updating equal the joint batched
+   update, and what assumption breaks the equivalence?
+2. *(Calculation)* A two-dimensional GPS innovation has NIS = 14, and the gate
+   is \(\chi^2(0.99) = 9.21\). Accept or reject, and what does 14 mean in
+   sigma terms?
+3. *(Debugging)* After a hard bump, your robot's filter rejects every GPS fix
+   for thirty seconds and then snaps two metres sideways. Reconstruct the
+   sequence.
+4. *(System design)* Design the fusion for the capstone robot gaining a
+   magnetometer: which states does it update, what gate, and what happens near
+   the loading dock's steel door?
 
 ??? note "Answer sketches"
-    **1.** Each update is exact Bayesian conditioning, and conditioning on independent measurements factorizes: \(p(x \mid z_1, z_2) \propto p(z_1 \mid x)\, p(z_2 \mid x)\, p(x)\). So folding in sensor 1 and then using that posterior as the prior for sensor 2 lands on the same Gaussian as one stacked update with block-diagonal \(R\). The assumption that breaks it is exactly that block-diagonality — correlated sensor noise (two estimates derived from the same wheel encoders, or a shared clock/calibration error) gets counted twice and the filter comes out overconfident.
+    **1.** Each update is exact Bayesian conditioning, and conditioning on
+    independent measurements factorises, since
+    \(p(x \mid z_1, z_2) \propto p(z_1 \mid x)\, p(z_2 \mid x)\, p(x)\).
+    Folding in sensor 1 and then using that posterior as the prior for sensor 2
+    therefore lands on the same Gaussian as one stacked update with a
+    block-diagonal \(R\). The assumption that breaks it is exactly that
+    block-diagonality: correlated sensor noise, whether from two estimates
+    derived from the same wheel encoders or from a shared clock or calibration
+    error, gets counted twice and the filter emerges overconfident.
 
-    **2.** Reject: 14 > 9.21. NIS is a squared Mahalanobis distance, so 14 is \(\sqrt{14} \approx 3.7\sigma\) against a gate sitting at \(\sqrt{9.21} \approx 3.0\sigma\). For 2 degrees of freedom the tail is exactly \(e^{-x/2}\), so \(P(\text{NIS} > 14) = e^{-7} \approx 9\times10^{-4}\) — under the assumed model this is a 1-in-1100 event, which is far better explained by a lying sensor (multipath) than by unlucky data.
+    **2.** Reject, since 14 exceeds 9.21. NIS is a squared Mahalanobis
+    distance, so 14 corresponds to \(\sqrt{14} \approx 3.7\sigma\) against a
+    gate sitting at \(\sqrt{9.21} \approx 3.0\sigma\). For two degrees of
+    freedom the chi-squared tail is exactly \(e^{-x/2}\), giving
+    \(P(\text{NIS} > 14) = e^{-7} \approx 9 \times 10^{-4}\), so under the
+    assumed model this is roughly a one-in-1100 event, which is far better
+    explained by a lying sensor than by unlucky data.
 
-    **3.** The bump jolted the state; honest GPS now looks like an outlier (gate death spiral); dead reckoning drifts 2 m; eventually an innovation squeaks under the gate — or a rejection cap fires — and the filter lurches to reality. Fix: consecutive-rejection cap + covariance inflation on impact detection.
+    **3.** The bump jolted the true state, so honest GPS fixes now look like
+    outliers and the gate rejects them, which is the death spiral from failure
+    mode 2. Dead reckoning then drifts about two metres over thirty seconds,
+    until either an innovation happens to squeak under the gate or a rejection
+    cap fires, at which point the filter lurches to reality in a single step.
+    The fix is a consecutive-rejection cap combined with covariance inflation
+    triggered by impact detection, so that the filter widens rather than
+    stiffening after a shock.
 
-    **4.** The magnetometer testifies to one thing only — yaw — so it gets a single row of \(H\) touching heading (and the gyro bias states only indirectly, through the filter's own correlations); it must never be allowed to nudge position or velocity. Gate it at 1-D \(\chi^2(0.99) = 6.63\) on a *wrapped* angular residual, behind a hard pre-gate on field magnitude and inclination versus the surveyed local field. Near the steel door the field bends and the innovations go persistently biased rather than noisy, so the gate starts rejecting — which is the correct behaviour: coast on the gyro and let yaw covariance widen honestly. Crucially, the consecutive-rejection cap from failure mode 2 must *not* force-accept here, because the disturbance is a sustained bias, not a transient; disable the sensor by magnetic-anomaly detection or a mapped no-mag zone instead.
+    **4.** The magnetometer testifies to exactly one thing, which is yaw, so it
+    receives a single row of \(H\) touching heading, influencing the gyro bias
+    states only indirectly through the filter's own correlations, and it must
+    never be permitted to nudge position or velocity. Gate it at the
+    one-dimensional \(\chi^2(0.99) = 6.63\) on a *wrapped* angular residual,
+    behind a hard pre-gate on field magnitude and inclination compared against
+    the surveyed local field. Near the steel door the field bends, so the
+    innovations become persistently biased rather than merely noisy and the
+    gate begins rejecting, which is the correct behaviour: coast on the
+    gyroscope and let yaw covariance widen honestly. Crucially the
+    consecutive-rejection cap from failure mode 2 must *not* force-accept
+    here, because the disturbance is a sustained bias rather than a transient,
+    so disable the sensor through magnetic-anomaly detection or a mapped
+    no-magnetometer zone instead.
 
 ### Interactive quiz
 
 <quiz-bank src="estimation-l5-fusion"></quiz-bank>
 
-## J. References
+## J. Annotated references
 
 | Reference | Type | Difficulty | Why read it |
 |---|---|---|---|
-| Bar-Shalom et al., *Estimation with Applications to Tracking* | book | advanced | Gating, association, and consistency — the professional depth |
-| [`robot_localization` wiki](https://docs.ros.org/en/melodic/api/robot_localization/html/index.html) | docs | intermediate | The architecture as configuration surface |
-| Moore & Stouch (2016), the `robot_localization` paper | paper | introductory | Short, and explains the two-filter REP 105 convention |
+| Bar-Shalom et al., *Estimation with Applications to Tracking* | book | advanced | Gating, association and consistency at professional depth |
+| [`robot_localization` wiki](https://docs.ros.org/en/melodic/api/robot_localization/html/index.html) | docs | intermediate | The architecture presented as a configuration surface |
+| Moore & Stouch (2016), the `robot_localization` paper | paper | introductory | Short, and it explains the two-filter REP 105 convention directly |
 
-## K. Graded work & portfolio extension
+## K. Graded work and portfolio extension
 
-**Graded:** gating joins the localization project as a stretch goal (corrupted-measurement scenario).
+**Graded:** gating joins the localisation project as a stretch goal, in the
+corrupted-measurement scenario.
 
-**Portfolio:** the section G threshold-sweep U-curve, clean vs corrupted — a one-figure demonstration that you understand robustness as a *tuned trade*, not a checkbox.
+**Portfolio:** the section G threshold-sweep U-curve, clean against corrupted.
+It is a one-figure demonstration that you understand robustness as a tuned
+trade rather than a checkbox, which is a distinction interviewers probe for and
+few candidates can evidence.
