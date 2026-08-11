@@ -42,6 +42,35 @@ source (teleop|scripted|sim|generated), generator_seed, parent_dataset_version
 
 The two fields most often missing are `outcome` (because failures were discarded) and `generator_seed` (because nobody expected to need to regenerate synthetic data). Both are cheap to record and expensive to reconstruct.
 
+### Curation, priced: coverage per label
+
+The coreset argument in one table. Twelve hundred logged trajectories,
+described by four features each, and a labelling budget to spend; coverage
+scored over the binned feature space:
+
+| Budget | Farthest-point selection | Random selection |
+|---|---|---|
+| 25 | **0.812** | 0.344 |
+| 100 | **1.000** | 0.675 |
+| 400 | 1.000 | 0.981 |
+
+Farthest-point sampling reaches *complete* coverage of the feature space at
+a budget of 100, where random sampling has covered two-thirds; random needs
+the full 400 to approach what curation achieved with a quarter of it. The
+mechanism is the same one behind lesson 9.3's budget study: random sampling
+reproduces the collection distribution, so it spends most of its budget
+re-buying the dense middle — the ten-thousandth straight-corridor cruise —
+while the rare corners that actually stretch a model wait at the tail.
+Farthest-point inverts that, spending every label on the most novel thing
+remaining.
+
+A 4× labelling-cost difference at equal coverage is the business case for
+curation infrastructure in one line, and it compounds: the same selection
+logic that stretches a labelling budget also picks which episodes to keep
+when storage forces deletion, which is this lesson's lifecycle point — the
+dataset you can afford to keep should be chosen by coverage, not by arrival
+order.
+
 ## D. From ML to robotics
 
 - **This is feature-store discipline** with harder constraints: no backfill (you can't re-run yesterday's physical world) and expensive rows.

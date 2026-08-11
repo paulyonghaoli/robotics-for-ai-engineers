@@ -38,6 +38,47 @@ S_t = \max(0,\; S_{t-1} + (x_t - \mu_0) - k), \qquad \text{alarm when } S_t > h
 
 with \(k\) a slack term (typically half the shift you care about) and \(h\) the alarm threshold. The slack is what stops noise from accumulating.
 
+### The layers race, and the smoothing trap — measured
+
+This lesson's simulated fleet degrades in the canonical order — the lidar
+starts failing on day 90, filter consistency follows from day 125, and the
+outcome metric moves last from day 155 — and monitoring each layer with a
+4σ threshold on a 7-day rolling mean, requiring 10 consecutive days above
+threshold, detects:
+
+| Layer | True onset | Detected | Lag |
+|---|---|---|---|
+| Sensor distribution | day 90 | day 105 | 15 days |
+| Filter NIS | day 125 | day 143 | 18 |
+| Task success | day 155 | day 169 | 14 |
+
+The headline is the *lead*: the sensor layer raises its hand **64 days
+before the outcome metric does**, which is 64 days of scheduling maintenance
+instead of explaining incidents. Monitoring only outcomes — the layer
+everyone dashboards first, because it is what the business cares about —
+means learning about a two-month-old hardware problem from your success
+rate.
+
+The persistence sweep contains the measurement's own trap, and it is worth
+the table:
+
+| Persistence required | Sensor detection | Verdict |
+|---|---|---|
+| 1 day | day 40 | false alarm — the lighting transient |
+| 3 days | day 42 | **still the false alarm** |
+| 5 days | day 44 | **still the false alarm** |
+| 10 days | day 105 | correct |
+
+The transient only lasts two days (40–41), so a 5-day persistence rule
+"should" ignore it — and does not, because the **7-day rolling mean smears a
+2-day spike into a week-long excursion**. The smoothing that suppresses
+daily noise also stretches every transient, so the persistence requirement
+must exceed the transient length *plus* the smoothing window, not the
+transient length alone. Tuning the alarm on the raw series and deploying it
+on the smoothed one is a genuinely easy mistake to ship, and this table is
+what it costs: three configurations that page someone at 3 a.m. for a
+lighting change.
+
 ## D. From ML to robotics
 
 - **This is model monitoring**, and your instincts transfer wholesale: reference windows, PSI, alert fatigue, the whole discipline. The robotics differences are that inputs degrade *physically* and the feedback loop is closed.

@@ -45,6 +45,41 @@ with \(z = 1.96\) for 95%. For **comparing two stacks**, the cleanest tool is a 
 
 For continuous metrics (path ratio, localization RMSE, latency), report **percentiles rather than means** — p95 latency is a service-level statement, while a mean latency hides exactly the tail that breaks real-time systems.
 
+### Wald's coverage, measured — and the price of a claim
+
+The standard-error interval everyone writes first, \(\hat p \pm 1.96\sqrt{\hat p(1-\hat p)/n}\),
+makes a promise: it should contain the truth 95% of the time. Simulating
+20,000 evaluation campaigns per cell, here is how often it actually does,
+against the Wilson interval this lesson builds:
+
+| True success rate | Episodes | Wald covers | Wilson covers | Wald has *zero width* |
+|---|---|---|---|---|
+| 0.95 | 10 | **40.4%** | 91.4% | **59.6%** |
+| 0.95 | 25 | 72.3% | 96.7% | 27.6% |
+| 0.95 | 50 | 91.9% | 96.1% | 7.7% |
+| 0.80 | 10 | 88.2% | 96.8% | 11.1% |
+| 0.80 | 200 | 94.3% | 96.0% | 0.0% |
+
+The first row is the one to memorise, because it describes the most common
+evaluation in robotics: a good policy (95%) and a small run (10 episodes).
+The nominal "95% interval" covers the truth **40% of the time**, and worse,
+in six campaigns out of ten the policy goes 10-for-10, \(\hat p = 1\), and
+the Wald interval collapses to the single point [1, 1] — a confidence
+interval that expresses *no uncertainty whatsoever* about a ten-episode
+estimate. That zero-width interval is not a pathology of bad luck; it is the
+formula working as written, and it is on page one of many robotics papers.
+Wilson costs one extra line and holds near 95% everywhere on the table.
+
+The second calculation every evaluator needs is the price of a comparison.
+To distinguish a 90% policy from a 95% one at 80% power takes about **434
+episodes per arm**; to distinguish 90% from 93% takes about **1,354 per
+arm**. Against those numbers, "we ran 20 episodes and improved from 90% to
+95%" is not a finding — it is one success in twenty either way, and the
+honest report is the Wilson interval around each, which will overlap
+generously. Episodes-per-claim arithmetic is the difference between
+evaluation and anecdote, and it is why the capstone's rubric fixes episode
+counts before anyone sees a result.
+
 ## D. From ML to robotics
 
 - **This is A/B testing, and you have probably done it correctly before.** The robotics twist is that episodes are expensive (a real-robot rollout costs minutes and a human resetter), so the discipline of *paired designs and variance reduction* matters far more than in web experimentation where samples are free.

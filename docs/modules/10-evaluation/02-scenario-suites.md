@@ -32,6 +32,34 @@ For a scenario space with parameters \(\theta\) (obstacle density, corridor widt
 
 Discrimination is the property people forget. A benchmark that everything passes has stopped being a measurement — which is exactly how LIBERO saturated (lesson 10.1).
 
+### A suite that everyone passes ranks nobody — measured
+
+Discrimination is a property a suite either has or lacks, and it is
+measurable. Take two policies with a genuine skill gap (0.70 against 0.85 on
+this lesson's scale) and ask each suite to rank them, 120 episodes per
+policy, 200 independent comparisons:
+
+| Suite | Better policy scores | Weaker policy scores | Ranks them correctly |
+|---|---|---|---|
+| Trivial (difficulty 0.10) | 100% | 99% | **63%** |
+| Balanced (difficulty 0.70) | 74% | 48% | **100%** |
+| Brutal (difficulty 1.15) | 9% | 3% | 97% |
+
+The trivial suite — the one whose dashboard looks best, where everything is
+green — ranks a genuinely better policy above a genuinely worse one barely
+more often than a coin flip, because both saturate the ceiling and the 1%
+separation left over drowns in binomial noise. The information a suite
+extracts lives in the *variance* of its outcomes, and variance dies at both
+extremes: the brutal suite keeps most of its discrimination (97%) only
+because 9% versus 3% is still a threefold ratio on the floor.
+
+The design rule falls out directly: **a scenario suite should be tuned so
+current policies score in the middle of the range**, and a suite your fleet
+passes at 99% has stopped being an instrument — it is a regression tripwire
+at best. This is also the honest reading of any public leaderboard whose top
+entries cluster above 95%: the benchmark is no longer measuring what its
+axis label claims, and the fix is harder scenarios, not more episodes.
+
 ## D. From ML to robotics
 
 - **This is test-set design**, with the same pathologies: a test set drawn from one distribution, class imbalance hiding rare-case failure, and the slow leak of test information into design decisions as you iterate against it.

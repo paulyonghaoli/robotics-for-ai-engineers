@@ -36,7 +36,7 @@ Four submitted results, one honest. Work out which — and, for each of the othe
 
 The reviewer's checklist, in the order that catches the most problems soonest:
 
-1. **How many trials, and what's the interval?** Almost never reported, and it invalidates more claims than everything else combined.
+1. **How many trials, and what's the interval?** Almost never reported, and it invalidates more claims than everything else combined. Lesson 10.1's measurements are your calibration: at 10 episodes the textbook interval covers the truth 40% of the time and is a single zero-width point in 6 runs of 10, and separating 90% from 95% honestly costs ~434 episodes per arm. Any claim resting on fewer episodes than that arithmetic requires is an anecdote with a decimal point.
 2. **Is there a trivial baseline?** If a linear probe or a constant policy matches the result, the benchmark isn't measuring what its name says. A 0.09B-parameter probe with no language encoder matching SOTA on LIBERO is the field's most useful embarrassment.
 3. **Does it survive perturbation?** Move the camera, change the initial state. A 95%→30% collapse means the number described memorization.
 4. **Was the suite tuned against?** Months of iterating on an evaluation set turns it into a training set, invisibly.
