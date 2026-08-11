@@ -54,6 +54,33 @@ $$
 z_i = -k\,\frac{q_i - \bar{q}_i}{(q_i^{max} - q_i^{min})^2}
 $$
 
+### The null-space "invariant" drifts — measured, then fixed for free
+
+The null-space projector \(N = I - J^{+}J\) promises that motion through it
+leaves the tip fixed, and the promise is exact only for infinitesimal steps.
+Descending the joint-limit cost from a near-limits posture down to the same
+cost level, at four step sizes:
+
+| Step size × iterations | Tip drift |
+|---|---|
+| 0.2 × 50 | **133.4 mm** |
+| 0.05 × 200 | 33.2 mm |
+| 0.01 × 1000 | 6.6 mm |
+| 0.002 × 5000 | 1.3 mm |
+| 0.05 × 200, **plus task re-correction each step** | **0.0000 mm** |
+
+The drift is linear in step size — each finite step incurs an
+\(O(\|\Delta q\|^2)\) task-space error because \(J\) changed over the step,
+and the errors accumulate — so "the null space doesn't move the tip" is true
+in the limit and off by *thirteen centimetres* at a step size someone would
+actually use. The last row is the production answer, and it costs one line:
+after each null-space step, close the loop with a tiny damped IK correction
+back to the held pose. The secondary objective then runs at whatever step
+size converges fastest while the task error stays at machine precision,
+because the correction consumes exactly the drift the projector leaked. Open
+loop, invariants decay; closed loop, they hold — which is this curriculum's
+oldest lesson, reappearing inside a single arm posture.
+
 ## D. From ML to robotics
 
 Iterative IK is gradient descent on a squared error, so the vocabulary is familiar and two of the instincts are wrong.

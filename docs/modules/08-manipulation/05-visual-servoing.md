@@ -54,6 +54,34 @@ Three features give you a square-ish system; four is the usual choice, because t
 
 **The classic pathology** is a target rotated 180° about the optical axis. IBVS computes a motion that retreats the camera toward infinity — every feature moves correctly in the image while the camera does something absurd in the world. It is not a bug in the implementation; the image error genuinely decreases along that trajectory. It is the clearest demonstration that minimising image error and moving sensibly are different objectives.
 
+### How wrong can the depth be — measured
+
+The interaction matrix needs each feature's depth \(Z\), which the camera
+does not measure, and IBVS's celebrated robustness is that a bad guess
+mostly doesn't matter. Servoing this lesson's four-point target from a
+displaced start, with the controller's depth deliberately scaled away from
+truth:
+
+| Depth estimate | Outcome |
+|---|---|
+| true Z × 0.25 | converged, 65 steps |
+| × 0.5 | converged, 36 steps |
+| × 1.0 | converged, 13 steps |
+| × 2.0 | converged, 30 steps |
+| × 4.0 | converged, 67 steps |
+| × 10 | **diverged** — error stuck at 0.23 |
+
+Depth wrong by a factor of four in either direction still converges,
+merely two to five times slower — the wrong \(Z\) mis-scales the commanded
+translation, the next image measurement absorbs the mistake, and the loop
+grinds on. That tolerance is the entire justification for running IBVS with
+a crude constant depth guess in practice. The 10× row shows the cliff:
+scale the step badly enough and each correction overshoots what the next
+measurement can retract, the ordinary stability-versus-gain failure from
+lesson 2.2 arriving through a parameter labelled "depth" instead of one
+labelled "gain". Feedback through the image forgives calibrated ignorance;
+it does not forgive an effective loop gain of ten.
+
 ## D. From ML to robotics
 
 The temptation is to regress camera velocity directly from images, and it works. What is worth keeping from the classical formulation is the **structure**: the interaction matrix says exactly how each degree of freedom moves each feature, and that is a strong inductive bias a network otherwise has to learn from data.

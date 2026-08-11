@@ -40,6 +40,33 @@ $$
 
 The third term is not a refinement. A grasp planner that ignores the gripper's stroke produces beautiful, physically sound, entirely unexecutable answers — and it is the single most common way a grasp pipeline wastes a week.
 
+### Geometry first, friction second — counted
+
+Enumerating antipodal pairs on this lesson's two objects, with the gripper's
+stroke window (2–9 cm) enforced and the friction cone checked at both
+contacts:
+
+| Friction μ | Box (6×14 cm) | Disc (11 cm diameter) |
+|---|---|---|
+| 0.2 (smooth) | 5% of width-feasible pairs hold | **0%** |
+| 0.5 (rubber pads) | 9% | **0%** |
+| 1.0 (implausibly grippy) | 17% | 22% |
+
+The box always has grasps, because parallel flat faces provide truly
+antipodal normals that satisfy any friction cone — at μ = 0.2 the survivors
+are exactly the face-to-face pinches. The disc has **none at all** until
+μ reaches 1.0, and the reason is pure geometry: its diameter (11 cm) exceeds
+the gripper's 9 cm stroke, so every reachable chord is non-diametric, the
+contact normals on a non-diametric chord are not anti-aligned, and holding
+one is asking friction to supply what alignment didn't. At μ = 1.0 — a 45°
+friction cone, beyond most real material pairs — friction finally rescues
+22% of the chords, which is the quantified version of a rule every grasp
+planner encodes: **force closure is bought with geometry and only rented
+with friction.** An object one centimetre wider than the stroke is not
+"harder to grasp"; within physical friction, it is ungraspable, and the fix
+is a different approach direction or a different gripper, not a better
+planner.
+
 ## D. From ML to robotics
 
 **What transfers:** ranking candidates by a learned score is exactly the right architecture, and it is what Dex-Net and its successors do.

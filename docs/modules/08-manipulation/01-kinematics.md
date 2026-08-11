@@ -52,6 +52,27 @@ $$
 
 `w = 0` exactly at a singularity. It is a scalar field over configuration space, and looking at where it collapses tells you which parts of the workspace to stay out of.
 
+### What redundancy looks like in the singular values
+
+The third joint changes the Jacobian's shape — 2×3 now, wider than tall —
+and the consequences read directly off its singular values at three postures:
+
+| Posture | \(\sigma_1, \sigma_2\) | Null-space dimension |
+|---|---|---|
+| Comfortably bent | 2.58, 0.49 | 1 |
+| Nearly stretched | 2.84, **0.047** | 1 |
+| Fully stretched | 2.84, 0.000 | **2** |
+
+A wide Jacobian has a null space *everywhere* — at least one combination of
+joint velocities that leaves the tip exactly still, which is the redundancy
+lesson 8.2 will spend. The stretch singularity from lesson 2.3 is still here
+too, and nastier in one respect: near full extension \(\sigma_2\) collapses
+through 0.047 to zero, and at the singularity itself the null space *grows*
+to two dimensions — two independent self-motions, neither of which helps you,
+because the direction the task needs is precisely the one that vanished.
+Redundancy is extra freedom in the directions you already had, never a
+substitute for the one you lost, and this table is the compact proof.
+
 ## D. From ML to robotics
 
 The forward map is a differentiable function of a parameter vector — familiar territory. Three things are not:

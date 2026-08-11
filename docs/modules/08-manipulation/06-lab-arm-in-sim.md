@@ -48,6 +48,14 @@ The tool moves 3 cm between waypoints; the joints jump 1125°. Seeding every IK 
 
 **Periodicity and multiplicity are the two structural facts about joint space.** Angles wrap; poses have several configurations. Nearly every manipulation-specific bug is one of those two arriving somewhere it was not expected — bug 1 is periodicity, bug 3 is multiplicity, and the branch flip in bug 3 is what happens when you let multiplicity resolve itself independently at every timestep.
 
+And carry the module's measured numbers out as calibration: a null-space
+descent at a practical step size drifts the tip **33 mm** until a one-line
+task correction zeroes it; a disc one centimetre wider than the gripper's
+stroke has **zero** force-closure grasps below μ = 1.0; a 0.6 rad edge check
+waves through **22%** of true tunnel edges; and IBVS forgives a 4× depth
+error while diverging at 10×. Each is the price tag on an assumption this
+lab's bugs quietly violate.
+
 ## F. Graded work & portfolio extension
 
 **Graded:** the three fixes are Module 8's diagnostic assessment, and each corresponds to a stage of [Capstone III](../capstone-3/index.md) — interpolation, validity checking, and trajectory continuity.

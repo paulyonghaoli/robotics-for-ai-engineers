@@ -42,6 +42,36 @@ Getting this wrong produces a planner that returns confident, verified, collidin
 
 **RRT in joint space** is [5.3's](../05-planning/03-rrt.md) algorithm with the metric changed: sample a random configuration, step toward it from the nearest tree node, keep the step if the *edge* is collision-free. Nothing else changes, which is the point — the algorithm never needed to know what the configuration meant.
 
+### How coarse can the edge check be — measured on the honest cases
+
+Edge collision-checking resolution is a straight compute-safety dial, and
+measuring it took two attempts that are both worth reporting. The first
+attempt sampled random configuration pairs and found that even a 0.6 rad
+resolution missed *nothing* — because randomly chosen colliding edges mostly
+collide at an endpoint, and endpoints are checked at any resolution. The
+number that matters is conditional: among **tunnel edges**, whose endpoints
+are free while the interior collides — exactly the edges an RRT actually
+asks about, since it never extends from or toward a colliding configuration:
+
+| Check resolution (rad) | Tunnel edges missed |
+|---|---|
+| 0.05 | 1% |
+| 0.15 | 2% |
+| 0.3 | 10% |
+| 0.6 | **22%** |
+
+At 0.6 rad the checker waves through more than a fifth of the edges that
+sweep an arm link straight through an obstacle, and every one becomes a
+planned path the physical arm cannot execute. The scaling is set by the
+sweep: a joint step of \(\Delta q\) moves the farthest link point by up to
+\(\Delta q\) times its lever arm (2.4 m here), so 0.3 rad sweeps up to 70 cm
+between samples — wider than this scene's obstacles. The production answers
+are the ones the lesson names: sample at a resolution matched to obstacle
+size over lever arm, or use conservative swept-volume bounds that cannot
+tunnel at any resolution. And the first attempt's lesson stands on its own:
+**an average over the wrong distribution can certify a broken component**,
+because the edges that matter are never a random sample of edges.
+
 ## D. From ML to robotics
 
 The instinct to reach for a learned planner is reasonable and premature. Sampling planners are probabilistically complete, need no training data, and generalise to any obstacle configuration you hand them. What they lack is speed and path quality, which is exactly what learned samplers and neural motion planners target — they bias *where* you sample rather than replacing the collision checker.
