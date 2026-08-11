@@ -20,6 +20,54 @@ State dimension \(3 + 2N\) for \(N\) 2-D landmarks. Motion updates touch only th
 
 Two structural facts worth internalizing: (1) **the map is only determined relative to the start** — absolute uncertainty never drops below the initial pose uncertainty (nothing anchors you to the world); (2) landmark initialization inherits the robot's current uncertainty *plus* measurement noise — mapping while lost makes vague landmarks, which is the chicken-and-egg made quantitative.
 
+### The correlation, measured
+
+Section B's claim — observing one landmark improves another you are not
+looking at — is the kind of claim that deserves a number, so here it is on the
+exercise's own two-landmark world, thirty seeds, comparing the honest joint
+filter against a lobotomised variant that zeroes the cross-covariance blocks
+before every update.
+
+First, ordinary operation. After forty steps of alternating observations, the
+landmark–landmark correlation coefficient in the joint filter reaches
+**+0.98** — the two landmarks, which have never been observed together and
+have no physical connection, are almost perfectly correlated, because both
+inherited errors from the same drifting robot. And that correlation already
+pays rent in ordinary tracking accuracy:
+
+| Filter | Landmark errors (m) |
+|---|---|
+| Joint | 0.239 / 0.264 |
+| Cross-covariances zeroed | 0.273 / 0.307 |
+
+Then the decisive test. At the end of the run, give the filter one
+near-perfect fix of landmark 0 alone — a surveyed marker, say — and watch what
+happens to landmark 1, which the fix never mentions:
+
+| Filter | Landmark 1 error before | After fixing landmark 0 |
+|---|---|---|
+| Joint | 0.264 m | **0.134 m — 49% better** |
+| Cross-covariances zeroed | 0.307 m | 0.307 m — unchanged |
+
+Half of landmark 1's error was never landmark 1's fault. It was the shared
+robot drift, recorded in the off-diagonal blocks, and the moment any
+observation reveals that drift, every victim of it gets corrected — through
+\(K = PH^\top S^{-1}\) reading the full column of \(P\), exactly as question
+1 traces. The zeroed filter, which is what you build if you treat each
+landmark as its own tidy little estimator, cannot receive the news at all.
+The off-diagonals are not overhead to be economised away; they are where the
+map's shared history lives, and this table is what it costs to delete them.
+
+A methodological confession belongs here, because it is a SLAM lesson in
+itself: the first version of this measurement, built on a hand-rolled
+nonlinear range-bearing filter, produced the *opposite* result — re-observing
+landmark 0 made landmark 1 worse. The cause was a subtle linearisation-order
+bug in fifty lines of fresh EKF code, and the fix was to abandon the fresh
+code and run the study on this lesson's CI-tested linear model instead.
+Getting a joint filter's bookkeeping right is genuinely hard, which is an
+argument the field itself accepted: it moved to graph formulations partly
+because their machinery is easier to get provably correct.
+
 ## D. From ML to robotics
 
 - **The correlation structure is a learned covariance graph** — like a multi-task model where improving one head's calibration transfers to the others through shared parameters. The robot pose is the shared trunk; landmarks are heads.

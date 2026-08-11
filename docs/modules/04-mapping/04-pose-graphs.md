@@ -27,6 +27,51 @@ Each edge contributes a residual (measured relative pose vs current relative pos
 
 The pipeline division of labor: the **front-end** (scan matching, place recognition) proposes edges; the **back-end** (this optimization) makes them consistent. Front-end lies — a wrong loop closure — are the catastrophic failure, so robust back-ends downweight implausible edges (switchable constraints, robust kernels: Huber and friends — your robust-loss instincts apply directly).
 
+### The spring model, measured on this repository's own back end
+
+The capstone investigation left this repository with a tested pose-graph
+optimiser (`projects/capstone_nav/posegraph.py`), and its test suite doubles
+as this lesson's evidence. An octagonal trajectory with a 0.05 rad heading
+bias baked into every odometry edge — the drifted arc of section B — opens by
+**1.103 m** at the seam. Adding one loop-closure edge and relaxing the springs
+closes that seam to **0.000 m**, while the *worst-corrected node anywhere in
+the loop moves at most 0.017 m from truth*. One edge, global repair, error
+redistributed so evenly that no single pose bears more than a couple of
+centimetres of it. Those three numbers are asserted by
+`tests/mapping/test_posegraph.py` on every CI run, so if the claim ever stops
+being true, the build fails.
+
+The weight \(\Omega\) deserves the same treatment, on question 2's four-node
+chain — odometry edges measuring 1.0 each, a loop edge insisting pose 3 sits
+at 2.4:
+
+| Loop-edge weight | Solution \([x_1, x_2, x_3]\) | Where the disagreement went |
+|---|---|---|
+| \(\Omega = 1\) (equal) | [0.85, 1.70, **2.55**] | split evenly: every edge stretches 0.15 |
+| \(\Omega = 100\) | [0.801, 1.601, **2.402**] | loop edge nearly satisfied; odometry eats ~0.20 each |
+
+Neither answer is "the odometry says 3.0" nor "the closure says 2.4" — the
+optimum sits between, at a position set entirely by the stiffness ratio. That
+is the precision-weighted average of lesson 3.1 wearing graph clothes, and it
+is why stating honest edge covariances matters as much here as honest \(R\)
+mattered there: the map's shape *is* the weights.
+
+And the catastrophic case, measured on the same chain — a **wrong** loop
+closure claiming pose 3 sits at 1.0 when the true position is 3.0:
+
+| Wrong closure | Solution | Damage |
+|---|---|---|
+| \(\Omega = 1\) | [0.50, 1.00, 1.50] | every edge compressed by 0.5 — **the whole map shrinks 50%** |
+| \(\Omega = 100\) | [0.34, 0.67, 1.01] | the lie nearly wins outright |
+
+Note what the damage looks like: not a local kink at the false edge, but a
+*uniform* distortion of every edge in the loop. The same mechanism that
+spreads a true correction gracefully spreads a false one just as gracefully,
+which is exactly why false closures are the field's nightmare — the folded
+map is internally smooth, locally plausible, and wrong everywhere. Robust
+kernels exist to break precisely this symmetry between truth and confident
+lies.
+
 ## D. From ML to robotics
 
 - **A pose graph is a factor graph, and optimizing it is MAP inference** — the same object as a CRF, solved by the same sparse Gauss–Newton you'd use for any structured least squares. SLAM's "modern era" is largely the realization that the estimation problem *is* an optimization problem.

@@ -27,6 +27,43 @@ R = V U^\top \;(\text{fix } \det R = +1), \qquad t = \bar{a} - R\,\bar{b}
 
 (the determinant fix rejects reflections — lesson 1.6's mirror bug, preempted). Production refinements, each earning its keep: **outlier trimming** (drop the worst-matched pairs — a moving person in scan B has no honest partner in A), **point-to-plane** metrics (converges in far fewer iterations on structured scenes), and correspondence via KD-trees (the naive O(n²) search is the actual bottleneck).
 
+### The basin, measured — and a metric that lied first
+
+How good does the initial guess actually have to be? Take two noisy scans of
+an L-shaped corner (walls of 4 m and 3 m), offset one by a known rotation plus
+20 cm of translation, and score ICP by whether it *recovers the known
+transform* to within 2°, across twenty scan pairs per offset:
+
+| Initial rotation error | Recovered | Median rotation error |
+|---|---|---|
+| 5° – 60° | **20/20 at every offset** | 1.3° |
+| 65° | 0/20 | ~135° |
+| 90° | 0/20 | 134.8° |
+| 120° | 0/20 | 134.8° |
+
+The basin is not a slope; it is a **cliff**. Every trial inside 60° converges
+essentially perfectly, and every trial at 65° or beyond is captured by the
+same wrong minimum, roughly 135° away — the alignment that swaps the two
+walls' roles. The cliff's location is no accident: the wrong minimum sits at
+about 135°, and the watershed between the two basins falls near the halfway
+point, ≈ 67°. The scene's geometry, not the algorithm, decides how much
+initial error is survivable — which is why "seed from odometry" is a hard
+requirement and why a scene with strong symmetry (a square room, a regular
+colonnade) shrinks the safe basin further than any corridor of numbers here.
+
+The measurement itself taught a second lesson worth passing on. The first
+version of this experiment scored ICP by mean nearest-neighbour residual, and
+reported the *same* value, 0.0341 m, for every initial offset from 0° to 45° —
+suspicious enough to investigate. The residual was the metric's floor, not
+the alignment's quality: with wall points sampled every 6.8 cm, a perfectly
+aligned scan still shows a mean nearest-neighbour distance of about half the
+sampling interval, and the aligned and misaligned-then-converged cases are
+indistinguishable through it. Scoring against the *known transform* is what
+produced the table above. The general rule: **a residual can only measure
+what the correspondences can express**, and a low residual is a statement
+about the metric as much as about the fit — section D's third bullet, arrived
+at the hard way.
+
 ## D. From ML to robotics
 
 - **ICP = k-means' loop, Procrustes' solve.** Hard-EM structure, SVD-based alignment — you have implemented both halves in other costumes. The local-minimum caveat transfers verbatim: initialization is destiny.
@@ -43,9 +80,29 @@ R = V U^\top \;(\text{fix } \det R = +1), \qquad t = \bar{a} - R\,\bar{b}
 
 `slam_toolbox` (Nav2's default SLAM) runs correlative scan matching against the map; LOAM-family 3D lidar odometry is point-to-plane ICP with feature selection; Open3D ships production ICP you'll use in Module 7 for 3D data. All expose the same three knobs you just built: correspondence distance, outlier rejection, iteration/convergence limits.
 
-## G. Experiment
+## G. Experiment — the corridor's stiffness, in numbers
 
-Corridor degeneracy: match two scans of a straight featureless corridor. ICP nails the *lateral* offset and hallucinates the *longitudinal* one — the cost function is flat along the corridor axis (nothing constrains sliding). Compute the correspondence cost surface over (dx, dy) and look at the valley. This is the capstone's feature-poor drift (field notes!) and lesson 2.3's rank deficiency, reunited: degenerate geometry ⇒ unobservable directions ⇒ the fit is confident *and* unconstrained.
+Match two scans of a straight featureless corridor and ICP nails the
+*lateral* offset while hallucinating the *longitudinal* one, because the cost
+function is flat along the corridor axis — nothing constrains sliding.
+Computing the correspondence cost for a 0.3 m probe displacement in each
+direction, on the lab's own scenes:
+
+| Scene | Cost increase, 0.3 m **along** | 0.3 m **across** | Stiffness ratio |
+|---|---|---|---|
+| Corridor | 0.45 | 43.2 | **95×** |
+| Room | 8.7 | 42.8 | 5× |
+
+The corridor punishes lateral displacement ninety-five times harder than
+longitudinal, so the optimiser's answer along the axis is set by noise and
+initialisation while looking exactly as converged as the well-constrained
+direction. The room's 5× is ordinary anisotropy; the corridor's 95× is a
+subspace pretending to be a point. This is the capstone's feature-poor drift
+from the field notes and lesson 2.3's rank deficiency reunited: degenerate
+geometry produces unobservable directions, and the fit is simultaneously
+confident and unconstrained. The detection is the same as 2.3's, too — the
+eigenvalue ratio of the cost Hessian *is* this table, computed at runtime,
+and question 3 turns it into an estimator-level fix.
 
 ## H. Failure modes
 

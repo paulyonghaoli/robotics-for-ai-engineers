@@ -25,13 +25,28 @@ The through-line: **an optimizer will always give you an answer**. Your job is k
 
 ### Case 1: the confident lie
 
-A pose graph with sixteen honest odometry edges, one honest loop closure — and one **false** closure claiming two different places are the same. Least squares will dutifully deform the entire trajectory to satisfy it. Your job: make the back-end robust enough to notice.
+A pose graph with sixteen honest odometry edges, one honest loop closure — and
+one **false** closure claiming two different places are the same. Least
+squares will dutifully deform the entire trajectory to satisfy it, and lesson
+4.4's measurement shows exactly how: on a four-edge chain, one confident false
+closure compressed *every* edge by the same factor, shrinking the whole map
+50% while leaving it perfectly smooth. The damage is global and locally
+invisible, which is what makes this the field's nightmare failure. Your job:
+make the back-end robust enough to notice.
 
 <code-exercise src="map-l5-false-closure"></code-exercise>
 
 ### Case 2: the corridor that slides
 
-Scan matching in a featureless corridor converges to a confident, wrong answer along the corridor axis. The residual looks fine — because the cost surface really is flat in that direction. Your job: **detect the degeneracy before trusting the match**, and report honest uncertainty instead of a point estimate.
+Scan matching in a featureless corridor converges to a confident, wrong
+answer along the corridor axis, and lesson 4.2's stiffness measurement says
+how bad the anisotropy really is: this exercise's corridor punishes a 0.3 m
+lateral displacement **95 times harder** than the same displacement along the
+axis, against a healthy room's 5×. The residual looks fine because the cost
+surface genuinely is flat in that direction — the answer along the axis is
+set by noise, at full confidence. Your job: **detect the degeneracy before
+trusting the match**, by reading exactly that stiffness ratio out of the cost
+Hessian, and report honest uncertainty instead of a point estimate.
 
 <code-exercise src="map-l5-degeneracy"></code-exercise>
 
