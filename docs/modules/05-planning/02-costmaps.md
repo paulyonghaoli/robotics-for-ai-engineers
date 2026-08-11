@@ -25,6 +25,32 @@ C_{max} \, e^{-\alpha (d(c) - r)} & d(c) > r
 
 Search minimizes \(\sum (\text{step length} + w \cdot cost(c))\). The decay rate \(\alpha\) and weight \(w\) *are* the personality of your robot's driving: large → wide berths and longer paths; small → efficient and brave. The distance field is the same chamfer transform the capstone's likelihood field used — one primitive, three jobs now.
 
+### What the skirt buys, measured
+
+The cost skirt's purpose is to make the planner prefer the middle of
+corridors without forbidding the edges, and the trade it drives is
+quantifiable. On the same ten random grids as lesson 5.1, with a skirt of
+radius 6 cells and varying weight:
+
+| Skirt | Path length | Min clearance along path | Mean clearance |
+|---|---|---|---|
+| None (pure shortest path) | 144.9 | **1.00 cell** | 12.9 |
+| Weight 1 | 149.3 | 4.02 | 14.9 |
+| Weight 5 | 151.7 | 5.57 | 15.3 |
+| Weight 20 | 153.5 | 6.00 (saturated) | 15.7 |
+
+The first row is the argument for the skirt's existence: a pure shortest
+path *always* grazes obstacles at minimum clearance, because cutting every
+corner as tightly as legality allows is what "shortest" means. One cell of
+clearance is one localisation hiccup away from a collision — lesson 5.5
+quantifies exactly how close. A weight-1 skirt buys the minimum clearance up
+to 4 cells for 3% extra path; weight 5 reaches 5.6 cells for under 5%; and by
+weight 20 the path has saturated the skirt radius — it will not leave a
+6-cell tube around obstacles at any price, and further weight only distorts
+behaviour elsewhere. The knee is early and the price is small, which is why
+every production costmap ships a skirt and why its two parameters (radius and
+decay) are worth understanding rather than inheriting.
+
 ## D. From ML to robotics
 
 - **Costmaps are reward shaping**: the hard constraint is the task; the skirt is shaped preference. The failure modes transfer — shape too aggressively and the planner "reward-hacks" into weird detours; too little and behavior is technically-legal-but-alarming.

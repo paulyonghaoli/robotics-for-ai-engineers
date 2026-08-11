@@ -33,6 +33,35 @@ G(v, \omega) = \alpha \cdot \text{progress} + \beta \cdot \text{clearance} + \ga
 
 The weights are the robot's temperament, and mistuning them produces the two canonical pathologies: β too high → the robot "freezes" in doorways (clearance dominates progress); α too high → it grazes furniture at speed.
 
+### The freezing boundary, measured
+
+The most instructive DWA failure is the one where nothing is broken: every
+candidate trajectory near a doorway violates the safety margin, the
+constraint filter rejects them all, and the robot stops — the **freezing
+robot problem**. On lesson 5.6's doorway world (1.4 m gap, 0.25 m robot),
+sweeping the safety margin:
+
+| Safety margin | Final distance to goal | Outcome |
+|---|---|---|
+| 0.30 m | 0.37 m | passes through |
+| **0.45 m** | 0.37 m | passes — at the limit |
+| 0.60 m | 4.58 m | **frozen at the doorway** |
+| 0.75 m | 4.82 m | frozen |
+| 0.85 m | 4.95 m | frozen |
+
+The boundary is exactly where geometry says it must be: the doorway's
+half-gap is 0.70 m and the robot's radius is 0.25 m, so the largest clearance
+any trajectory through the door can achieve is \(0.70 - 0.25 = 0.45\) m. A
+margin of 0.45 passes by nothing; a margin of 0.60 makes the doorway
+*mathematically infeasible* and the robot parks in front of it forever,
+reporting no error, because rejecting every unsafe candidate is precisely
+what it was told to do. The freeze is not a bug in the planner — it is a
+constraint set with an empty feasible region, which is lesson 2.6's
+infeasibility failure wearing local-planner clothes, and the honest fixes are
+the same: know your tightest doorway, set the margin below what it permits,
+and have a designed answer (not a discovered one) for the day the feasible
+set is empty anyway.
+
 ## D. From ML to robotics
 
 - **DWA is a one-step policy with a hand-crafted value function** — G(v, ω) is a value estimate over an action window. Learned local planners (Module 9) replace G with a network and keep the loop; knowing DWA is knowing the baseline they must beat *and* the safety envelope they run inside.

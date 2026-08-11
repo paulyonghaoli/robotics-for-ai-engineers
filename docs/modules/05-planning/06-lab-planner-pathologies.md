@@ -31,7 +31,16 @@ A robot exploring toward a goal replans on a timer. Each plan is optimal for wha
 
 ### Case 2: the robot that won't go through the door
 
-A DWA local planner refuses a gap it fits through comfortably. The parameters look sensible in isolation. Find the one that isn't, and fix it without turning off collision safety.
+A DWA local planner refuses a gap it fits through comfortably. The parameters
+look sensible in isolation. Find the one that isn't, and fix it without
+turning off collision safety.
+
+Lesson 5.4's measured boundary is your reference: on this exact doorway the
+largest achievable clearance is half-gap minus robot radius,
+\(0.70 - 0.25 = 0.45\) m, and the sweep shows the robot passing at a margin
+of 0.45 and parking 4.6 m short at 0.60. A safety margin is a claim about
+the tightest doorway on the route, whether whoever set it meant to make that
+claim or not.
 
 <code-exercise src="plan-l6-freezing"></code-exercise>
 

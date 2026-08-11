@@ -26,6 +26,40 @@ is admissible *and* consistent (\(h(n) \le c(n, n') + h(n')\)), which lets each 
 
 One correctness subtlety our implementation enforces: **no corner cutting** — a diagonal step requires both orthogonal neighbors free, else the robot's body would clip the corner between two blocked cells (and a diagonal wall of obstacles becomes, correctly, watertight).
 
+### The heuristic sweep, measured
+
+Every claim about heuristics deserves a number, so here they all are at once,
+on ten random 100×100 obstacle grids, 8-connected, planning corner to corner:
+
+| Heuristic | Mean expansions | Mean path cost | vs optimal |
+|---|---|---|---|
+| Zero (Dijkstra) | 9,502 | 144.87 | exact |
+| Euclidean | 1,968 | 144.87 | exact |
+| Octile (tight) | 1,099 | 144.87 | exact |
+| Octile, weight 1.5 | **137** | 145.34 | +0.32% |
+| Octile, weight 3.0 | 112 | 145.30 | +0.30% |
+| Manhattan (inadmissible on 8-connected) | 114 | 145.22 | +0.24% |
+
+Read it in three passes. First, the free lunch: every admissible heuristic
+returns the *identical* optimal cost, and tightening the heuristic from
+nothing to Euclidean to octile cuts expansions 4.8× and then 8.6× — the
+heuristic is pure search-pruning with zero cost in solution quality, which is
+the theorem, observed. Second, the deliberate trade: **weighted A\*** at
+\(w = 1.5\) gives up admissibility and 0.32% of path quality to buy a
+**69× reduction** over Dijkstra and 8× over honest A\*. A third of a per cent
+of extra driving for an order of magnitude less compute is a trade almost
+every real-time system takes, which is why `w` is a first-class parameter in
+production planners rather than a bug.
+
+Third, the classic "bug": Manhattan distance on an 8-connected grid
+overestimates diagonal moves and is therefore inadmissible — and here it
+costs all of 0.24%, behaving almost exactly like weighted A\*. That is worth
+stating honestly rather than theatrically: on *random* clutter, mild
+inadmissibility is mild suboptimality. The theorem's teeth show elsewhere —
+adversarial mazes where the overestimate points the search down a long wrong
+corridor — so the correct posture is to know which regime you are in, not to
+treat admissibility as a superstition.
+
 ## D. From ML to robotics
 
 - **The heuristic is a value-function prior.** \(h\) is a hand-built lower bound on cost-to-go — a pessimist's value function. Learning \(h\) from experience is an active research thread, and the admissibility trade you feel here is exactly the optimism/soundness tension in RL exploration bonuses.

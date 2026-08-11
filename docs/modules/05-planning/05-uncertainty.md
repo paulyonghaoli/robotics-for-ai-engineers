@@ -25,6 +25,34 @@ Every planner so far pretended the state was known and actions did what they sai
 - **Determinize-and-replan is online learning's "act on current belief, update on feedback"** — regret-minimization instincts apply, including the caveat: it fails precisely when errors are *irreversible* (cliffs, one-way doors) — the cases where you must plan conservatively rather than adaptively.
 - **Information-gathering actions = active learning**: spending motion to reduce uncertainty is the label-budget trade, embodied.
 
+### What padding buys, measured
+
+The simplest way to plan under localisation uncertainty is to inflate the
+obstacles by a multiple of the position noise and plan as if certain. Here is
+what that actually buys, Monte Carlo over the lesson 5.1 grids with a
+localisation error of \(\sigma = 1.5\) cells, 200 executions per path:
+
+| Obstacle padding | Collision rate |
+|---|---|
+| none | **79.1%** |
+| 1 cell (0.7σ) | 44.6% |
+| 2 cells (1.3σ) | 20.2% |
+| 3 cells (2σ) | 5.2% |
+| 4.5 cells (3σ) | **0.6%** |
+
+The first row deserves a moment of respect: a *shortest* path executed under
+realistic noise collides four times out of five, because shortest paths graze
+obstacles by construction (lesson 5.2's first row) and any lateral error at
+the graze point is a hit. The padding rows then trace the Gaussian tail
+downward until the familiar engineering rule falls out of the data: **pad by
+3σ and the collision rate lands near half a per cent**, which is the same
+three-sigma logic as lesson 3.5's gates, applied in space instead of in
+innovation. The cost is the same as the gate's, too — padding by 3σ closes
+every gap narrower than \(2 \times 3\sigma\), so doorways start vanishing
+from the map exactly as lesson 5.4's freezing analysis predicts. Uncertainty
+does not make planning harder at the margins; it *consumes clearance*, and
+clearance is the currency every lesson in this module has been trading.
+
 ## D. Where you've already met this
 
 The capstone is a live exhibit: v1's PF drift during feature-poor stretches (a localizability problem the planner ignored), the mapped-crust inflation (uncertainty padding, ad hoc), replanning-with-hysteresis (determinize-replan with thrash control), and the collision-recovery behavior (the irreversibility hedge). This lesson is the vocabulary for decisions you already made — which is the right order to learn it.

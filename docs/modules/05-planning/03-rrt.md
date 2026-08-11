@@ -20,6 +20,54 @@ Probabilistic completeness: if a solution path exists with clearance, RRT finds 
 
 The steer step-size δ is the resolution/effort dial; segment collision checking at spacing finer than your thinnest obstacle is correctness, not style (lesson 1.5's sparse-sampling warning, now load-bearing).
 
+### The narrow passage and the goal bias, measured
+
+RRT's two famous sensitivities — narrow passages hurt, goal bias helps — both
+deserve numbers. Planning through a 4 m-thick wall pierced by a tunnel of
+varying width, 20 seeds each, 8,000-sample budget:
+
+| Tunnel width | Success | Median samples to solve |
+|---|---|---|
+| 4.0 m | 20/20 | 77 |
+| 2.0 m | 20/20 | 90 |
+| 1.0 m | 20/20 | 124 |
+| 0.5 m | 20/20 | 277 |
+| 0.25 m | 20/20 | **1,184** |
+
+Narrowing the passage 16× costs roughly 15× the samples — for this straight
+tunnel the cost scales like the inverse of the width, smoothly rather than
+catastrophically. The catastrophic version of the narrow-passage problem is
+real but needs worse geometry: long bent tunnels whose traversal requires a
+*sequence* of low-probability extensions, where the costs multiply instead of
+adding. Which regime you are in is a property of your building, and it is
+worth knowing that a doorway is an inconvenience while a duct is a wall.
+
+An honest note on experiment design: with a *thin* wall the sweep shows
+almost nothing (122 samples even at 0.5 m), because a single greedy 1 m
+extension steps clean through the gap. The pathology lives in passages longer
+than the step size — the measurement only bit once the wall became a tunnel,
+and knowing *why* the first version failed to show the effect teaches as much
+as the table.
+
+Goal bias, at a fixed 1 m tunnel:
+
+| Goal bias | Median samples |
+|---|---|
+| 0 (pure exploration) | 248 |
+| 5% | 97 |
+| 20% | 50 |
+| 50% | 27 |
+
+Half the samples aimed at the goal solves this map nine times faster than
+none. So why does every reference say 5–10%? Because this world is easy: one
+wall, one detour. Every sample spent extending toward the goal is a sample
+not spent exploring, and in a cluttered map a heavily biased RRT rams the
+same local minimum repeatedly — greed pays exactly until the world stops
+being simple, which is the ε-greedy trade from lesson 3.2's kidnapped robot,
+wearing planner clothes. The production default of 5–10% is not the optimum
+for any particular map; it is the setting that is never terrible on any of
+them.
+
 ## D. From ML to robotics
 
 - **The collision checker is a labeling oracle and RRT is active exploration** — the planner "queries where it's uncertain," and Voronoi bias is an exploration bonus you get from geometry instead of engineering it.
