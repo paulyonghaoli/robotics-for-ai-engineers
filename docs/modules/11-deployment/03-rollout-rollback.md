@@ -45,6 +45,38 @@ Two design levers beyond size:
 
 **The asymmetry that should shape your thresholds:** promoting a bad policy to 500 robots costs far more than delaying a good one by a day. Tune for power against the regressions you fear, and accept a higher false-alarm rate than you would in a web system.
 
+### How big must a canary be — measured
+
+A canary exists to catch a regression before full rollout, and its size is a
+statistical decision that usually gets made by vibes. Here is the actual
+detection power at a 5% false-alarm rate, for a fleet whose baseline succeeds
+95% of the time:
+
+| Canary episodes | Catches a 95%→85% regression | Catches 95%→90% |
+|---|---|---|
+| 20 | 35% | 13% |
+| 50 | 78% | 38% |
+| 100 | 94% | 55% |
+| 300 | 100% | 95% |
+
+The twenty-episode canary — a day of pilot traffic on a small fleet — misses
+a *ten-point* collapse two times out of three, and a five-point one almost
+seven times out of eight. It is not a safety net; it is a ritual. Reliable
+detection of a ten-point regression starts around 100 episodes, and a
+five-point regression, the size that actually ships past code review, needs
+roughly 300. This is lesson 10.1's episodes-per-claim arithmetic wearing an
+operations hat, and it sets canary duration from statistics rather than
+patience: episodes per day × days = the left column, and you read the row
+you can afford.
+
+The design consequence is the one production fleets converge on: since the
+canary that can catch small regressions is expensive in time, pair a small
+fast canary (catching disasters at 100 episodes) with the regression gate of
+lesson 10.3 running on *logged* scenarios, which replays thousands of
+episodes per hour and catches the five-point class before any robot sees the
+build. The canary then defends only against what replay cannot represent —
+which is exactly the division of labour its size makes affordable.
+
 ## D. From ML to robotics
 
 - **This is canary analysis** with a sample-rate problem. The methodology transfers; the episode budget is three or four orders of magnitude smaller, which changes what is detectable.

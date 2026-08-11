@@ -40,6 +40,39 @@ For a loop at frequency \(f\), the period is \(T = 1/f\) and the deadline-miss r
 
 For the delay's effect on stability: a loop delay \(\tau\) contributes roughly \(-\omega\tau\) radians of phase at frequency \(\omega\). A controller with 45° of phase margin at 10 rad/s loses all of it at \(\tau \approx 78\) ms. That is the arithmetic behind "latency is a stability parameter."
 
+### How stage percentiles compose — measured, and gentler than feared
+
+Allocating an end-to-end budget across stages raises a question nobody
+answers from first principles: do stage p95s add? Simulating a four-stage
+pipeline with log-normal latencies, 200,000 end-to-end samples:
+
+| Stage | Mean | p95 |
+|---|---|---|
+| Camera | 20 ms | 27.2 |
+| Perception | 45 ms | 66.9 |
+| Planning | 15 ms | 26.3 |
+| Control | 5 ms | 6.8 |
+| **Sum of stage p95s** | | **127.2 ms** |
+| **True p95 of the end-to-end sum** | | **110.1 ms** |
+| True p99 end-to-end | | 124.2 ms |
+
+Stage p95s do *not* add — they over-predict the end-to-end p95 by about 15%,
+because four independent stages rarely all have a bad tick simultaneously.
+That makes the naive rule conservative rather than dangerous, and it yields
+a genuinely useful engineering identity you can read off the last two rows:
+**budgeting each stage at p95 and summing buys you approximately the
+end-to-end p99.** Allocate that way deliberately and you get tail protection
+one grade stronger than the arithmetic appears to promise.
+
+Two caveats keep the rule honest. It leans on independence, and stages
+sharing a CPU, a memory bus or a garbage collector are *not* independent —
+correlated stalls push the true end-to-end tail back up toward the naive
+sum, which is one more reason lesson 13.2 cares about isolating the control
+path. And the comfort applies only to percentiles, never to deadlines: the
+110 ms p95 still means one cycle in twenty is slower, and what happens on
+that cycle — skip, extrapolate, or hold last command — is a design decision
+this lesson's section C insists you make explicitly rather than discover.
+
 ## D. From ML to robotics
 
 - **You already run p95/p99 dashboards.** The transfer is direct; what changes is the consequence of a breach — a dropped frame in a feedback loop is not a slow response, it is a missing correction.

@@ -21,6 +21,10 @@ matplotlib.use("Agg")
 # Keep text as text rather than converting every glyph to a path: it cuts
 # the SVGs by roughly an order of magnitude and keeps them diffable.
 matplotlib.rcParams["svg.fonttype"] = "none"
+# Deterministic SVG ids: without a fixed hashsalt matplotlib randomises
+# internal path ids on every render, so byte-identical figures diff on
+# every build and pollute commits with phantom changes.
+matplotlib.rcParams["svg.hashsalt"] = "rfae"
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 

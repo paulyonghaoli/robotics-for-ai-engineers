@@ -55,6 +55,14 @@ Three habits close out this module:
 
 And the thread running through all of Module 11: **deployment failures are rarely failures of the algorithm.** A deadline cascade, an underpowered canary, a saturated uploader, an over-conservative monitor — every one of these is a correct component in a system whose operating conditions moved. That is the same shape as the capstone's eight field notes, at fleet scale.
 
+The module's measured numbers, as calibration for incidents like these: a
+20-episode canary misses a ten-point regression 65% of the time (11.3);
+stage p95s over-predict the end-to-end p95 by ~15%, so a pipeline "over
+budget" by that much may be exactly on target (11.1); and the safety
+monitor's intervention gap grows from 0.37 m at 0.5 m/s to 1.95 m at 3 m/s
+(11.5) — so a speed limit raised by "just one metre per second" moves the
+envelope more than any software change in the release.
+
 ## F. Graded work & portfolio extension
 
 **Graded:** the four-incident shift is Module 11's synthesis, and its probes transfer to any deployed system.

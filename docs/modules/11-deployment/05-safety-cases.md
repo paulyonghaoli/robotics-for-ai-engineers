@@ -49,6 +49,32 @@ The workable structure for a learned component:
 5. **Show the system remains useful** under those mechanisms. The liveness claim.
 6. **State the residual risk** honestly, including what your evidence could not have detected (lesson 11.3's canary-power argument applies directly).
 
+### The monitor's envelope is a parabola — tabulated
+
+The braking-feasibility check that wraps this lesson's learned policy is
+four lines of physics, and its entire content fits in one table. With
+3 m/s² of honest braking authority and one 50 ms control tick of reaction:
+
+| Speed | Stopping distance | Monitor must intervene at gap ≤ |
+|---|---|---|
+| 0.5 m/s | 0.07 m | 0.37 m |
+| 1.0 | 0.22 | 0.52 |
+| 1.5 | 0.45 | 0.75 |
+| 2.0 | 0.77 | 1.07 |
+| 3.0 | **1.65** | 1.95 |
+
+The quadratic is the point: doubling speed quadruples the braking term, so
+the envelope that feels roomy at 1 m/s is consumed alarmingly fast at 3.
+Note what the table does *not* mention: the policy. The intervention
+boundary depends on speed, gap, braking authority and reaction time — all
+measurable physical quantities — and not at all on how clever, well-trained
+or recently-updated the thing being supervised is. That independence is the
+whole design: the monitor's correctness argument survives every model update
+because nothing in it refers to the model, which is lesson 0.1's
+enforce-with-something-simpler principle holding up the entire safety case.
+When someone proposes "improving" the monitor with a learned
+collision-predictor, this table is what they are proposing to give up.
+
 ## D. From ML to robotics
 
 - **This is the guardrail pattern**, and it has the same virtue and the same trap. The virtue: you constrain an unpredictable component with a predictable one. The trap: guardrails tight enough to guarantee safety often make the system useless, and nobody notices because the safety metric looks perfect.
