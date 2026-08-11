@@ -52,6 +52,37 @@ Two consequences deserve naming:
 
 **The model inherits its data's coverage.** Outside the region the logs covered, \(\hat{f}\) is extrapolating, and a planner will cheerfully seek out exactly those regions — because an inaccurate model often looks *optimistic* there. This is model exploitation, and it is the planner doing its job against a flawed objective. The standard defences are penalizing uncertainty (ensembles disagreeing) and restricting the planner to stay near the data.
 
+### Imagination decays; replanning forgives — measured
+
+This lesson's exercise learns the plant's dynamics from logged transitions
+and then plans through the learned model, and its own printed numbers carry
+the whole argument. The fitted model is close but not exact —
+\(x' = 1.753x + 1.001a\) against a true coefficient of 1.75 — and that small
+error compounds through imagined rollouts exactly as lesson 9.1's policy
+errors did: imagined-versus-real drift grows 0.09 → 0.47 → 0.72 over
+horizons of 1, 2 and 4 steps, roughly multiplying per step because the plant
+is unstable.
+
+What matters is how the *planner* spends that decaying imagination:
+
+| Planning horizon | Open-loop (execute the whole imagined plan) | Replan every step |
+|---|---|---|
+| 4 | 0.529 | 0.084 |
+| 8 | 2.123 | 0.161 |
+| 16 | **2.984** | **0.149** |
+
+Open-loop execution gets *worse* as the horizon grows — a longer plan is a
+longer stay inside a hallucination, and by horizon 16 the plan's later steps
+are optimising a trajectory that no longer resembles reality. Replanning is
+nearly flat across the same horizons, because it only ever *executes* one
+step of imagination before checking in with the world, so the model error
+never compounds beyond a single step's worth. This is lesson 2.6's
+receding-horizon argument with the model now learned rather than given, and
+it is the design rule of every working world-model system, from MPPI over
+learned dynamics to the modern dreamer lineage: **imagine far, act once,
+re-imagine.** The measured factor here — 20× better at horizon 16 — is what
+that rule is worth.
+
 ## D. From ML to robotics
 
 - **This is model-based RL**, and you have already built its planner. The only new component is the learned dynamics.

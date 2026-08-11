@@ -49,6 +49,37 @@ rather than \(J(\pi, \xi_{nominal})\). The maximizer of an expectation over a fa
 
 The complement is worth naming: **system identification narrows \(p(\xi)\)**. Every parameter you measure is one you no longer have to hedge against, which is why the two stances are partners rather than rivals.
 
+### Randomisation interpolates; it does not extrapolate — measured
+
+Domain randomisation's promise and its boundary, on this lesson's disturbed
+plant. The simulator's disturbance is randomised during training; reality
+applies a push of 1.5 that the nominal simulator lacks entirely:
+
+| Training regime | Gain it selects | Sim success | Reality success |
+|---|---|---|---|
+| Nominal sim only | k = 0.4 | 100% | **0%** |
+| Push randomised over ±0.6 | k = 0.7 | 100% | **0%** |
+| Push randomised over ±1.8 | k = 1.2 | 100% | 68% |
+
+Row two is the one that corrects the folklore. Randomisation *was* applied,
+the policy *did* become more conservative (0.4 → 0.7), and reality still
+kills it every single time — because the real push of 1.5 lies outside the
+±0.6 the training ever sampled. Randomisation teaches robustness across the
+range you randomise, and nothing beyond it; it is interpolation insurance,
+not extrapolation magic, and a range chosen by guessing is a guess wearing a
+uniform.
+
+Row three covers reality and transfers — but at 68%, not 100%, and the gap
+has a diagnosable cause worth its own sentence. The feasibility sweep shows
+every gain from 1.3 upward scoring 97–100% in reality, but training that
+*averages* success over the ±1.8 range prefers k = 1.2, which trades away
+tail robustness for performance on the easy middle. The mean-over-range
+objective optimises the wrong statistic: if reality might be the tail, train
+on the tail — optimise a low percentile of the randomised distribution, not
+its mean. Two lessons in one table: get the range right, then get the
+objective right, and note that the second failure only becomes visible after
+the first is fixed.
+
 ## D. From ML to robotics
 
 - **This is data augmentation with physics.** The exact same logic as rotating and cropping images — you augment along the axes you expect to vary — and the same failure if you augment along axes that don't matter while missing the one that does.

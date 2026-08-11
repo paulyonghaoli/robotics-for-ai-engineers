@@ -47,6 +47,37 @@ Classification over \(K\) discretized bins instead maximizes likelihood over a c
 
 The diffusion-policy formulation learns to reverse a noising process on action sequences, sampling \(a \sim p(a \mid o)\) rather than predicting a point. It costs multiple denoising steps per action, which is why inference latency is a live concern in the frontier research.
 
+### Two perfect strategies, averaged into zero — measured
+
+This lesson's obstacle world makes the mode-averaging failure exact. The
+demonstrations are bimodal at ±0.98 — every demonstrator dodged hard left or
+hard right, and both choices work:
+
+| Policy | Success |
+|---|---|
+| Commit to the left mode (−0.98) | 100% |
+| Commit to the right mode (+0.98) | 100% |
+| Each demo, on its own episode | 100% |
+| **The mean of the demos (+0.02)** | **0%** |
+
+The mean of two perfect strategies drives straight into the obstacle every
+single time, because the average of "dodge left" and "dodge right" is "don't
+dodge", an action *no demonstrator ever took*. The regression loss is
+perfectly happy — the mean minimises squared error to the data — and the
+minimiser is the one action guaranteed to fail.
+
+One more measurement closes an escape route. Conditioning on the obstacle's
+side and averaging within each side still scores **0%** (per-side means of
+−0.12 and +0.16), because the left-or-right choice in these demos is *free*,
+not determined by the context — demonstrators facing the same obstacle chose
+differently. No amount of input conditioning fixes multimodality that lives
+in the demonstrators' preferences rather than in the observable state. The
+fix has to change the *output* representation: commit to a mode (argmax over
+discretised actions), or model the distribution and sample from it, which is
+precisely the job diffusion policies and action-chunking transformers exist
+to do. When someone asks why modern imitation learning uses generative
+policy heads instead of regression, this table is the answer.
+
 ## D. From ML to robotics
 
 - **You have met this exact failure.** A regression model on bimodal targets predicting the trough is a standard cautionary tale; robotics just makes the trough a collision instead of a bad forecast.

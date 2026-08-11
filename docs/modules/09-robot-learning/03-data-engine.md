@@ -41,6 +41,34 @@ outcome_after (recovered | failed | ambiguous), operator_id
 
 **Weighting.** Interventions are rarer than demonstrations, so uniform sampling under-trains on them. Upweighting helps, but over-weighting produces a policy that behaves as though it is always in trouble. Treat the weight as a tuned hyperparameter with a held-out check, not a constant handed down.
 
+### The budget study: where a label is spent matters more than how many
+
+The data engine's core claim, priced on this lesson's push world. The expert
+costs the same per label wherever you ask it; the only choice is *which
+states* to ask about:
+
+| Label budget | Spent on expert demos only | Spent on demos + on-policy states |
+|---|---|---|
+| 100 | 0% | **100%** |
+| 300 | 0% | 100% |
+| 1,000 | **0%** | 100% |
+
+The left column is the finding worth staring at: **ten times the budget buys
+exactly nothing**, because every additional label lands in the same narrow
+band of states the expert frequents, and deployment starts outside it. The
+thousandth expert demonstration is as redundant as the hundredth; coverage,
+not quantity, is what the policy lacks, and more of the same distribution
+cannot supply it. The right column is the same expert answering questions
+about the states the *learner* actually reaches, and a hundred labels
+suffice.
+
+This is the economics behind every fleet data engine: the valuable frames are
+not the ones where the policy was confident and correct — you have millions
+of those, and the million-and-first is worthless — but the interventions,
+near-misses and novel states, which are precisely the on-policy distribution
+the left column never samples. Mining those is lesson 10.4's curation
+problem; this table is why it pays.
+
 ## D. From ML to robotics
 
 - **This is active learning with a $118/hour oracle**, and the query strategy is "wherever the policy struggled." The unusual part is that the labelling event and the failure event are the same event, so your annotation budget and your incident response are the same budget.

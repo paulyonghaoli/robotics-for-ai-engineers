@@ -51,6 +51,16 @@ Three habits generalize out of this module:
 
 The unifying idea across all of Module 9 is worth stating once more, because it is the same shape every time: **composing an imperfect function with itself makes error grow, and something has to periodically re-ground it in reality.** For a policy, that regrounding is intervention data (9.1, 9.3). For a simulator, it is randomization spanning the truth (9.4). For a world model, it is replanning from a measured state (9.5). For a benchmark, it is real hardware (9.6). Remove the regrounding and the failure is always the same, only the victim changes.
 
+And the module's measured numbers, kept as a set, because each is one clause
+of that idea with a price on it: 0.00008 of offline MSE separates a policy
+that lives forever from one that always dies (9.1); forty on-policy labels
+beat twelve hundred off-policy ones (9.1); the mean of two 100% strategies
+scores 0% (9.2); a thousand labels on the wrong distribution buy nothing
+(9.3); randomisation over ±0.6 transfers 0% to a reality at 1.5 (9.4);
+open-loop imagination at horizon 16 is twenty times worse than replanning
+(9.5); and a tokenizer that destroys precision is invisible to a success
+metric that reads 0.97 (9.6).
+
 ## F. Graded work & portfolio extension
 
 **Graded:** the four-policy clinic is this module's synthesis, and its probes transfer to any learned controller.

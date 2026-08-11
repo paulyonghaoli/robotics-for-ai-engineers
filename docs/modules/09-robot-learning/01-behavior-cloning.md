@@ -32,6 +32,40 @@ which minimizes error under the *expert's* state distribution \(d_{\pi^*}\), whi
 
 **DAgger** (Dataset Aggregation) attacks it directly: roll out the current policy, have the expert label the states *it* visited, add those to the dataset, retrain, repeat. You are deliberately collecting data from \(d_{\hat\pi}\) — the distribution that actually matters. Its cost is that the expert must remain available to label new states, which for a robot means a human on the loop, which is precisely why the data engine (lesson 9.3) is where the money goes.
 
+### The cliff under the smooth metric — measured
+
+The compounding-error argument earns its numbers on this lesson's unstable
+lane-keeping plant (open-loop gain 1.55, expert gain 0.60). Clone the expert
+imperfectly and pair each clone's *offline* score with its *closed-loop*
+fate:
+
+| Cloned gain | Offline action MSE on demos | Closed-loop pole | Survival, T=40 | T=200 | T=1000 |
+|---|---|---|---|---|---|
+| 0.60 (exact) | 0.00000 | 0.95 | 100% | 100% | 100% |
+| 0.55 | 0.00003 | 1.00 | 100% | 100% | 98% |
+| 0.50 | **0.00011** | 1.05 | 39% | **0%** | 0% |
+
+Read the two outer columns against each other. The offline metric is smooth
+and tiny everywhere — the difference between a policy that survives forever
+and one that *always* dies within 200 steps is 0.00008 of mean-squared
+action error, a number no validation curve would flag. The closed-loop
+column is a step function, and the step sits exactly where the closed-loop
+pole \(1.55 - k\) crosses 1: an 8% error in the cloned gain is invisible,
+and a 17% error is fatal, with nothing in between. Supervised metrics vary
+continuously; stability does not, and the cliff between them is where
+behaviour cloning's reputation for treachery comes from.
+
+And the fix, measured on this lesson's second world, where the expert's
+demonstrations never visit the recovery states: behaviour cloning from 1,200
+expert-state labels scores **0%** — its policy covers 30% of the state bins
+and deployment starts outside them. One round of DAgger, which rolls the
+current policy out and asks the expert to label the **40 states it actually
+visited**, takes success to **100%**. Forty on-policy labels beat twelve
+hundred off-policy ones, because they are the *right* forty: the states the
+learner reaches and the demos systematically omit. That ratio — 30:1 in
+favour of asking about where you actually are — is the entire argument for
+the data engine of lesson 9.3.
+
 ## D. From ML to robotics
 
 - **This is covariate shift you caused yourself.** You've met distribution shift as something the world does to you; here the policy generates it, every rollout, by construction.
