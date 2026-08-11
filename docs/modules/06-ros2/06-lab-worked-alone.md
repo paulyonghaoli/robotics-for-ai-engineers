@@ -62,7 +62,23 @@ Three habits close out the module.
 
 **3. Separate "is it running" from "is it right".** The middleware's diagnostics answer the first question well and the second not at all. E and F are the reminder: a node can be perfectly scheduled, perfectly connected, and wrong. The checks that catch those are yours to write — a residual, a consistency check, a comparison against a reference — and they are the same argument as [3.6](../03-estimation/06-consistency-lab.md)'s lying filter, arriving from the middleware.
 
-And the thread through Module 6: **ROS 2 does not fail loudly, because most of what it does is matching.** An unmatched endpoint, an unmatched parameter key, an unmatched name — none of these is an error condition. Each is a state the system is entitled to be in, indefinitely, and the only thing that distinguishes it from "the publisher has not started yet" is you.
+And the thread through Module 6: **ROS 2 does not fail loudly, because most
+of what it does is matching.** An unmatched endpoint, an unmatched parameter
+key, an unmatched name — none of these is an error condition. Each is a state
+the system is entitled to be in, indefinitely, and the only thing that
+distinguishes it from "the publisher has not started yet" is you.
+
+The module's measured numbers are worth carrying out as a set, because each
+is the price of one silent state: a QoS mismatch orphans the SLAM node with
+zero messages and zero errors; deepening a saturated queue from 1 to 30
+changes the drop rate by *nothing* while adding a full second of staleness;
+four executor threads leave the control timer exactly as late as one (63 ms
+worst, three periods) until a one-line group assignment takes it to zero;
+looking up "latest" instead of capture time misplaces a 5 m detection by
+32 cm at this module's ordinary 80 ms of processing; and one leading slash
+disconnects a namespaced robot without a message. None of these is exotic.
+Together they are most of a working engineer's first year of ROS incidents,
+with the diagnosis attached in advance.
 
 ## F. Graded work & portfolio extension
 

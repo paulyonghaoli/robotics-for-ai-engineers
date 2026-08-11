@@ -46,6 +46,22 @@ Note what the last row does *not* claim: the navigation still takes four seconds
 
 Note also the second row's framing. A 45 ms map fetch is not a bug. Calling it from *here* is the bug, and no amount of optimizing the map server fixes a design that cannot tolerate 45 ms.
 
+### The discovery bill, in arithmetic
+
+DDS discovery is peer-to-peer: every participant announces itself and probes
+every other, so the wiring work scales as \(N(N-1)/2\) pairs. That is
+harmless prose until you put numbers on it. Ten nodes is 45 pairs; forty
+nodes — an unremarkable robot once every driver, filter and visualiser is
+counted — is **780 pairs**, each exchanging endpoint listings for every topic
+it touches; a hundred-node fleet segment sharing one network domain is 4,950.
+This quadratic is why a robot that boots cleanly on the bench can take tens
+of seconds to "find itself" on a congested WiFi network, why multi-robot
+deployments partition `ROS_DOMAIN_ID` rather than sharing one graph, and why
+discovery servers (a return to a broker, quietly) exist for large systems.
+The graph is flat and brokerless at *data* time precisely by paying a
+quadratic bill at *discovery* time — an architectural trade, not a free
+lunch.
+
 ## D. The other budget: bandwidth
 
 The same exercise adds up what the graph actually carries:

@@ -58,6 +58,47 @@ A 30 Hz camera into a detector that takes 60 ms per frame. The detector can hand
 
 So for a stream you cannot keep up with, **the right depth is 1**: process the newest thing available and discard the backlog, because the backlog is not useful work, it is old work. Depth exists for the opposite case — a bursty producer and a subscriber that *can* keep up on average, where the queue absorbs the burst instead of losing it.
 
+### The exercise's world, resolved — and the queue-depth surprise
+
+Running the matching rules over this lesson's six endpoints produces the
+whole doctrine in one table:
+
+| Pair | Outcome |
+|---|---|
+| `lidar_driver` (best-effort) → `slam_node` (requests reliable) | **silent no-match** |
+| `lidar_driver` → `rviz` (best-effort) | connected |
+| `map_server` (transient-local) → `late_planner` | connected, late joiner receives the map |
+| `map_server` → `logger` (volatile) | connected — but no history for late joiners |
+| `controller` → `base_driver` | **silent no-match on deadline** |
+
+Two subscribers end up orphaned — the SLAM node and the base driver, which
+are precisely the two a robot cannot run without — and the system reports
+*nothing*, because an unmatched QoS pair is not an error in DDS, merely an
+absence of connection. The failure signature is a node that starts cleanly,
+subscribes successfully and receives zero messages forever, and `ros2 topic
+info -v` showing both endpoints with incompatible policies is the
+one-command diagnosis.
+
+The depth study attached to the same exercise corrects a near-universal
+instinct. A 30 Hz camera feeding a subscriber that takes 60 ms per message
+(16.7 Hz of drain) overflows any queue, and the instinct is to deepen it:
+
+| Queue depth | Processed | Dropped | Age of newest processed frame |
+|---|---|---|---|
+| 1 | 16.7 Hz | 13.3/s | 33 ms |
+| 5 | 16.7 Hz | 13.3/s | 167 ms |
+| 10 | 16.7 Hz | 13.3/s | 333 ms |
+| 30 | 16.7 Hz | 13.3/s | **1,000 ms** |
+
+Deepening the queue changed the drop rate by exactly nothing — arrival minus
+drain is 13.3/s at every depth, conservation of flow — while the *staleness*
+of what does get processed grew linearly to a full second. For a sensor
+stream, depth 1 is not a compromise; it is the correct setting, because the
+only message worth processing is the newest one. Deep queues belong to
+commands and events, where every message must be acted on and staleness is
+tolerable. "Increase the queue depth" as a fix for an overloaded subscriber
+is the single most common QoS mistake in the wild, and this table is why.
+
 ## D. From ML to robotics
 
 - **You have met this contract before**, as consumer groups, at-least-once versus at-most-once, and retention windows. `transient_local` is a compacted topic with retention 1; `best_effort` is fire-and-forget; the deadline policy is a liveness SLA.

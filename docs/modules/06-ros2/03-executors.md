@@ -50,6 +50,39 @@ Every callback is in one mutually-exclusive group unless you say otherwise, so a
 
 The fix is **both changes and neither alone**. Give the control timer its own group and it can run concurrently with the rest — but on one thread there is nothing to run concurrently *with*, so it buys nothing. Add threads without splitting the group and the group still serializes. The exercise asserts both halves, because each one on its own is a plausible fix that does nothing.
 
+### Threads change nothing; groups change everything — measured
+
+The lesson's central claim is that a multi-threaded executor so often changes
+nothing, and a discrete-event simulation of this exercise's callback set — a
+50 Hz control timer sharing a node with scan, camera, diagnostics and a slow
+45 ms map client — makes it exact. The control timer's period is 20 ms;
+here is how late its executions actually start:
+
+| Configuration | Mean delay | p95 | Worst |
+|---|---|---|---|
+| Single thread, everything in the default group | 10.0 ms | 30.0 | 63.0 |
+| **Four threads**, everything in the default group | 10.0 ms | 30.0 | **63.0** |
+| Four threads, control timer in its own group | 0.0 | 0.0 | 0.0 |
+| Four threads, everything reentrant | 0.0 | 0.0 | 0.0 |
+
+Rows one and two are *identical to the tenth of a millisecond*. Quadrupling
+the thread pool bought nothing, because every callback still lives in one
+mutually-exclusive group and the group, not the pool, is what serialises
+them: three of the four threads sit idle while the camera callback blocks
+the control timer. Worst case, the timer starts 63 ms late — three full
+control periods, which on the capstone's controller is the difference
+between tracking and weaving.
+
+Row three is the fix, and note what it costs: one line, assigning the
+control timer to its own callback group. Not more threads, not a faster
+machine, not a shorter camera callback — a declaration about what may
+overlap with what. Row four shows full reentrancy achieving the same
+latency, and it is the *wrong* fix anyway: it also permits the scan and
+camera callbacks to run concurrently with themselves, which most callback
+code touching shared state was never written to survive. The disciplined
+version is exactly row three — isolate the latency-critical callback,
+leave everything else serialised — and the simulation is why.
+
 ## D. The deadlock
 
 A callback makes a synchronous service call and waits for the response. The response can only be delivered by the executor, and the executor can only deliver it by running another callback. So:

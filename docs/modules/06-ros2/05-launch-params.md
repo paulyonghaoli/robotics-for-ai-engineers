@@ -51,6 +51,35 @@ The same holds for `kp`: the launch file sets 3.0, the YAML says 2.4, and with t
 
 **This is why the diagnostic is `ros2 param get`, not reading the YAML.** The file tells you what somebody intended; only the running node knows what it got. And `ros2 param dump` on a live node is the fastest way to find the whole class of problem at once.
 
+### One node, five sources, resolved
+
+The exercise's controller node receives values for five parameters from four
+different places, and the resolution — which the exercise makes you compute
+and the runtime performs silently — lands like this:
+
+| Parameter | Winning value | Came from |
+|---|---|---|
+| `frame_id` | `base_link` | code default (nothing overrode it) |
+| `ki` | 0.05 | YAML wildcard `/**` |
+| `lookahead` | 1.2 | YAML, node-specific `/robot1/controller` |
+| `kp` | 3.0 | launch file |
+| `max_speed` | 2.0 | command line |
+
+Each row is the *most specific, latest* source winning: defaults lose to the
+wildcard YAML, the wildcard loses to the node-specific block, YAML loses to
+launch, and launch loses to the command line. Note also what the exercise's
+resolver **ignored**: a whole YAML block addressed to `/controller` — the
+right node name in the wrong namespace — discarded without a message, which
+is the parameter system's version of QoS's silent no-match. When a parameter
+"refuses to change", the question is never whether your value is correct but
+whether the block it sits in *addresses the node that actually exists*, and
+`ros2 param describe` tells you which source won.
+
+The same run demonstrates section D's slash trap: the node publishes
+`/robot1/cmd_vel` (relative name, namespaced) while its intended consumer
+subscribes to `/cmd_vel` (absolute, immune to the namespace), and the two do
+not connect. One leading slash, one dead robot, zero error messages.
+
 ## D. One leading slash
 
 The other silent failure:
