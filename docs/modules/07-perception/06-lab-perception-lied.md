@@ -28,6 +28,8 @@ Each bug below is diagnosable in about two minutes *from the probe*, and essenti
 
 The team doubled the resolution with the same lens, so the field of view is identical and the picture is strictly better — and every range estimate halves. A factor of exactly two, arriving the same day the pixel count doubled, is not a quality problem. `fx` is a focal length expressed **in pixels**: same angle, twice as many pixels across it, twice the `fx`. The stored calibration describes a sensor that no longer exists.
 
+Lesson 7.1's table prices this exactly: 5 m reads as 2.5, 10 as 5, 20 as 10 — a perfectly consistent −50% at every range, no noise, no drift. Consistency is what lets it survive review; a lie without variance looks like a property of the world.
+
 <code-exercise src="per-l6-bug-invalid-depth"></code-exercise>
 
 This one is the most instructive, because the bug was introduced *deliberately, as a safety measure.* Missing depth defaults to "far away" so the robot will not panic about dropouts. But sixteen beams looking at a blank wall three metres ahead return no measurement — the matcher has no texture to work with — and "far away" turns *I could not see* into *I looked, and it is clear.* The robot then plans straight through the one region it had no information about.

@@ -46,6 +46,35 @@ with the intersection computed per axis as `max(0, min(hi) − max(lo))`.
 
     The danger arrives with the overlap measure production stacks actually reach for. A duplicate box nested inside a larger one also has low IoU and survives IoU-NMS as a phantom, so implementations commonly score overlap as **intersection over the smaller area** instead. That fixes nested duplicates and makes containment score 1.0 — including a pedestrian standing inside a truck's bird's-eye footprint. Now class-agnostic suppression deletes a correct detection, and the metric that notices is the one you compute at the end of the quarter.
 
+### The sparsity that pays for everything, measured
+
+The pillar encoding's whole justification is a distribution, so here it is
+on this lesson's synthetic scene — 12,900 lidar points over an 80×80 grid of
+0.25 m pillars:
+
+| Statistic | Value |
+|---|---|
+| Pillars in the grid | 6,400 |
+| Pillars containing any point | 4,305 (67%) |
+| Points per occupied pillar, median | **1** |
+| p95 | 4 |
+| Maximum | 38 |
+
+Two facts drive the architecture. First, a third of the grid is empty and
+processing it densely is pure waste, which is the argument for encoding only
+occupied pillars and scattering the results back into the BEV image — the
+sparse-to-dense trick at PointPillars' core. Second, and less advertised: the
+occupancy that does exist is savagely skewed. The *median* occupied pillar
+holds a single point while the maximum holds 38, so any fixed
+points-per-pillar budget is simultaneously too big and too small — pad the
+median pillar 32× to reach a 32-point budget, truncate the densest one. That
+skew is why the per-pillar feature net must be permutation-invariant and
+robust to padding, why nearby objects (dense pillars) and distant ones
+(single-return pillars) effectively pass through different networks, and one
+concrete reason detection quality falls with range even before resolution
+does: at distance, "a car" is a handful of pillars holding one point each,
+and no encoder conjures structure from a single return.
+
 ## D. From ML to robotics
 
 **Transfers directly:** backbone design, anchor matching, focal loss for the extreme foreground/background imbalance, and your whole intuition for detection heads.

@@ -58,6 +58,30 @@ $$
 
 Both are linear in `Z`, which is why a single frame cannot separate them. Only `ω` distinguishes the two, and `ω` is something you already log.
 
+### Sixty milliseconds of disagreement, in pixels
+
+This lesson's exercise carries a lidar sampled 60 ms before the camera —
+an ordinary offset for unsynchronised sensors — and projecting the stale
+points through the extrinsics as if simultaneous costs, at three turn rates:
+
+| Robot turn rate | Mean pixel error of naive projection |
+|---|---|
+| 0.3 rad/s (gentle arc) | 11.3 px |
+| 0.8 rad/s (ordinary corner) | **30.1 px** |
+| 1.5 rad/s (tight turn) | 56.7 px |
+
+Thirty pixels is the width of a pedestrian at mid-range: paint-by-projection
+at that error rate colours the road surface with pedestrian labels and the
+pedestrian with road. Note what the number depends on — not the offset alone
+but the offset *times the motion*, which is why the bug class is so
+treacherous: on the bench the robot is stationary, the 60 ms costs zero
+pixels, and every fusion demo looks perfect. The error budget only activates
+when the robot moves, growing linearly with angular rate, and the fix is
+lesson 6.4's, verbatim — transform each sensor's data at *its own* timestamp
+through the TF buffer, letting interpolation absorb the offset. Motion
+compensation is not a refinement of sensor fusion; below about 30 px of
+tolerable error, it is a precondition for it.
+
 ## D. From ML to robotics
 
 **What transfers:** multi-modal fusion architecture, attention across modalities, the whole late/early/mid fusion vocabulary.

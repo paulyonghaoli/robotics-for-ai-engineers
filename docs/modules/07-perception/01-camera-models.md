@@ -63,6 +63,46 @@ $$
 
 Note $r^2$: the correction is negligible at the centre and grows quadratically outward. A model that ignores distortion is *nearly perfect* in the middle of the image, which is exactly why the bug survives testing.
 
+### What the model errors cost, in pixels and metres
+
+Two calibration sins, priced. First, ignoring distortion. A cheap wide lens
+with barrel distortion of \(k_1 = -0.2\) — unremarkable for the class of
+camera robots actually carry — projected through the ideal pinhole model
+instead:
+
+| Ideal pixel position | Error from ignoring \(k_1\) |
+|---|---|
+| u = 380 (near centre) | 0.1 px |
+| u = 500 | 3.2 px |
+| u = 620 | 15.0 px |
+| u = 740 (near the edge) | **41.2 px** |
+
+The error is invisible at the image centre and forty pixels at the edge,
+growing with the *cube* of the normalised radius. This is why a detector can
+localise beautifully in the middle of the frame and be tens of pixels off at
+the border, and why "the calibration looks fine" — checked, as people check
+it, near the centre — proves nothing about the corners. Every downstream
+geometric consumer (triangulation, PnP, visual servoing) inherits whichever
+region of the image you fed it.
+
+Second, the wrong intrinsics entirely — lesson 7.6's resolution bug, priced
+here in advance. Estimating range from apparent width with an \(f_x\)
+calibrated on a 640-wide image while the pipeline now receives 1280-wide
+frames:
+
+| True range | Estimated range |
+|---|---|
+| 5 m | 2.5 m (−50%) |
+| 10 m | 5.0 m (−50%) |
+| 20 m | 10.0 m (−50%) |
+
+Every range in the system is exactly halved, at every distance, with no noise
+and no drift — a perfectly *consistent* lie, which is what makes it survive
+casual inspection. Intrinsics are per-resolution, not per-camera: resample the
+image and \(f_x, f_y, c_x, c_y\) all scale with it, and a config file that
+stores them without storing the resolution they belong to is the bug waiting
+to happen.
+
 ## D. From ML to robotics
 
 You already have the linear algebra. What is new is that these matrices have **units and physical meaning**, so an error in one is not a slightly worse fit — it is a claim about the world that is wrong in a structured way.

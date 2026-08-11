@@ -48,6 +48,37 @@ $$
 
 With $w = 0.5$ and $p = 0.99$ that is 35 iterations. RANSAC is cheap; the expensive mistake is not running enough of them and quietly accepting a bad hypothesis.
 
+### The biggest plane is a wall — measured
+
+Ground extraction sounds like a solved problem — "RANSAC the biggest plane" —
+and this lesson's corridor scene is built to break exactly that recipe. The
+scene has 2,500 floor points and 6,000 wall points, because tall walls
+subtend more of a lidar's field of view than the floor does, which is the
+ordinary indoor case rather than a contrived one. Running the standard
+recipes:
+
+| Method | Plane tilt from horizontal | Ground → obstacle | Obstacle → ground |
+|---|---|---|---|
+| Least squares over all points | 0.4° | 0.0% | 40.9% |
+| Vanilla RANSAC, biggest plane wins | **88.9° — it found a wall** | 97.2% | — |
+| RANSAC + normal gate (\|n·up\| > 0.9) | 0.54° | 0.0% | 5.2% |
+
+The middle row is the punchline: vanilla RANSAC returned a plane with 2,984
+inliers — one wall, whose 3,000 points outnumber the floor's inlier count —
+tilted 89° from horizontal, and then the 15 cm height cut classified
+essentially the entire floor as an obstacle. Nothing failed numerically;
+RANSAC answered the question it was asked, which was "biggest plane", not
+"ground". The one-line fix is a **normal gate**: reject candidate planes
+whose normal is not near vertical before counting inliers, after which the
+fit lands at half a degree and the residual 5.2% obstacle-to-ground leakage
+is almost entirely the 4.9% of obstacle points that genuinely sit below
+15 cm — the inherent floor of any height cut, not an error of the plane.
+
+Prior knowledge — the ground is roughly below you and roughly horizontal — is
+not cheating; it is the difference between the question you meant and the
+question you asked. Production ground segmenters all encode it, and now you
+know what happens on the day someone removes it.
+
 ## D. From ML to robotics
 
 **What transfers:** if you have worked with PointNet, PointPillars, VoxelNet or any sparse-convolution detector, the encoder story is exactly this — quantise, aggregate symmetrically, hand a dense tensor to a conventional network.

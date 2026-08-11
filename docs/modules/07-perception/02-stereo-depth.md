@@ -59,6 +59,35 @@ Some numbers worth carrying around, for `f = 600 px`, `B = 0.12 m`, `σ_d = 0.25
 
 At 20 m the disparity is under four pixels. There is almost nothing left to measure.
 
+### The error budget, tabulated — and what a baseline buys
+
+The formula \(\sigma_z = z^2 \sigma_d / (f_x b)\) makes its point best as a
+table. With \(f_x = 600\) and a quarter-pixel of disparity noise, three
+baselines a robot might actually carry:
+
+| Baseline | σ at 5 m | 10 m | 20 m | 40 m | Range where σ ≤ 5% of z |
+|---|---|---|---|---|---|
+| 0.12 m (compact head) | 8.7 cm | 34.7 | 139 | 556 | **14 m** |
+| 0.30 m (typical AMR) | 3.5 cm | 13.9 | 56 | 222 | 36 m |
+| 0.54 m (vehicle-width) | 1.9 cm | 7.7 | 31 | 123 | 65 m |
+
+Read the rows for the quadratic: doubling the range quadruples the error, so
+the compact head that is centimetre-accurate at 5 m carries **±5.6 m** at
+40 m — the measurement still *returns a number* out there, and the number is
+noise. Read the last column for the honest way to spec a stereo rig: decide
+the relative error your consumer tolerates, and the formula hands you the
+maximum range as \(z_{max} = 0.05 f_x b / \sigma_d\), linear in baseline.
+Wider is simply better, which is why the constraint that actually sets \(b\)
+is never optics — it is the chassis, and the calibration stability of a long
+rigid bar on a vibrating robot.
+
+The design consequence worth stating plainly: a stereo pair is a *short-range
+instrument* whose useful envelope you choose at mounting time. The far half
+of its returns should arrive at the fusion layer (lesson 3.5) with the
+covariance this table says they deserve — growing with \(z^2\) — and a
+pipeline that assigns stereo a constant \(R\) is feeding the filter fiction
+beyond a range you can now compute exactly.
+
 ## D. From ML to robotics
 
 You are used to models whose error is roughly stationary across the input distribution — a detector is about as good on one image as another. Here the error is a **known function of the output**, and that changes what you do with it.
