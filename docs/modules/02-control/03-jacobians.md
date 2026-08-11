@@ -102,6 +102,72 @@ correspondingly *best* at resisting radial loads, because a force along the
 arm produces almost no moment about either joint. This is the same reason you
 instinctively carry a heavy box with straight arms rather than bent ones.
 
+### The sweep, with numbers — and a disagreement between two measures
+
+Section G asks you to sweep \(\theta_2\) and watch three quantities tell one
+story. Here is that sweep run for this arm (\(l_1 = 1.0\), \(l_2 = 0.8\)),
+with a fourth column: the joint speed demanded to move the hand at a fixed
+1 cm/s in the *worst* direction, which is the minor axis of the ellipse.
+
+| \(\theta_2\) | \(\sigma_{min}\) | \(\det J = l_1 l_2 \sin\theta_2\) | \(\|\dot\theta\|\) for 1 cm/s, worst direction |
+|---|---|---|---|
+| 5° | 0.035 | 0.070 | **0.282 rad/s** |
+| 15° | 0.106 | 0.207 | 0.094 |
+| 30° | 0.210 | 0.400 | 0.048 |
+| 60° | 0.406 | 0.693 | 0.025 |
+| 90° | 0.573 | **0.800** | 0.018 |
+| **120°** | **0.693** | 0.693 | **0.014** |
+| 150° | 0.497 | 0.400 | 0.020 |
+| 170° | 0.169 | 0.139 | 0.059 |
+
+Two readings. The first is the expected one: between a nearly-straight arm at
+5° and a comfortable bend, the joint speed needed for the same worst-direction
+hand speed varies by a factor of **twenty**. The \(1/\sigma_{min}\) blow-up is
+not an asymptotic statement about a measure-zero configuration — it is already
+costing you an order of magnitude at 15°, which is a posture arms pass through
+constantly.
+
+The second reading is the interesting one, and it is easy to miss:
+**the two columns disagree about the best posture.** The determinant peaks at
+exactly 90°, but \(\sigma_{min}\) peaks near 120°. Both are legitimate
+manipulability measures, and they are answering different questions. The
+determinant is the *area* of the ellipse — a geometric mean of capability over
+all directions — while \(\sigma_{min}\) is the *minor axis*, the guaranteed
+speed in the single worst direction. At 90° this arm's ellipse has more area
+but is more eccentric; at 120° it is smaller and rounder. If your requirement
+is written as "at least \(v\) in *any* direction" — and question 4 shows that
+real requirements usually are — then \(\sigma_{min}\) is the measure that
+matches the contract, and optimising Yoshikawa's \(\sqrt{\det JJ^\top}\)
+instead will quietly park the arm in a posture that fails the spec in one
+direction while excelling in others. The general lesson travels well beyond
+arms: when someone says "maximise manipulability," ask which norm.
+
+### Checking a Jacobian without trusting yourself
+
+The finite-difference check from section D deserves its three lines here,
+because it is the single highest-value unit test in kinematics code:
+
+```python
+def jac_fd(fk, theta, eps=1e-6):
+    n = len(theta)
+    J = np.zeros((2, n))
+    for j in range(n):
+        d = np.zeros(n); d[j] = eps
+        J[:, j] = (fk(theta + d) - fk(theta - d)) / (2 * eps)
+    return J
+
+assert np.allclose(jacobian(theta), jac_fd(fk, theta), atol=1e-5)
+```
+
+Central differences give error \(O(\epsilon^2)\) against forward differences'
+\(O(\epsilon)\), which is why the two-sided form is worth its second function
+evaluation. Run the assert over a few dozen random configurations, not one:
+a sign error in a single trigonometric term can vanish at special angles
+(\(\sin 0 = -\sin 0\)) and a check at \(\theta = 0\) proves nothing. This is
+the same discipline as gradient-checking a hand-written backward pass, and it
+catches the same class of bug — the one that makes the system *almost* work,
+which section H already named as the worst kind.
+
 ## D. From ML to robotics
 
 The manipulability ellipsoid is principal component analysis of instantaneous

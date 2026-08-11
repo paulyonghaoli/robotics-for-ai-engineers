@@ -111,6 +111,62 @@ the step bounded near singularities where \(J\) loses rank and the undamped
 pseudoinverse would command infinite joint speed. Question 1 works through
 what it buys and what it costs.
 
+### What damping actually costs, measured
+
+Section C claimed that damping trades a little accuracy for boundedness, and
+the claim deserves numbers, because the two halves of the trade live at very
+different scales. Running damped-least-squares IK from a fixed seed toward
+targets that approach and then pass the workspace boundary at
+\(\|p\| = l_1 + l_2 = 1.8\):
+
+| Target \(\|p\|\) | \(\lambda = 0\): iters, max step | \(\lambda = 0.01\): iters, max step | \(\lambda = 0.1\): iters, max step |
+|---|---|---|---|
+| 1.2 (comfortable) | 6, 1.35 rad | 6, 1.35 rad | 7, 1.28 rad |
+| 1.79 | 7, 1.11 | 7, 1.11 | 20, 1.09 |
+| 1.7999 (at the edge) | 9, 1.11 | 15, 1.11 | 400, 1.09 — never reaches 10⁻⁶, stalls at 6×10⁻⁶ |
+| **1.85 (unreachable)** | **400 iters, max step 132 rad**, residual 2.0 | 400, max step 2.29, residual 0.5 | 400, max step 1.09, residual 0.05 |
+
+Three things fall out of that table. First, inside the workspace,
+\(\lambda = 0.01\) is essentially free — identical iteration counts and step
+sizes to the undamped solver everywhere that matters. Second, at the exact
+boundary, heavy damping shows its bias: \(\lambda = 0.1\) runs out its 400
+iterations without hitting the 10⁻⁶ tolerance, stalling at a residual of
+6×10⁻⁶, which is the ridge-regression shrinkage from question 1 made visible.
+Third, and the reason the guard exists: given an unreachable target, the
+undamped solver commands a **132-radian joint step** — twenty-one full
+revolutions, in one iteration. On hardware that is not a numerical curiosity;
+it is whatever your velocity limiter, your gearbox, or your e-stop makes of
+it. The damped solvers stall gracefully at the boundary instead, leaving a
+residual that honestly reports "this is as close as the arm reaches."
+
+The practical recipe follows: run with a small \(\lambda\) always, anneal it
+downward near convergence if the last few micrometres matter, and treat any
+residual above tolerance as the answer "unreachable," never as noise.
+
+### Which branch you get is decided by the seed, and it is close to a coin flip
+
+The elbow-up/elbow-down multimodality from section B is not a rare edge case
+that occasional bad luck exposes. Solving to the same target from 500 random
+seeds spread over the joint space:
+
+| Outcome | Count |
+|---|---|
+| Converged to branch A | 207 |
+| Converged to branch B | 259 |
+| Failed to converge | 34 |
+
+The two basins of attraction split the seed space nearly evenly, so a solver
+re-initialised arbitrarily — from zero, from the previous *task's* pose, from
+whatever happened to be in the variable — is close to a fair coin on which
+configuration you receive. That is why the warm-starting rule in section H is
+a correctness requirement rather than a performance optimisation: along a
+trajectory of nearby targets, seeding each solve from the previous solution is
+the only thing keeping consecutive waypoints on the same branch. The 7% that
+failed outright are seeds that started near the fully-folded singularity,
+where the first Jacobian is nearly rank-deficient and the damped step, kept
+deliberately small, cannot escape within the iteration budget — the same
+phenomenon as the boundary rows above, seen from the inside.
+
 ## D. From ML to robotics
 
 Numerical inverse kinematics is literally optimisation, minimising

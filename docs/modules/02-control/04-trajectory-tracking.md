@@ -92,6 +92,51 @@ return zero curvature rather than dividing by zero. And pure pursuit by itself
 never *stops*, because the steering law has no notion of arrival, so goal
 detection and a stopping controller live outside it — which is failure mode 4.
 
+### The stability boundary, measured
+
+Question 4 derives that speed-scaled lookahead holds the preview *time*
+constant, and lesson 2.7's third bug shows a fixed lookahead failing as speed
+rises. Both arguments deserve the actual boundary. The table below is the
+worst late-run cross-track error, in metres, for a robot recovering to a
+straight path from 0.5 m off, with a fixed 0.2 s actuation delay between
+command and wheels — zero means it converged, anything else means it was still
+oscillating at the end of the run.
+
+| Speed | L=0.3 | L=0.5 | L=0.9 | L=1.35 | L=2.0 |
+|---|---|---|---|---|---|
+| 0.5 m/s | 0 | 0 | 0 | 0 | 0 |
+| 1.0 | **0.75** | 0 | 0 | 0 | 0 |
+| 1.5 | 1.24 | **0.32** | 0 | 0 | 0 |
+| 2.0 | 1.94 | 1.31 | 0 | 0 | 0 |
+| 3.0 | 8.64 | 2.22 | **1.70** | 0 | 0 |
+
+Read down any column and you watch a fixed lookahead die as speed rises; read
+along the boundary between oscillation and convergence and you find it sits at
+a nearly constant **lookahead time** of \(L/v \approx 0.45\)–0.6 s. Repeating
+the v = 2.0 row at different delays pins the relationship down:
+
+| Actuation delay | Minimum stable L at 2.0 m/s | Minimum preview time |
+|---|---|---|
+| 0.1 s | 0.5 m | 0.25 s |
+| 0.2 s | 0.9 m | 0.45 s |
+| 0.4 s | 2.0 m | 1.0 s |
+
+The minimum stable preview time is roughly **2 to 2.5 times the actuation
+delay**, which turns the folk rule \(L = k v\) into a design equation: measure
+your command-to-wheels delay, multiply by 2.5, and that is the smallest \(k\)
+you may use — with corner-cutting from section H setting the ceiling from the
+other side. A rule with its validity region attached is worth far more than
+the rule alone, which is exactly the point of the portfolio task in
+section K.
+
+One confession that doubles as a warning: the first version of the script
+that produced this table showed *every* configuration unstable, including
+ones the no-delay experiment had already shown converging. The cause was
+failure mode 3 below — a global nearest-point search aliasing onto path
+points beside and behind the robot. The lesson's own bug bit the measurement
+of the lesson, and the fix was the monotonic forward search that section H
+prescribes.
+
 ## D. From ML to robotics
 
 The lookahead behaves like a discount horizon. Reacting only to the nearest

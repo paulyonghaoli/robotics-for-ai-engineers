@@ -78,6 +78,15 @@ command takes effect the robot is steering toward somewhere it has already
 been. This is lesson 2.4's speed-scaled lookahead argument arriving as a
 failure rather than as advice.
 
+Lesson 2.4's measured boundary makes the fix quantitative: stability requires
+a preview *time* of at least 2 to 2.5 times the actuation delay, so with this
+system's 0.20 s delay the smallest safe lookahead time is about 0.5 s. Check
+the recovery rule `max(0.4, 0.9·v)` against that: it holds preview time at
+0.9 s, sitting at roughly twice the measured minimum. That factor of two is
+the rule's safety margin, and now you know both the rule and the region it is
+valid in — halve the delay and the rule is conservative, double the delay and
+it fails, which is precisely what the portfolio task below asks you to map.
+
 ## D. Diagnosis drills
 
 <quiz-bank src="ctl-l7-drills"></quiz-bank>

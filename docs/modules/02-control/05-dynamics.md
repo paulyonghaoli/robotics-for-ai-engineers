@@ -124,6 +124,48 @@ one pose oscillate at another. The plant genuinely changed underneath the
 controller, and this is the concrete version of lesson 2.2's warning that
 retuning is not exorcism.
 
+### The comparison, measured
+
+Section G describes the one-plot experiment; here are its numbers, for the
+rod of section C (\(m = 2\) kg, \(l = 0.5\) m) under gains
+\(k_p = 20\), \(k_i = 15\), \(k_d = 4\), holding the horizontal worst case:
+
+| Controller | Steady-state error holding \(\theta = 0\) |
+|---|---|
+| PD only | **13.65°** of sag |
+| PID | 0.06° |
+| PD + gravity feedforward | 0.000° |
+
+The PD row is worth checking against section H of lesson 2.2, because it is
+the same arithmetic. At equilibrium the spring force must equal the gravity
+torque, so the sag solves \(k_p e = \tau_g \cos(e)\); iterating that fixed
+point gives \(e = 0.238\) rad \(= 13.66°\), and the simulation lands on
+13.65°. When a measured number and a two-line derivation agree to three
+figures, both are probably right, and this pairing — predict, then measure —
+is the habit the whole curriculum is trying to install.
+
+The steady-state column, though, understates the real difference, because the
+integral *does* eventually cancel gravity. The cost is time, paid again at
+every setpoint. Commanding the sequence 0 → 0.8 → −0.4 → 0.6 rad and timing
+each move to within 1°:
+
+| Move | PID | PD + feedforward |
+|---|---|---|
+| 1st | 2.95 s | 0.69 s |
+| 2nd | 2.87 s | 0.75 s |
+| 3rd | 3.68 s | 0.81 s |
+| 4th | 2.89 s | 0.79 s |
+
+The feedforward controller is not slightly faster; it is **four times faster
+on every single move, indefinitely**, because the integral must re-learn the
+gravity torque at each new angle — \(g(\theta)\) changed, and its lookup
+table of size one is stale — while the feedforward simply computes it. Note
+also what the PID's third move shows: the largest angle change gets the
+slowest settle, because the integral has the most re-learning to do exactly
+when the motion is largest. That correlation between demand and sluggishness
+is the signature to watch for in a system you suspect of fighting its own
+physics.
+
 ## E. Minimal implementation and practice
 
 <code-exercise src="ctl-l5-gravity"></code-exercise>

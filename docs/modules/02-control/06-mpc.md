@@ -134,6 +134,51 @@ the controller assumes, and watch re-planning quietly absorb the error. That
 is feedback through re-optimisation, demonstrated rather than asserted, and it
 is the most persuasive argument for why the discarded plan is not waste.
 
+### The experiment's numbers
+
+Running section G's sweep on the constrained cart — target at 2.3, wall at
+2.5, sampling MPC with 300 candidate sequences per step:
+
+| Horizon \(N\) | Final \(x\) | Worst \(x\) | Hit the wall? | ms per step |
+|---|---|---|---|---|
+| 3 | 2.299 | 3.078 | **yes, by 0.58 m** | 3.6 |
+| 6 | 2.299 | 3.102 | yes | 6.7 |
+| 10 | 2.297 | 2.626 | yes, barely | 10.9 |
+| **20** | 2.306 | **2.349** | no | 22.0 |
+| 30 | 2.341 | 2.350 | no | 32.4 |
+
+Every horizon eventually parks at the target — the final-\(x\) column barely
+varies — which is exactly why horizon myopia is dangerous: the *steady-state*
+behaviour looks fine on any dashboard, and the crime happens in the transient.
+The short horizons sail 0.6 m past a wall they could not yet see, because at
+cruising speed the braking manoeuvre spans more steps than their plan can
+represent, which is question 2's arithmetic playing out. The knee sits between
+\(N = 10\) and \(N = 20\), where the horizon first covers the braking
+distance; beyond it, doubling the horizon to 30 changes the worst excursion by
+one millimetre while costing half again as much compute. Horizon tuning is
+finding that knee, and the knee is at the braking distance — not at a round
+number.
+
+The model-mismatch half of the experiment sharpens the receding-horizon
+argument into something more honest than "feedback absorbs the error." With
+the model believing the cart is 30% lighter than it is, at \(N = 10\):
+
+| Strategy under 30% mass error | Final \(x\) | Worst \(x\) |
+|---|---|---|
+| Re-plan every step | **2.302** — on target | 2.836 |
+| Plan once, execute the whole sequence | 1.627 — 29% short | 1.660 |
+
+Open-loop execution inherits the model error wholesale and undershoots by
+roughly the mass ratio, while re-planning walks the cart onto the target
+anyway. But look at the worst-\(x\) column: the re-planning controller still
+overran the wall during the transient, because braking a cart that is 30%
+heavier than the model believes takes 30% longer than the plan allowed.
+**Re-optimisation recovers the objective; it cannot un-violate a constraint
+that the surprise already violated.** That asymmetry — goals are forgiving,
+constraints are not — is why production MPC carries explicit constraint
+margins or robust formulations rather than trusting feedback to absorb
+everything, and it is the sharpest version of failure mode 2 below.
+
 ## H. Failure modes
 
 **Horizon myopia** occurs when \(N\) is too short to see an approaching
