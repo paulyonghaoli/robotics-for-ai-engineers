@@ -123,17 +123,38 @@ than the transform layer. Per-sensor `*_config` matrices choose which rows of
 \(H\) each sensor contributes, and the `*_rejection_threshold` parameters are
 precisely the chi-squared gates of section C.
 
-## G. Experiment — find the gate's sweet spot
+## G. Experiment — find the gate's sweet spot, which is not where the rule says
 
-On the exercise's setup, sweep the gate threshold from two to ten standard
-deviations under two conditions: clean data, and data with five per cent
-multipath corruption. Plot RMSE against threshold for both.
+Sweep the gate threshold from two to ten standard deviations under two
+conditions — clean data, and data where five per cent of measurements carry a
+±10 multipath jump — and score RMSE for each, twenty seeds per cell:
 
-On clean data a looser gate is slightly better, because at two sigma you are
-discarding real information for no reason. On corrupted data the curve is a
-U, with the sweet spot near three sigma, and seeing both curves together is
-what turns "gate your measurements" from a rule into an engineering decision
-with a defensible setting.
+| Gate | Clean RMSE | Corrupted RMSE |
+|---|---|---|
+| 2σ | 0.458 | 0.941 |
+| 3σ | 0.418 | 0.672 |
+| 4σ | 0.411 | 0.544 |
+| **6σ** | 0.411 | **0.421** |
+| 10σ | 0.411 | 0.729 |
+| no gate | 0.411 | 0.753 |
+
+The clean column behaves as expected: tighter gates discard real information,
+and from 4σ outward the gate costs nothing. The corrupted column is a U — but
+its bottom sits at **6σ**, not at the 3σ that the χ²(0.99) convention
+suggests, and the reason repays attention. These outliers land around 9σ, so
+any gate below 8σ excludes them all; among gates that exclude them, *looser
+is better*, because after any transient displacement of the state a tight
+gate starts rejecting honest measurements too — a miniature of the death
+spiral from section H — and recovers slowly, while the 6σ gate re-accepts
+reality immediately.
+
+The general rule that falls out: the optimal gate sits **just below wherever
+your corruption actually lands**, and the χ²(0.99) ≈ 3σ convention is not
+optimal but *safe* — it is what you choose when you cannot know in advance
+whether the lies will be barely-outliers at 4σ or monsters at 9σ. If you have
+characterised the failure mode (and lesson 3.4 says you should), you can buy
+measurable accuracy by loosening toward it. One more reason gating parameters
+belong in per-sensor configuration rather than in a constant.
 
 Then kill the absolute sensor entirely partway through a run and verify that
 the covariance *grows*. That is the honest-widening check, and a fusion stack

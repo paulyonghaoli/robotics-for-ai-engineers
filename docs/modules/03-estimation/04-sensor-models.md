@@ -132,6 +132,36 @@ carrying bias states, and it also shows why the absolute fix is required:
 without it the bias is unobservable and the filter has no way to separate a
 constant rate offset from genuine slow rotation.
 
+### The experiment's numbers
+
+Running section G's comparison — the same gyroscope (\(\sigma_n = 0.01\
+\text{rad}/\sqrt{\text{s}}\), initial bias 0.01 rad/s, slowly wandering) for
+five minutes, with a compass fix every ten seconds:
+
+| Strategy | Heading error |
+|---|---|
+| Integrate the gyro raw | **+191° after 300 s**, growing linearly forever |
+| Two-state KF, bias as a state | worst error 7.8°, bounded, indefinitely |
+| — its bias estimate at the end | 0.0099 rad/s against a true 0.0109 |
+
+The raw integration is not noisy; it is *wrong in a straight line*, which is
+what a bias does under integration, and after five minutes it has lapped half
+a revolution. The two-state filter identifies the bias to within ten per cent
+— including tracking its slow wander — from nothing but occasional coarse
+compass fixes, and holds heading bounded forever after. The section C
+arithmetic predicts the crossover: at 60 s the noise random walk has
+contributed 4.4° while the bias ramp has contributed 34.4°, so the bias
+dominates by 8× within the first minute, and every second after that widens
+the gap.
+
+One subtlety the numbers reveal: the bias is **unobservable without the
+absolute fix**. Between compass updates the filter cannot distinguish a rate
+bias from a genuine slow turn — nothing in the gyro stream separates them —
+so the bias estimate only corrects when an absolute reference arrives. That
+is why the worst-case error (7.8°) is set by the compass interval, and why
+halving that interval roughly halves the bound. Bias states do not remove the
+need for absolute sensing; they let sparse absolute sensing go a long way.
+
 ## H. Failure modes
 
 **Trusting the datasheet's \(\sigma\)** ignores that the number describes some

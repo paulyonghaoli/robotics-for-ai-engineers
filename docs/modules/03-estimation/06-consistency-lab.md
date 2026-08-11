@@ -104,6 +104,25 @@ In simulation, add NEES to the picture. On hardware you have only NIS, which
 is why `robot_localization` exposes innovation monitoring as a first-class
 output and why Module 10's fleet dashboards chart it continuously.
 
+### The perfectly accurate liar
+
+One result from lesson 3.1's tuning study belongs in this lab's closing
+argument, because it is the strongest form of the accuracy-versus-honesty
+distinction. Scale a filter's \(Q\) and \(R\) by the same factor — both ×10,
+or both ×0.1 — and the Kalman gain, which depends only on their ratio, does
+not change at all. The state trajectory is *bit-identical to the tuned
+filter's*: RMSE 0.254 in all three cases. But the covariance is off by
+exactly the common factor, and the consistency statistics read it exactly —
+NIS 10.06 when both are understated, 0.10 when both are overstated, against
+an expected 1.0.
+
+So there exists a filter that no accuracy test can distinguish from a
+perfectly tuned one — same estimates, same errors, same plots — that is
+nonetheless reporting ten times too much or too little certainty to every
+consumer downstream. The only instruments that can see it are the two on this
+page. If you ever need one sentence for why consistency auditing is
+mandatory rather than nice-to-have, that is the sentence.
+
 ## F. Graded work and portfolio extension
 
 **Graded:** the localisation project's consistency stretch goal uses exactly

@@ -147,29 +147,63 @@ toggles rows of \(H\). Its per-sensor `mahalanobis_threshold` is the NIS
 gating from lesson 3.1 under a different name. When you wire up the capstone,
 this node is what your filter's role corresponds to.
 
-## G. Experiment — earn the folk rule
+## G. Experiment — interrogate the folk rule, and find it incomplete
 
-Initialise the EKF progressively further from the truth, at 0.5 m, 2 m and 5 m
-of position error plus a variant with 90° of heading error, and record both
-the convergence rate and the fraction of runs that fail outright, across fifty
-seeds each.
+The folk rule says the EKF diverges when initialised far from the truth. Run
+the experiment and something more interesting happens: initialise the
+range-bearing localiser at 2 m, 5 m, 90° of heading error, even 5 m *plus*
+180°, across fifty seeds each — and with three landmarks observed every step,
+**it recovers every single time**, to a median final error of 4 cm, even when
+\(P_0\) falsely claims centimetre confidence. The measurement geometry here is
+simply too strong: three simultaneous range-bearing pairs constrain the pose
+from three directions, the innovations are enormous, and the state gets
+dragged to the truth before the bad linearisation can do sustained damage.
 
-Small offsets are handled gracefully. Large heading error is the interesting
-case, because the linearisation points the corrections in the wrong direction
-and the filter confidently walks away from the truth, which is **divergence
-rather than noise** and looks completely different in the logs.
+So bad initialisation alone did not kill it, and overconfidence alone did not
+kill it. Now add the one ingredient every production filter has and this clean
+experiment lacked: **innovation gating**, at the standard
+\(\chi^2_2(0.99) = 9.21\) from lesson 3.5.
 
-Then hand the identical worst cases to the particle filter from lesson 3.2 and
-watch it shrug them off. That pair of plots is the EKF-versus-particle-filter
-folk rule earned from measurement rather than memorised from a lecture, and it
-is the portfolio artifact in section K.
+| Initialisation, with gating on | Failure rate (50 seeds) | Median error | Measurements rejected |
+|---|---|---|---|
+| 2 m off, honest \(P_0\) | 0/50 | 0.039 m | 1% |
+| 2 m off, confident \(P_0\) | 6/50 | 0.043 m | 43% |
+| 90° off, confident \(P_0\) | **50/50** | **5.70 m** | **93%** |
+| 2 m + 90°, confident \(P_0\) | **50/50** | 4.60 m | 91% |
+
+There is the divergence — permanent, total, and with a mechanism you can now
+name precisely. The confident \(P_0\) makes every honest measurement look like
+a 20-sigma outlier, the gate faithfully rejects 93% of them, and the filter
+dead-reckons forever inside a bubble of its own certainty. It is lesson 3.5's
+death spiral, seeded by initialisation instead of by a bump.
+
+The refined rule is worth stating carefully, because it is more useful than
+the folk version: **divergence is a conjunction.** Bad initialisation, an
+overconfident covariance, and a rejection mechanism — in this well-observed
+regime, any two of the three are survivable, and all three together are fatal
+in every seed. (With sparser measurements — one landmark, intermittent
+fixes — the linearisation itself can create wrong basins and the conjunction
+shrinks; observability buys you slack.) The practical consequences read
+straight off the table: initialise \(P\) to reflect what you actually know,
+never less; cap consecutive gate rejections; and if you must guess between an
+honest-but-wide \(P_0\) and a flattering one, the wide one costs a few
+transient updates while the flattering one can cost the mission.
+
+Then hand the 90°-with-gating case to the particle filter from lesson 3.2 and
+watch it shrug, since fifty of its four hundred hypotheses are always near
+enough to the truth to be upweighted. That pair of results — not "EKF fragile,
+PF robust," but *this specific conjunction kills the EKF and cannot kill the
+PF* — is the earned version of the folk rule, and the portfolio artifact in
+section K.
 
 ## H. Failure modes
 
-**Bad initialisation leading to divergence** is the headline, and the
-important structural point is that the EKF has no mechanism whatsoever for
-recovering from the wrong basin. Production systems bootstrap it with a global
-localiser rather than hoping.
+**Bad initialisation leading to divergence** is the headline, with section
+G's refinement: in a well-observed system it takes the conjunction of a bad
+state, an overconfident covariance and a gate, and production filters have all
+three ingredients on hand at every startup. The structural point stands — once
+inside the spiral, the EKF has no mechanism for escaping it — which is why
+production systems bootstrap with a global localiser rather than hoping.
 
 **Unwrapped angular residuals** inject a correction of roughly \(2\pi\) from a
 single bearing measurement near \(\pm\pi\), and the filter survives it badly

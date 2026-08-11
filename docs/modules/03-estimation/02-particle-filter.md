@@ -163,6 +163,53 @@ is sample impoverishment made visible, and it is worth seeing because the
 symptom is so misleading: the belief looks tight and confident precisely when
 it has stopped carrying information.
 
+### The corridor, measured
+
+Section G's three studies, run on the corridor world with ten seeds each.
+
+The particle-count sweep first, scored as mean error over the converged half
+of each run:
+
+| \(N\) | Mean error |
+|---|---|
+| 50 | **2.85 m** — fails outright |
+| 200 | 0.378 m |
+| 2000 | 0.382 m |
+
+The step from 50 to 200 is the difference between a filter that works and one
+that does not, and the step from 200 to 2000 buys *nothing* — a tenfold
+compute increase for a result identical to three decimal places. The
+diminishing returns are not gradual; they are a cliff followed by a plateau,
+and the practical question is only which side of the cliff you are on. This is
+also why AMCL's adaptive particle count is such an easy win: run at 2000 while
+the belief is spread, drop to 200 once it has collapsed, and lose nothing.
+
+The kidnapped-robot study, teleporting the true robot half the corridor away
+at step 40 and scoring the error well after:
+
+| Recovery strategy | Error after recovery window |
+|---|---|
+| Vanilla resampling | **7.77 m** — still lost, and confident |
+| 5% uniform injection | 0.27 m — recovered |
+
+The vanilla filter's 7.77 m is not noise; it is the distance to where the
+robot *used* to be. Every particle sits in the old, wrong hypothesis, the
+likelihood upweights whichever of them fit the new measurements least badly,
+and the filter settles into confident wrongness with no mechanism for
+representing "somewhere else entirely." Five per cent injection fixes it
+completely, for the ε-greedy reason from section D: recovery requires that
+candidate hypotheses exist before evidence can support them.
+
+The impoverishment study deserves an honest report rather than a dramatic
+one. Resampling every step instead of on the \(N_{eff}\) rule cut the number
+of distinct particles from 324 to 261 out of 400 — real erosion, but no
+collapse, and the reason is instructive: this filter's motion noise re-spreads
+the swarm every step, continuously restoring the diversity that resampling
+destroys. Impoverishment becomes catastrophic exactly when motion noise is
+small, which is the low-noise-odometry case where everything else about the
+filter looks healthiest. The protection and the vulnerability travel
+together.
+
 ## H. Failure modes
 
 **Sample impoverishment** follows from aggressive resampling combined with low

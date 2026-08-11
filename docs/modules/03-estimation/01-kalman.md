@@ -196,6 +196,48 @@ Those four quadrants — \(Q\) and \(R\), each over- and under-stated — are
 essentially the entire craft of filter tuning, and having generated the
 diagnostic signature of each one you will recognise them in the field.
 
+### The four quadrants, measured
+
+Here is section G's study run properly: a constant-velocity tracker, true
+noise held fixed, the filter's *assumed* \(Q\) and \(R\) scaled away from
+truth, ten seeds per cell.
+
+| Filter's assumption | RMSE | Mean NIS (expect 1.0) |
+|---|---|---|
+| Tuned | 0.254 | 1.01 |
+| \(Q\) understated ×20 | **0.423** | 1.16 |
+| \(Q\) overstated ×20 | 0.318 | 0.97 |
+| \(R\) understated ×10 | 0.295 | **9.81** |
+| \(R\) overstated ×10 | 0.345 | 0.11 |
+| **Both** understated ×10 | **0.254** | **10.06** |
+| **Both** overstated ×10 | **0.254** | **0.10** |
+
+Three findings, in increasing order of importance.
+
+First, the errors are asymmetric. Understating \(Q\) — trusting the model too
+much — costs far more accuracy than overstating it (0.423 against 0.318),
+because a filter that will not believe the state changed lags every
+manoeuvre. When forced to guess a noise parameter, guess high; the price of
+pessimism is smaller.
+
+Second, the diagnostics point at different knobs. \(Q\) errors mostly move
+RMSE while barely disturbing NIS; \(R\) errors scream in NIS while RMSE stays
+plausible. A filter with fine accuracy and NIS at 10 has a measurement-trust
+problem, not a model problem — the two statistics triangulate.
+
+Third, and the sharpest result in the module: look at the last two rows.
+Scaling **both** \(Q\) and \(R\) by the same factor leaves RMSE *identical to
+the tuned filter*, to three decimal places, because the Kalman gain depends
+only on their ratio — the state trajectory is literally the same. But the
+covariance is off by exactly the common factor, and NIS reads it exactly:
+10.06 and 0.10. Here is a filter that is **perfectly accurate and lying by a
+factor of ten about its certainty**, and no accuracy metric — no RMSE, no
+trajectory plot, no test drive — can ever detect it, because there is nothing
+wrong with the trajectory. Only a consistency statistic sees it. That is the
+whole argument of lesson 3.6 compressed into two rows of a table, and it is
+why "accuracy and honesty are different properties" is a theorem of this
+module rather than a slogan.
+
 ## H. Failure modes
 
 **Overconfidence**, from \(Q\) or \(R\) being too small, collapses the
