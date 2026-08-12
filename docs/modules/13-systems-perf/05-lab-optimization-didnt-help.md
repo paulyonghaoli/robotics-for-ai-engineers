@@ -52,7 +52,7 @@ And the one that worked touched no hardware and wrote no C++. It removed per-op 
 
 Three habits close out the module, and Course IV.
 
-**1. Compute the ceiling before starting.** Every entry in that table could have been predicted from one profile. The accelerator was 4% of the frame, so its ceiling was 4%. `undistort` was a library call, so its ceiling was the Python call overhead. Amdahl is an afternoon of arithmetic and it is the difference between a quarter of work and a week.
+**1. Compute the ceiling before starting.** Every entry in that table could have been predicted from one profile. The accelerator was 4% of the frame, so its ceiling was 4%. `undistort` was a library call, so its ceiling was the Python call overhead. Amdahl is an afternoon of arithmetic and it is the difference between a quarter of work and a week. Lesson 13.1's computed budget is the extreme case: the policy's mathematics is 51 µs of a 4,370 µs frame, so doubling the device's FLOPs has a ceiling of ~1%, while collapsing the 72 kernel launches into one CUDA graph — attacking the 99% — is worth 77×. The ceiling arithmetic ranks every optimisation before anyone writes code.
 
 **2. Optimize the metric the system is scored on.** A robot's control loop is scored on whether every frame arrives before its deadline. Mean latency is a proxy for that, throughput is not a proxy for it at all, and both of them can improve while the thing you care about gets worse. State the requirement as a maximum and a deadline, and check optimizations against that statement rather than against the dashboard.
 

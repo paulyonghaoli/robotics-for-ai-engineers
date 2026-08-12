@@ -55,7 +55,7 @@ Two of these are worth sitting with.
 
 Three habits close out the module.
 
-**1. Pin datasets by content, not by description.** A filter is not a dataset. It is a function whose output depends on the archive's state when you run it, and the archive's state changes. An immutable manifest — a list of episode ids and a content hash — costs a few lines and is the precondition for everything else here: "reproduce this result" has no meaning until "this" refers to a fixed set of bytes.
+**1. Pin datasets by content, not by description.** A filter is not a dataset. It is a function whose output depends on the archive's state when you run it, and the archive's state changes. An immutable manifest — a list of episode ids and a content hash — costs a few lines and is the precondition for everything else here: "reproduce this result" has no meaning until "this" refers to a fixed set of bytes. Lesson 12.2's ladder says how strict "fixed" must be for closed-loop replay: any nonzero difference doubles every 14 steps regardless of its size, and nine orders of magnitude of extra care buys only 425 more faithful steps. Bit-exact or a different episode; there is no third category.
 
 **2. Record the state at capture, not the state today.** The hardware table, the calibration, the config, the software version: all of them are mutable, all of them get joined against later, and all of them are wrong for historical data. Stamping the value into each record is redundant and cheap; maintaining a table with validity intervals is elegant and nobody does it correctly. Prefer the redundant version.
 

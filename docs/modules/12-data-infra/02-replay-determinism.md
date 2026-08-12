@@ -46,6 +46,39 @@ The practical consequence is that **"close enough" is not a stable category**. T
 
 **The diff that is worth building** reports the *first* step at which the runs differ, not just that they do. The first divergence points at the cause; the hundredth points at nothing.
 
+### The divergence ladder — measured
+
+How exactly does a replay diverge from the original run? Perturb this
+lesson's deterministic episode by \(\varepsilon\) at the first step and watch
+when the difference reaches lane scale (1.0):
+
+| Initial perturbation | Reaches lane scale at step | Growth rate |
+|---|---|---|
+| 10⁻¹² (one float ulp's worth) | 566 | 0.0488/step |
+| 10⁻⁹ | 424 | 0.0488/step |
+| 10⁻⁶ | 283 | 0.0488/step |
+| 10⁻³ | 141 | 0.0488/step |
+
+Two structural facts fall out. First, the growth rate is *identical in every
+row* — 0.0488 per step, a doubling every 14 steps — because the exponent is
+a property of the closed-loop system, not of the perturbation. You cannot
+make a replay diverge more slowly by being more careful; care only buys a
+longer head start. Second, that head start is logarithmically expensive:
+each **thousandfold** reduction in \(\varepsilon\) buys a constant **141
+steps** of faithful replay. Driving the initial error from a sloppy 10⁻³ all
+the way to 10⁻¹² — nine orders of magnitude, essentially the limit of double
+precision — extends fidelity from 141 steps to 566, about 21 seconds at
+50 Hz.
+
+This is why bit-exactness is the only meaningful standard for closed-loop
+replay, and why "close enough" reproduction is a category error rather than
+an engineering compromise: any nonzero difference, however produced — a
+reordered float sum, a different BLAS build, a timestamp rounded differently
+— is an \(\varepsilon\) on this ladder, and the ladder has no rung labelled
+"negligible". A replay is either bit-identical or it is a *different
+episode* that starts out looking similar, and the doubling time tells you
+exactly how long the resemblance lasts.
+
 ## D. From ML to robotics
 
 Your instincts about seeding transfer, and two habits do not.

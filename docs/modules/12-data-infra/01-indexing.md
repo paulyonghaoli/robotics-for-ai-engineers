@@ -51,6 +51,34 @@ $$
 
 If the attribute is not recorded, this is zero, and no ranking improvement moves it.
 
+### The question the schema cannot ask — measured
+
+This lesson's archive holds 1,500 episodes, and the safety team's question —
+*find every episode where the robot yielded to a pedestrian approaching from
+the left* — has exactly 122 true answers sitting in the raw logs. Here is
+what each schema can do about it:
+
+| Schema | Fields indexed | Targeted result | Raw logs scanned |
+|---|---|---|---|
+| v1 | weather, version, outcome | **nothing expressible** — nearest query returns all 1,500 | 1,500 |
+| v2 | v1 + ped_present, ped_from_left, yielded | **exactly the 122**, verified against ground truth | 122 |
+
+The v1 index is not wrong; it is *mute*. The pedestrian information exists in
+every raw log — the archive faithfully stored it — but the index can only
+answer questions phrased in the fields somebody chose to extract, and nobody
+chose these. Answering the safety question under v1 means a full scan of
+1,500 raw episode logs, which at fleet scale is a reprocessing job measured
+in days and dollars; under v2 it is an index lookup touching 122 records.
+
+The asymmetry to internalise: **storage keeps everything, but the schema
+decides what you can find**, and the questions that matter most — the safety
+inquiries, the regulator's request, the incident retrospective — are
+precisely the ones nobody anticipated at schema-design time. That is why
+lesson 12.3's migration machinery exists, why raw logs are kept even though
+they are painful to scan, and why "add it to the schema when someone asks"
+means every novel question costs one full-fleet reprocess before it costs
+anything else.
+
 ## D. From ML to robotics
 
 Standard data-engineering practice transfers wholesale — inverted indexes, columnar stores, partitioning, bucketing. Three things are specific enough to catch you:

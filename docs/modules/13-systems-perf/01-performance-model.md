@@ -53,6 +53,40 @@ Three readings, in increasing order of how much they change what you do:
 
 3. **Optimizing widens the gap, from 3.6× to 4.9×.** This is the counterintuitive one and worth sitting with: the CPU bottleneck was hurting both machines, and it was *relatively* worse on the workstation because its GPU was otherwise idle. Removing it exposes the bandwidth ratio underneath. A team that benchmarks in eager mode concludes the edge deployment is a 3.6× problem and finds out it is a 4.9× problem after the port.
 
+### The whole budget, computed — and where the frame actually goes
+
+Run this lesson's visuomotor policy (2.1 GFLOP, 80 MB of weights and
+activations, 72 kernel launches) through the performance model on both
+devices:
+
+| | Workstation A100 | Robot Orin |
+|---|---|---|
+| Arithmetic intensity vs ridge | 26 vs 201 — **memory-bound** | 26 vs 336 — memory-bound |
+| Kernel math (compute or memory, whichever binds) | 51 µs | 391 µs |
+| **Dispatch: 72 launches × per-launch overhead** | **4,320 µs** | **15,120 µs** |
+| Total, launch-per-op | 4.37 ms (229 Hz) | 15.5 ms (64 Hz) |
+| Total with CUDA graph (one launch) | 56 µs | 411 µs |
+| **Speedup from graphing alone** | **77×** | **38×** |
+
+Read the middle rows and the folklore of this module becomes arithmetic. The
+actual mathematics of the policy occupies 51 microseconds of the A100's
+frame; the *launching* of that mathematics occupies 4,320. The GPU spends
+1% of the wall-clock computing and 99% being told what to compute next, so
+**doubling the device's FLOPs changes the frame time by roughly nothing** —
+you would be doubling the throughput of the 1%. The same model explains the
+A100-to-Orin cliff without any hand-waving about "edge devices being slow":
+the Orin's dispatch overhead is 3.5× higher per launch, and 72 launches
+multiply that difference into the whole budget.
+
+It also says exactly what *does* work, in order: fuse or graph the launches
+(CUDA graphs collapse 72 dispatches into one, worth 77× here — more than any
+conceivable hardware upgrade), then shrink the *bytes* (the model is
+memory-bound, so quantisation's 4× byte reduction from lesson 13.3 is a real
+4× on the kernel time), and only then think about FLOPs at all. The
+performance model is not an approximation of profiling; on a system this
+dispatch-dominated it *is* the profile, computable before you buy the
+hardware.
+
 ## D. From ML to robotics
 
 If you come from training, most of your performance intuition was formed at large batch on a machine with 2 TB/s of bandwidth, and almost none of it transfers.

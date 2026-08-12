@@ -40,6 +40,37 @@ Almost none of it is your algorithm.
 - **Frequency and thermal scaling.** The governor drops the clock, and the identical code takes longer. Benchmark with clocks pinned or you are measuring the governor — the same warning as [13.1](01-performance-model.md).
 - **Cache and TLB.** A data structure that fits in L2 during the benchmark and not in production has a different worst case, and nothing in the code changed.
 
+### Mean versus deadline — the exercise's three traces, read properly
+
+This lesson's exercise supplies three latency traces from the same nominal
+50 Hz loop with a 10 ms deadline, and the summary statistics disagree about
+which implementation is best in exactly the way this module exists to teach:
+
+| Trace | Mean | p95 | p99 | Max | Deadline misses |
+|---|---|---|---|---|---|
+| A — allocating in the loop | **4.29 ms** | 4.60 | 4.87 | 27.7 | 12 (0.6%) |
+| B — preallocated | 6.21 ms | 6.50 | 6.62 | **6.82** | **0** |
+| C — occasionally preempted | 4.71 ms | 4.86 | 15.3 | 16.5 | 60 (3.0%) |
+
+Ranked by mean, A wins comfortably and B is the *worst* of the three. Ranked
+by the only statistic the plant cares about — did the command arrive before
+the deadline, every single time — B is the only acceptable implementation,
+because its maximum is 6.82 ms and the deadline is 10. Trace A is 45% faster
+on average and misses twelve deadlines when its allocator takes a 27 ms
+excursion; a controller that skips twelve commands is not "faster", it is
+broken twelve times.
+
+Trace C is the diagnostic subtlety: mean *and* p95 both look healthy, and
+the 3% miss rate lives entirely between p95 and p99 — a monitoring dashboard
+plotting means and p95s would show C green while one command in
+thirty-three arrives late. Real-time evaluation reads the **max and the miss
+count**, treats percentiles below p99 as decoration, and understands why B's
+uniformly *slower* loop is the correct engineering: preallocation traded
+away the fast average that nobody needed for the bounded worst case that
+everything depends on. It is the same trade as lesson 2.2's derivative
+filter and lesson 10.2's balanced suite — the useful property lives in the
+distribution's shape, not its centre.
+
 ## D. From ML to robotics
 
 - **Throughput is the wrong axis, and it is the only one most ML tooling reports.** A batch of 64 at 2000 samples/s is irrelevant to whether one inference finished in 10 ms.
