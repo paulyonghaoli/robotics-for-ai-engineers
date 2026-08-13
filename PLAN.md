@@ -2,7 +2,7 @@
 
 **Version:** 1.2 · **Date:** 2026-08-03 · **Status:** governing document — supersedes the original ChatGPT outline; update this file when scope decisions change.
 
-**Where things stand:** all four courses and the ROS 2 track are built — 14 modules, 82 lessons, 14 labs, 9 mini-projects, 117 exercises, 84 question banks, 3 capstones, 23 CI gates. Phases A–D are complete. Capstone v5 was investigated and declined on evidence (see §5d and capstone-log note 14). No phase below is outstanding; the sections are kept as the record of how the scope was decided.
+**Where things stand:** all four courses and the ROS 2 track are built — 14 modules, 82 lessons, 14 labs, 9 mini-projects, 117 exercises, 84 question banks, 3 capstones, 24 CI gates (gate 24, `mdlite`, runs the mdLite renderer's own test suite under node — ported from the llm-systems-for-data-scientists curriculum after the same code-span-vs-emphasis bug was found and fixed there). Phases A–D are complete. Capstone v5 was investigated and declined on evidence (see §5d and capstone-log note 14). No phase below is outstanding; the sections are kept as the record of how the scope was decided.
 
 ---
 

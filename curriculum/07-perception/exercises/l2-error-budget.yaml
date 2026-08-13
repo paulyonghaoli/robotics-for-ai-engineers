@@ -89,7 +89,7 @@ tests: |
   assert 0.6 < _ratio_w < 1.6, "the range-aware estimator's claimed sigma should roughly match its actual error (ratio %.2f)" % _ratio_w
   assert _ratio_c > 2.5, "the constant-sigma estimator should be measurably OVERCONFIDENT — actual error far larger than claimed (ratio %.2f). That is the bug: it is most certain exactly where the measurement is worst." % _ratio_c
 hints:
-  - "max_range: solve tolerance = Z^2*sigma_d/(fx*B) for Z. It is a square root, which is why quadrupling the baseline only doubles the useful range."
+  - "max_range: solve `tolerance = Z^2*sigma_d/(fx*B)` for Z. It is a square root, which is why quadrupling the baseline only doubles the useful range."
   - "fuse: build the per-reading sigmas first — `sigma_z(ranges, baseline)` for the range-aware case, or `np.full_like(ranges, some_constant)` for the naive one. A reasonable constant is the sigma at a mid-range value; the point is that it is one number."
   - "Weights are 1/sigma^2. The claimed sigma of the fused estimate is sqrt(1/sum(w)) — note this shrinks with more readings whether or not those readings were any good, which is precisely how the constant-sigma version talks itself into confidence it has not earned."
 solution: |

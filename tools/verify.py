@@ -24,6 +24,7 @@ GATES = [
     ("pytest", [PY, "-m", "pytest", "-q"], ROOT),
     ("content", [PY, "tools/validate_content.py"], ROOT),
     ("mkdocs", [PY, "-m", "mkdocs", "build", "--strict"], ROOT),
+    ("mdlite", [PY, "tools/gate_mdlite.py"], ROOT),
     ("audit", [PY, "tools/audit.py"], ROOT),
     ("grader:frames", [PY, "-m", "grader", "--reference", "--seed", "1"],
      ROOT / "projects" / "frame_transforms_mini"),

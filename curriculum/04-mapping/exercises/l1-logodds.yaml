@@ -76,7 +76,7 @@ tests: |
   update_ray(_m4, (2, 2), (2, 30), hit=True)   # beam exits the grid
   assert np.isfinite(_m4).all(), "out-of-grid cells must be skipped, not crash"
 hints:
-  - "cells = bresenham(*c0, *c1); for each cell but the last add L_FREE (if in bounds); last cell gets L_OCC if hit else L_FREE; then np.clip the grid in place."
+  - "`cells = bresenham(*c0, *c1)`; for each cell but the last add L_FREE (if in bounds); last cell gets L_OCC if hit else L_FREE; then np.clip the grid in place."
   - "Healing math: a cell clamped at +6.0 needs 6.0/0.4 = 15 free passes to reach 0 — without the clamp, 200 hits would need 425 passes."
 solution: |
   import numpy as np

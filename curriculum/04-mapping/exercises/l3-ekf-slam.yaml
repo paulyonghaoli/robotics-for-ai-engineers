@@ -67,7 +67,7 @@ tests: |
   assert np.sqrt(_P3[2, 2]) > 0.15, "landmark absolute uncertainty stays floored near the initial pose uncertainty (0.5^2=0.25): nothing anchors the map to the world"
 hints:
   - "predict: x[0] += 0.5; P[:2, :2] += Q_STEP. Landmark blocks untouched — statics have zero process noise."
-  - "H = np.zeros((2, 6)); H[:, :2] = -np.eye(2); H[:, 2+2*lm_id : 4+2*lm_id] = np.eye(2). Innovation: z − (x[lm_block] − x[:2])."
+  - "`H = np.zeros((2, 6))`; `H[:, :2] = -np.eye(2)`; `H[:, 2+2*lm_id : 4+2*lm_id] = np.eye(2)`. Innovation: z − (x[lm_block] − x[:2])."
   - "The last two asserts ARE the lesson: cross-landmark correction, and the unobservable global anchor."
 solution: |
   import numpy as np

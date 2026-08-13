@@ -56,7 +56,7 @@ tests: |
   assert np.std(particles) < 2.5, "the particle spread should be far tighter than the initial uniform 20 m (std %.2f)" % np.std(particles)
 hints:
   - "likelihood: `d = nearest_door_dist(particles) - z; return np.exp(-0.5 * (d / SENSOR_SIGMA)**2) + 1e-300`."
-  - "Loop body: particles += SPEED*DT + rng.normal(0, 0.05, N); weights *= likelihood(...); weights /= weights.sum(); if 1/np.sum(weights**2) < N/2: systematic resample (searchsorted on cumsum) and weights[:] = 1/N."
+  - "Loop body: `particles += SPEED*DT + rng.normal(0, 0.05, N)`; `weights *= likelihood(...)`; `weights /= weights.sum()`; if `1/np.sum(weights**2) < N/2`: systematic resample (searchsorted on cumsum) and `weights[:] = 1/N`."
   - "The belief is multimodal after the first door (three doors could explain it) — motion between doors is what disambiguates. Don't panic mid-run."
 solution: |
   import numpy as np

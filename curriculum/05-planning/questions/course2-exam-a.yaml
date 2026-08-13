@@ -133,7 +133,7 @@ questions:
         correct: true
         explanation: "Capstone field note 6. Every layer that pads for uncertainty adds its own, and the total can exceed real clearance. Audit margins end to end, not per layer."
       - text: "A* is incomplete on large grids"
-        explanation: "A* is complete on a finite grid — if it reports no path, none exists *in the grid you gave it*. The grid is the suspect."
+        explanation: "`A*` is complete on a finite grid — if it reports no path, none exists *in the grid you gave it*. The grid is the suspect."
       - text: "The goal was genuinely unreachable"
         explanation: "The robot physically fit through the gap; the representation didn't."
   - id: e13

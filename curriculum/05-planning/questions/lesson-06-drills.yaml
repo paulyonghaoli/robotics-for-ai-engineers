@@ -47,7 +47,7 @@ questions:
         correct: true
         explanation: "Capstone field note 6: an online map's walls are ~1 cell fat, and full inflation on top welded a passable pocket shut. Audit margins end-to-end, not per-layer."
       - text: "A* is incomplete"
-        explanation: "A* is complete on a finite grid — if it says no path exists, no path exists *in the grid you gave it*. The grid is the suspect."
+        explanation: "`A*` is complete on a finite grid — if it says no path exists, no path exists *in the grid you gave it*. The grid is the suspect."
       - text: "The goal is unreachable"
         explanation: "Possible, but the giveaway is that the robot has traversed this corridor before — the world didn't change, the representation did."
   - id: d5

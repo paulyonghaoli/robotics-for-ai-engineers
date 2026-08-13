@@ -60,7 +60,7 @@ tests: |
       _back = project_scan(_scan, _pose)
       assert np.allclose(_back, _wall, atol=1e-9), "projected scan must reproduce the wall; at pose %s the error is %s — check which transform composes first" % (str(_pose), np.round(np.abs(_back - _wall).max(), 3))
 hints:
-  - "Subscript-check the buggy line: se2(*MOUNT) is T_base_lidar; se2(*robot_pose) is T_map_base. Does `T_base_lidar @ T_map_base` cancel anything?"
+  - "Subscript-check the buggy line: `se2(*MOUNT)` is T_base_lidar; `se2(*robot_pose)` is T_map_base. Does `T_base_lidar @ T_map_base` cancel anything?"
   - "The correct chain is T_map_lidar = T_map_base @ T_base_lidar — robot pose first, mount second."
 solution: |
   import numpy as np

@@ -86,7 +86,7 @@ tests: |
   _same = np.linalg.norm(to_pixels(undistort(_ideal, K1, K2), K) - to_pixels(_ideal, K), axis=1)
   assert _same.max() > 5.0, "undistort appears to return its input unchanged"
 hints:
-  - "distort: compute r2 = x**2 + y**2 per row, form the scalar factor, multiply both columns by it. Keep it vectorised — `xy * factor[:, None]`."
+  - "distort: compute `r2 = x**2 + y**2` per row, form the scalar factor, multiply both columns by it. Keep it vectorised — `xy * factor[:, None]`."
   - "undistort: the trap is computing r2 once from the distorted point and reusing it. Each iteration must recompute r2 from the current estimate, or you get an approximation that is fine near the centre and wrong exactly where distortion matters."
   - "Sanity check while debugging: `undistort(distort(p)) == p` to within a small fraction of a pixel, for points at the frame corners as well as the centre."
 solution: |

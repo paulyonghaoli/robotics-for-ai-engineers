@@ -61,7 +61,7 @@ tests: |
   assert episodes_needed(0.10) == 97, "for +/-10 points: 97 episodes"
   assert episodes_needed(0.20) == 25, "for +/-20 points: 25 episodes - which is what the field typically runs"
 hints:
-  - "Wald: p = successes/n; half = z*np.sqrt(p*(1-p)/n); return (p-half, p+half). At 8/8, p(1-p) = 0, so the half-width is zero — that's the bug you're demonstrating."
+  - "Wald: `p = successes/n`; `half = z*np.sqrt(p*(1-p)/n)`; `return (p-half, p+half)`. At 8/8, p(1-p) = 0, so the half-width is zero — that's the bug you're demonstrating."
   - "Wilson: compute `denom = 1 + z**2/n`, `center = (p + z**2/(2*n)) / denom`, `half = z*np.sqrt(p*(1-p)/n + z**2/(4*n**2)) / denom`, then clip to [0,1]."
   - "episodes_needed: `int(np.ceil(p*(1-p)*(z/margin)**2))`."
 solution: |
